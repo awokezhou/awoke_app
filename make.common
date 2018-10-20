@@ -1,0 +1,18 @@
+
+ROOT_PATH := $(subst /awoke_app,/awoke_app , $(shell pwd))
+ROOT_PATH := $(word 1, $(ROOT_PATH))
+
+INC_PATH := -I$(ROOT_PATH)/include
+
+OBJ_PATH = $(ROOT_PATH)/obj
+LIB_PATH = $(ROOT_PATH)/lib
+BIN_PATH = $(ROOT_PATH)/bin
+APP_PATH = $(ROOT_PATH)/application
+
+CFLAGS += -O -Wall #-Werror -word
+
+CFLAGS += $(INC_PATH)
+
+CC = gcc
+
+export CC CFLAGS ROOT_PATH INC_PATH OBJ_PATH LIB_PATH BIN_PATH APP_PATH
