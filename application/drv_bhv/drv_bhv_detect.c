@@ -160,3 +160,31 @@ err_type bhv_detect_init(bhv_manager *manager)
 		detect_crash, manager);
 	return et_ok;
 }
+
+static void dtct_free(bhv_dtct **dtct)
+{
+	bhv_dtct *p;
+
+	if (!dtct || !*dtct)
+		return;
+
+	p = *dtct;
+
+	if (p->name)
+		mem_free(p->name);
+	
+	mem_free(p);
+	p = NULL;
+	return;
+}
+
+void bhv_detect_clean(bhv_manager *manager)
+{
+	bhv_dtct *dtct;
+	bhv_dtct *temp;
+
+	list_for_each_entry_safe(dtct, temp, &manager->dtct_list, _head) {
+		list_unlink(&dtct->_head);
+		dtct_free(&dtct);
+	}
+}

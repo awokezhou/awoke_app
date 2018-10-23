@@ -279,4 +279,29 @@ err_type bhv_calculate_init(bhv_manager *manager)
 	return et_ok;
 }
 
+static void calc_free(bhv_calc **calc)
+{
+	bhv_calc *p;
 
+	if (!calc || !*calc)
+		return;
+
+	p = *calc;
+
+	if (p->name)
+		mem_free(p->name);
+	mem_free(p);
+	p = NULL;
+	return;
+}
+
+void bhv_calculate_clean(bhv_manager *manager)
+{
+	bhv_calc *calc;
+	bhv_calc *temp;
+
+	list_for_each_entry_safe(calc, temp, &manager->calc_list, _head) {
+		list_unlink(&calc->_head);
+		calc_free(&calc);
+	}
+}

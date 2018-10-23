@@ -22,5 +22,6 @@ typedef struct _bhv_dtct {
 
 
 err_type bhv_detect(struct _bhv_manager *manager);
-
+err_type bhv_detect_init(struct _bhv_manager *manager);
+void bhv_detect_clean(bhv_manager *manager);
 #endif /* __DRV_BHV_DETECT_H__ */

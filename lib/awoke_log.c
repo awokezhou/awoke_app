@@ -8,7 +8,7 @@
 
 static int g_log_level = LOG_DBG;
 
-void inline awoke_log_level_set(int level)
+inline void awoke_log_level_set(int level)
 {
 	if (level > LOG_BUG || level < LOG_DBG)
 		return;
@@ -23,7 +23,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
     struct tm *current;
     const char *header_title;
     const char *header_color;
-    const char *white_color = ANSI_WHITE;
+    //const char *white_color = ANSI_WHITE;
     const char *reset_color = ANSI_RESET;
 
 	if (level < g_log_level)

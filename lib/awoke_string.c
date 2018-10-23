@@ -1,11 +1,9 @@
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
 
+#include "awoke_string.h"
 #include "awoke_memory.h"
 #include "awoke_macros.h"
+
+
 
 char *awoke_string_dup(const char *s)
 {

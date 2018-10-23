@@ -95,6 +95,12 @@ typedef struct _bhv_scheduler_context {
 	struct _bhv_manager *manager;
 }bhv_scheduler_context;
 
+union semun
+{
+	int val;
+	struct semid_ds *buf;
+	unsigned short *arry;
+};		
 
 
 #endif /* __DRV_BHV_CORE_H__ */

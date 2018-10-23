@@ -93,5 +93,5 @@ typedef struct _calc_head_acc {
 
 
 err_type bhv_calculate_init(struct _bhv_manager *manager);
-
+void bhv_calculate_clean(bhv_manager *manager);
 #endif /* __DRV_BHV_CALCULATE_H__ */
