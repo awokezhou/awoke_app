@@ -23,6 +23,8 @@
 #include <pthread.h>
 #include <sys/prctl.h>
 #include <sys/mman.h>
+#include <sys/sem.h>
+
 
 
 #include "awoke_type.h"
@@ -32,14 +34,7 @@
 #include "awoke_macros.h"
 #include "awoke_log.h"
 #include "awoke_vector.h"
-
-#define CALC_NULL			0x0000
-#define CALC_VEC_ACC		0x0001
-#define CALC_VEC_CORNER		0x0002
-#define CALC_ACC_ANGLE		0x0004
-#define CALC_GYR_ANGLE		0x0008
-#define CALC_GPS_ACC		0x0010
-#define CALC_GPS_CORNER		0x0020
+#include "awoke_string.h"
 
 
 #define SCHEDULER_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
@@ -51,46 +46,55 @@
 #define scheduler_sleep(tick) usleep(tick)
 
 typedef struct _bhv_param {
-	uint8_t dlevel;			/* debug level 		 */
+	int dlevel;			/* debug level 		 */
 	bool daemon;            /* run as daemon     */
-};
-typedef struct _bhv_param bhv_param;
-
+}bhv_param;
 
 typedef struct _bhv_scheduler {
 	uint32_t tick;
 #define TICK_FAST 10000
 #define TICK_NORMAL 100000
 #define TICK_SLOW 1000000	
-	void (*scheduler)(struct _bhv_manager *);
+	void (*scheduler)(void *);
 	bool loop;
-};
-typedef struct _bhv_scheduler bhv_scheduler;
+#define LOCK_KEY_ID 0x1335
+	int sem_id;
+}bhv_scheduler;
+
+typedef struct _bhv_detection {
+	bool if_crash;
+	bool if_rp_acc;
+	bool if_rp_dec;
+	bool if_brakes;
+	bool if_roll_over;
+	bool if_sudden_turn;
+}bhv_detection;
+
+typedef struct _bhv_manager {
+	struct _bhv_param *param;
+	struct _bhv_detection detection;
+	struct _bhv_scheduler scheduler;
+	awoke_list worker_list;
+	awoke_list calc_list;
+	awoke_list dtct_list;
+}bhv_manager;
+
 
 typedef struct _bhv_worker {
 	char *name;
-	err_type (*worker_handler)(struct _bhv_manager *);
+	err_type (*worker_handler) (struct _bhv_worker *, struct _bhv_manager *);
 	awoke_list _head;
 	uint32_t calc_flag;			/* worker's calculate flag 				*/
 	uint32_t tick;				
 	uint32_t tick_int;			/* scheduler interval of worker 		*/
 	uint32_t tick_val;			/* scheduler init value of worker 		*/
 	awoke_list calculate_list;
-};
-typedef struct _bhv_worker bhv_worker;
+}bhv_worker;
 
 typedef struct _bhv_scheduler_context {
 	struct _bhv_manager *manager;
-};
-typedef struct _bhv_scheduler_context bhv_scheduler_context;
+}bhv_scheduler_context;
 
-
-typedef struct _bhv_manager {
-	struct _bhv_param *param;
-	struct _bhv_scheduler scheduler;
-	awoke_list worker_list;
-};
-typedef struct _bhv_manager bhv_manager;
 
 
 #endif /* __DRV_BHV_CORE_H__ */

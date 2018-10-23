@@ -23,6 +23,8 @@ typedef enum
     et_file_mmap,
     et_sendmore,
     et_flow_pull,
+    et_sem_create,
+    et_sem_init,
 } err_type;
 
 

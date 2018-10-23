@@ -1,6 +1,13 @@
 #include <getopt.h>
 
 #include "drv_bhv_core.h"
+#include "drv_bhv_calculate.h"
+#include "drv_bhv_detect.h"
+
+
+//static struct sembuf sem_up[1] = {{0, -1, IPC_NOWAIT | SEM_UNDO}}; // set sem_up
+static struct sembuf sem_up[1] = {{0, -1, SEM_UNDO}}; // set sem_up
+static struct sembuf sem_dw[1] = {{0, +1, SEM_UNDO}}; // set sem_dn
 
 
 void bhv_help(int ex)
@@ -109,6 +116,8 @@ bhv_manager *bhv_manager_create(bhv_param *param)
 	manager->param = param;
 
 	list_init(&manager->worker_list);
+	list_init(&manager->calc_list);
+	list_init(&manager->dtct_list);
 
 	return manager;
 }
@@ -146,42 +155,93 @@ void bhv_run_daemon(bhv_manager *manager)
     return;
 }
 
-err_type acc_listener(bhv_manager *manager)
+err_type acc_listener(struct _bhv_worker *worker, struct _bhv_manager *manager)
 {
 	vector vec;
+	bhv_calc *calc;
+	
 	memset(&vec, 0x0, sizeof(vector));
-	vec.x = awoke_random_int(10, 1);
-	vec.y = awoke_random_int(11, 1);
-	vec.z = awoke_random_int(12, 1);
+	vec.x = (double)awoke_random_int(10, 1);
+	vec.x++;
+	vec.y = (double)awoke_random_int(11, 1);
+	vec.z = (double)awoke_random_int(12, 1);
+
+	log_info("%s vector(%lf %lf %lf)", worker->name, vector_print(vec));
+
+	list_for_each_entry(calc, &manager->calc_list, _head) {
+		if (worker->calc_flag & calc->mask) {
+			if (calc->calc_handler != NULL)
+				calc->calc_handler((void *)&vec, calc, manager);
+		}
+	}
 	
 	return et_ok;
 }
 
-err_type gyr_listener(bhv_manager *manager)
+err_type gyr_listener(struct _bhv_worker *worker, struct _bhv_manager *manager)
 {
-	log_info("gyr_listener");
+	vector vec;
+	bhv_calc *calc;
+	
+	memset(&vec, 0x0, sizeof(vector));
+	vec.x = awoke_random_int(10, 1);
+	vec.x++;
+	vec.y = awoke_random_int(11, 1);
+	vec.z = awoke_random_int(12, 1);
+
+	log_info("%s vector(%lf %lf %lf)", worker->name, vector_print(vec));
+
+	list_for_each_entry(calc, &manager->calc_list, _head) {
+		if (worker->calc_flag & calc->mask) {
+			if (calc->calc_handler != NULL) {
+				calc->calc_handler((void *)&vec, calc, manager);
+			}
+		}
+	}
+
 	return et_ok;
 }
 
-err_type gps_listener(bhv_manager *manager)
+err_type gps_listener(struct _bhv_worker *worker, struct _bhv_manager *manager)
 {
 	log_info("gps_listener");
 	return et_ok;
+}
+
+static inline void scheduler_lock_acquire(bhv_scheduler *p)
+{
+    if (semop(p->sem_id, sem_up, 1) == -1) {
+        log_err("lock acquire error");
+   	}
+}
+
+static inline void scheduler_lock_release(bhv_scheduler *p)
+{
+    if (semop(p->sem_id, sem_dw, 1) == -1) {
+        log_err("lock release error");
+    }
 }
 
 void timer_scheduler(void *context)
 {
 	err_type ret = et_ok;
 	bhv_scheduler_context *ctx = context;
-	bhv_manager *manager = ctx->manager;
-	bhv_scheduler *scheduler = &manager->scheduler;
-	bhv_worker *worker;
+	struct _bhv_manager *manager = ctx->manager;
+	struct _bhv_scheduler *scheduler = &manager->scheduler;
+	struct _bhv_worker *worker;
 
 	while(scheduler->loop) {
 		list_for_each_entry(worker, &manager->worker_list, _head) {
 			worker->tick--;
 			if (!worker->tick) {
-				ret = worker->worker_handler(manager);
+
+				scheduler_lock_acquire(scheduler);
+				ret = worker->worker_handler(worker, manager);
+				if (et_ok != ret) {
+					log_err("%s handle error, ret %d", worker->name, ret);
+				}
+				scheduler_lock_release(scheduler);
+
 				worker->tick = worker->tick_int;
 			}
 		}
@@ -213,17 +273,17 @@ err_type bhv_scheduler_start(bhv_manager *manager)
 	return et_ok;
 }
 
-err_type bhv_scheduler_worker_register(char *name, 
-				err_type (*worker_handler)(struct _bhv_manager *),
-				uint32_t calc_mask,
-				uint32_t tick_int,
-				uint32_t tick_val,
+err_type bhv_scheduler_worker_register(const char *name, 
+				err_type (*handler)(struct _bhv_worker *, struct _bhv_manager *),
+				int calc_mask,
+				int tick_int,
+				int tick_val,
 				bhv_manager *manager)
 {
 	bhv_worker *worker;
 	bhv_worker *new_worker;
 
-	if (!name || !worker_handler || !manager)
+	if (!name || !handler || !manager)
 		return et_param;
 
 	list_for_each_entry(worker, &manager->worker_list, _head) {
@@ -242,27 +302,70 @@ err_type bhv_scheduler_worker_register(char *name,
 	new_worker->tick = tick_val;
 	new_worker->calc_flag = calc_mask;
 	new_worker->name = awoke_string_dup(name);
-	new_worker->worker_handler = worker_handler;
+	new_worker->worker_handler = handler;
 	list_append(&new_worker->_head, &manager->worker_list);
 	return et_ok;
 }
 
+err_type scheduler_lock_init(bhv_scheduler *scheduler)
+{
+	union semun
+	{
+		int val;
+		struct semid_ds *buf;
+		unsigned short *arry;
+	};		 
+
+	int sem_id;
+	err_type ret = et_ok;
+	union semun sem_union;
+	
+	sem_id = semget(LOCK_KEY_ID, 1, 0666 | IPC_CREAT);
+	if (sem_id < 0) {
+		log_err("create lock error");
+		ret = et_sem_create;
+		goto err;
+	}
+
+	sem_union.val = 1;
+	if(semctl(sem_id, 0, SETVAL, sem_union) == -1) {
+		log_err("init lock error");
+		ret = et_sem_init;
+		goto err;
+	}
+
+	scheduler->sem_id = sem_id;
+
+	return ret;
+
+err:
+	return ret;
+}
+
 err_type bhv_scheduler_init(bhv_manager *manager)
 {
+	err_type ret = et_ok;
 	manager->scheduler.tick = TICK_SLOW;
 	manager->scheduler.scheduler = timer_scheduler;
 
-	bhv_scheduler_worker_register("acc-listener", acc_listener, 
-								  CALC_VEC_ACC|CALC_ACC_ANGLE,
-								  2, 2, manager);
+	ret = scheduler_lock_init(&manager->scheduler);
+	if (et_ok != ret)
+		return ret;
 	
-	bhv_scheduler_worker_register("gyr-listener", gyr_listener, 
-							      CALC_VEC_CORNER|CALC_GYR_ANGLE, 
-							      2, 2, manager);
+	bhv_scheduler_worker_register("[worker-acc]", acc_listener, 
+								  CALC_HEAD_ACC|CALC_ACC_ANGLE,
+								  1, 1, manager);
 	
+
+	bhv_scheduler_worker_register("[worker-gyr]", gyr_listener, 
+							      CALC_GYR_CORNER|CALC_GYR_ANGLE, 
+							      1, 1, manager);
+	
+	/*
 	bhv_scheduler_worker_register("gps-listener", gps_listener, 
 							      CALC_GPS_ACC|CALC_GPS_CORNER, 
 							      10, 10, manager);
+	*/
 
 	return bhv_scheduler_start(manager);
 }
@@ -278,6 +381,11 @@ err_type bhv_init(bhv_manager *manager)
 
 	bhv_run_daemon(manager);
 
+	ret = bhv_calculate_init(manager);
+	if (et_ok != ret) {
+		log_err("calculate init error, ret %d", ret);
+	}
+
 	ret = bhv_scheduler_init(manager);
 	if (et_ok != ret) {
 		log_err("scheduler init error, ret %d", ret);
@@ -289,8 +397,18 @@ err_type bhv_init(bhv_manager *manager)
 
 err_type bhv_main_loop(bhv_manager *manager)
 {
+
+	bhv_scheduler *sched = &manager->scheduler;
+
 	while(1) {
-		sleep(60);
+
+		sleep(1);
+
+		scheduler_lock_acquire(sched);
+		log_err("bhv_detect get lock");
+		bhv_detect(manager);
+		scheduler_lock_release(sched);
+		
 	}
 	return et_ok;
 }
@@ -301,8 +419,6 @@ int main(int argc, char *argv[])
 	bhv_param *param;
 	bhv_manager *manager;
 
-	log_set(LOG_DBG);
-
 	param = bhv_param_parse(argc, argv);
 	if (!param) {
 		log_err("param parse error, will exit...");
@@ -312,7 +428,7 @@ int main(int argc, char *argv[])
 	manager = bhv_manager_create(param);
 	if (!manager) {
 		log_err("manager create error, will exit...");
-		bhv_param_clean(param);
+		bhv_param_clean(&param);
 		EXIT(AWOKE_EXIT_FAILURE);
 	}
 

@@ -87,8 +87,8 @@ static inline void list_prepend(struct _awoke_list *new, struct _awoke_list *exi
  */
 static inline void list_unlink(struct _awoke_list *entry)
 {
-   entry->next->prev = entry->prev;
-   entry->prev->next = entry->next;
+   	entry->next->prev = entry->prev;
+   	entry->prev->next = entry->next;
 
 	entry->next = 0;
 	entry->prev = 0;

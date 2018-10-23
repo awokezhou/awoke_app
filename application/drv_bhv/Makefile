@@ -33,7 +33,7 @@ obj/%.o:%.c
 .PHONY: build
 build:$(EXEC)
 $(EXEC):$(OBJ_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) $(LIBS) 
+	$(CC) $(CFLAGS) -o $@ $^ -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) $(LIBS) -lm
 
 .PHONY: clean
 clean:

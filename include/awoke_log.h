@@ -1,6 +1,11 @@
 #ifndef __AWOKE_LOG_H__
 #define __AWOKE_LOG_H__
 
+
+inline void awoke_log_level_set(int level);
+void awoke_log(int level, const char *func, int line, const char *format, ...);
+
+
 #define LOG_BUG   0x05
 #define LOG_ERR   0x04
 #define LOG_WARN  0x03
@@ -22,5 +27,8 @@
 #define log_bug(...)        awoke_log(LOG_BUG,    __func__, __LINE__, __VA_ARGS__)
 
 #define log_set(level)		awoke_log_level_set(level)
+
+
+
 
 #endif /* __AWOKE_LOG_H__ */
