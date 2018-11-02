@@ -107,7 +107,7 @@ static inline void list_unlink(struct _awoke_list *entry)
 	container_of(ptr, type, member)
 
 #define list_entry_first(ptr, type, member) container_of((ptr)->next, type, member)
-
+#define dlist_entry_last(ptr, type, member) container_of((ptr)->prev, type, member)
 
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_entry((head)->next, typeof(*pos), member);	\
