@@ -27,9 +27,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
     const char *reset_color = ANSI_RESET;
 
 	if (level < g_log_level)
-		return;
-    
-    va_start(args, format);
+		return;    
 
     switch (level)
     {
@@ -85,11 +83,15 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
         reset_color, header_color,
         func, line, reset_color);
 
+	va_start(args, format);
     vprintf(format, args);
     va_end(args);
 
     printf("%s\n", reset_color);
     fflush(stdout);
+
+	
+	
     return;
 }
 

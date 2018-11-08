@@ -2,7 +2,7 @@
 AWOKE_PATH:=$(subst /awoke_app,/awoke_app , $(shell pwd))
 AWOKE_PATH:=$(word 1, $(AWOKE_PATH))
 
-MAKE_PART := lib
+MAKE_PART := lib application
 
 .PHONY: $(MAKE_PART)
 all: $(MAKE_PART)
