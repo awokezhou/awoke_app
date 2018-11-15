@@ -107,7 +107,7 @@ err_type vector_file_write(vector *vec)
 
 int main(int argc, char **argv)
 {
-
+	/*
 	vector vec;
 
 	vec.x = awoke_random_int(52, 35);
@@ -116,6 +116,30 @@ int main(int argc, char **argv)
 
 	vector_file_write(&vec);
 	vector_file_read(&vec);
+	*/
+
+	uint8_t state[2];
+
+	uint8_t states = 0x35;
+
+	state[0] = 0x35;
+	state[1] = 0x10;
+
+	log_debug("init");
+
+	if ((0 != state[0]&0xfe) || (0 != (state[1]&0x40)))
+	{
+		log_err("state err");
+	}
+
+	if (0 != states&0xfe)
+	{
+		log_err("states err");
+	}
+
+	log_debug("exit");
+
+	log_debug("be32 %d", sizeof(__be32));
 	
 	return 0;
 }

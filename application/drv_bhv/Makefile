@@ -1,7 +1,7 @@
 
 
 EXEC = bin/drv_bhv
-LIBS = -lawoke -lpthread
+LIBS = -lutil -lpthread
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 

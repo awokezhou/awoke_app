@@ -7,7 +7,7 @@
 
 
 
-#define RTMSG_SOCK_ADDR				"/var/local_sock_addr_rtmsg"
+#define RTMSG_SOCK_ADDR				"/var/unix_sock_addr_rtmsg"
 
 typedef enum {
 	rtmsg_associate 				= 0x13000001,
