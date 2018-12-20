@@ -142,16 +142,17 @@ static inline bool qua_sgd_need_over(quaternion *q, double accuracy)
 	double delta = 0.0;
 		
 	for (i=0; i<4; i++) {
-		delta += q->val[i];
+		if (q->val[i] < 0)
+			delta -= q->val[i];
+		else
+			delta += q->val[i];
 	} 
-
-	if (delta < 0)
-		delta = -delta;
 	
 	if (delta < accuracy)
 		return TRUE;
 	else
 		return FALSE;
+
 }
 
 
