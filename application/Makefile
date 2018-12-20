@@ -1,5 +1,5 @@
 
-MAKE_PART := drv_bhv
+MAKE_PART := message_router rtmsg_test_client rtmsg_test_server
 .PHONY: $(MAKE_PART)
 all: $(MAKE_PART)
 

@@ -14,9 +14,25 @@
 #include "awoke_memory.h"
 #include "awoke_macros.h"
 
+rtmsg_app_info app_info_array[] = 
+{
+	{app_none, 			"none", 		RA_F_NULL},
+	{app_test_client,	"test_client",	RA_F_NULL},
+	{app_test_server, 	"test_server", 	RA_F_NULL},
+};
+int app_array_size = sizeof(app_info_array)/sizeof(rtmsg_app_info);
+
+rtmsg_app_info *get_app_array()
+{
+	return app_info_array;
+}
+
+int get_app_array_size()
+{
+	return app_array_size;
+}
 
 err_type rt_message_send(int, rtmsg_header *);
-
 
 err_type rt_message_send_reply(rtmsg_handle *handle, 
 									    rtmsg_header *header,
@@ -109,7 +125,6 @@ err_type rt_message_recv(int fd, rtmsg_header **buff, uint32_t *timeout)
 	}
 
 	if (header->data_len > 0) {
-		
 		char *data;
 		uint32_t read_size = 0;
 		uint32_t rest_size = header->data_len;
@@ -156,17 +171,13 @@ err_type rt_message_init(rt_app_id rid, rtmsg_handle **msg_handle)
 	rtmsg_header header;
 	rtmsg_handle *handle;
 	err_type ret = et_ok;
-
-	struct sockaddr_un router_addr = {
-    	.sun_family = AF_UNIX,
-        .sun_path = RTMSG_SOCK_ADDR,
-    };
+	struct sockaddr_un router_addr;
 
 	handle = mem_alloc_z(sizeof(rtmsg_handle));
 	if (!handle)
 		return et_nomem;
 
-	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	fd = socket(AF_LOCAL, SOCK_STREAM, 0);
 	if (fd < 0) {
 		ret = et_sock_creat;
 		goto err;
@@ -178,6 +189,9 @@ err_type rt_message_init(rt_app_id rid, rtmsg_handle **msg_handle)
 		goto err;
 	}
 
+	router_addr.sun_family = AF_LOCAL;
+	strcpy(router_addr.sun_path, RTMSG_SOCK_ADDR);
+	
 	rc = connect(fd, 
 				 (struct sockaddr *)&router_addr,
 				 sizeof(router_addr));
@@ -186,6 +200,7 @@ err_type rt_message_init(rt_app_id rid, rtmsg_handle **msg_handle)
 		goto err;
 	}
 
+	memset(&header, 0x0, sizeof(header));
 	header.src = rid;
 	header.dst = app_message_router;
 	header.msg_type = rtmsg_associate;
@@ -250,9 +265,11 @@ err_type awoke_rtmsg_init(rt_app_id rid, rtmsg_handle **msg_handle)
 	return rt_message_init(rid, msg_handle);
 }
 
-void awoke_rtmsg_clean(rtmsg_handle **handle)
+void awoke_rtmsg_handle_clean(rtmsg_handle **handle)
 {
 	return rt_message_handle_clean(handle);
 }
+
+
 
 

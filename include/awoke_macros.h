@@ -31,6 +31,13 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+#define array_size(array) (sizeof(array)/sizeof(array[0]))
+
+#define mask_exst(mask, flag)   ((mask) & (flag))
+#define mask_push(mask, flag)   ((mask) |= (flag))
+#define mask_pull(mask, flag)	((mask) &= (~flag))
+#define mask_only(mask, flag)   (!((mask) & (~(flag))))
+
 
 #endif /* __AWOKE_MACROS_H__ */
 

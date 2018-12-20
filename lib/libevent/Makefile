@@ -3,7 +3,7 @@
 LIB_OBJ_PATH := $(LIB_PATH)/librtmsg/obj
 LIB_LIB_PATH := $(LIB_PATH)/librtmsg/lib
 
-LIB = $(LIB_LIB_PATH)/librtmsg.so
+LIB = $(LIB_LIB_PATH)/libevent.so
 LIBS = -lutil
 
 SRC_FILES = $(wildcard *.c)
@@ -39,4 +39,4 @@ install:
 
 .PHONY: clean
 clean:
-	rm $(OBJ_FILES) $(LIB) $(LIB_PATH)/librtmsg.so
+	rm $(OBJ_FILES) $(LIB) $(LIB_PATH)/libevent.so

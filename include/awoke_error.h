@@ -13,6 +13,7 @@ typedef enum
     et_sock_creat,
     et_sock_bind,
     et_sock_conn,
+    et_sock_accept,
     et_sock_listen,
     et_sock_send,
     et_sock_recv,

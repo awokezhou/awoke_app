@@ -1,6 +1,7 @@
 
-EXEC = bin/string_test
-LIBS = -lutil -lrtmsg -levent -lpthread
+
+EXEC = bin/server
+LIBS = -lutil -lrtmsg -lpthread
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 

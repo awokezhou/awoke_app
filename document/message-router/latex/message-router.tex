@@ -150,7 +150,9 @@
 
 1. 第二章对整个message route的处理流程进行描述，包括router如何初始化、进程与router的交互、router的消息转发。
 
-2. 第三章对消息格式定义以及librtmsg需要提供的公共API进行说明。
+2. 第三章对librtmsg中的主要内容进行说明，包括App信息表、公共API。
+
+2. 第四章对消息格式进行定义。
 
 \chapter{message route消息处理流程}
 
@@ -192,6 +194,8 @@ router运行时处理流程如图2.2所示。
     \caption{router运行时逻辑}
 \end{figure}
 
-
+\chapter{librtmsg}
+\section{进程ID和信息定义}
+librtmsg库中以静态数组的方式定义一个进程信息表app\_info\_array，每个进程包括一个唯一标识app\_id，一个进程名称，一个进程标志(保留)。进程标识app\_id以整形数字的形式存在。
 
 \end{document}

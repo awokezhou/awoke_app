@@ -1,3 +1,7 @@
+#ifndef __CLIENT_H__
+#define __CLIENT_H__
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -22,8 +26,15 @@
 #include <sys/sem.h>
 
 #include "awoke_rtmsg.h"
+#include "awoke_event.h"
+#include "awoke_list.h"
+#include "awoke_type.h"
+#include "awoke_error.h"
+#include "awoke_log.h"
+#include "awoke_socket.h"
+#include "awoke_macros.h"
 
-int main(int argc, char **argv)
-{
-	
-}
+
+
+
+#endif /* __CLIENT_H__ */

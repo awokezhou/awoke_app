@@ -5,14 +5,43 @@
 #include <unistd.h>
 
 #include "awoke_log.h"
+#include "awoke_type.h"
 
-static int g_log_level = LOG_DBG;
-
-inline void awoke_log_level_set(int level)
+static int sg_log_level = LOG_ERR;
+static int sg_log_mode  = LOG_SYS;
+	
+inline void log_level_set(int level)
 {
 	if (level > LOG_BUG || level < LOG_DBG)
 		return;
-	g_log_level = level;
+	sg_log_level = level;
+}
+
+static inline int log_level_get()
+{
+	return sg_log_level;
+}
+
+static bool log_level_invalid(int level)
+{
+	return (log_level_get() > level);
+}
+
+inline void log_mode_set(int mode)
+{
+	if (mode > LOG_SYS || mode < LOG_TEST)
+		return;	
+	sg_log_mode = mode;
+}
+
+static inline int log_mode_get()
+{
+	return sg_log_mode;
+}
+
+static inline bool log_mode_test()
+{
+	return (log_mode_get()==LOG_TEST);
 }
 
 void awoke_log(int level, const char *func, int line, const char *format, ...)
@@ -26,8 +55,8 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
     //const char *white_color = ANSI_WHITE;
     const char *reset_color = ANSI_RESET;
 
-	if (level < g_log_level)
-		return;    
+	if (log_level_invalid(level))
+		return;
 
     switch (level)
     {
