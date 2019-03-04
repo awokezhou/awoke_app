@@ -15,7 +15,7 @@ all: prepare compile build install
 prepare:
 	echo "-------------prepare--------------"
 	if [ ! -d ${LIB_OBJ_PATH} ];then mkdir obj;fi;
-	if [ ! -d ${LIB_LIB_PATH} ];then mkdir obj;fi;
+	if [ ! -d ${LIB_LIB_PATH} ];then mkdir lib;fi;
 
 
 .PHONY: compile

@@ -14,6 +14,10 @@
 #define vector_print(vec) \
 		vec.x, vec.y, vec.z
 
+#define vector_printp(vec) \
+		vec->x, vec->y, vec->z
+#define vector_print_int(vec) \
+		(int)(vec.x), (int)(vec.y), (int)(vec.z)
 typedef struct _vector {
 	double x;
 	double y;

@@ -31,6 +31,9 @@
 #define SOCK_DEF_PORT		8998
 #endif
 
+#define UNIX_SOCK_F_NONE		0x0000
+#define UNIX_SOCK_F_WAIT_REPLY	0x0002
+
 #define sk_map_item(ltype, family, stype, flag) {ltype, family, stype, flag}
 typedef struct _sock_map{
 	uint8_t ltype;

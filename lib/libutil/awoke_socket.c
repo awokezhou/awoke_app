@@ -162,3 +162,78 @@ int awoke_socket_server(uint8_t type, const char *addr,
 
 	return server_fd;
 }
+
+err_type awoke_unix_message_send(char *addr, char *buff, int len, int *rfd, uint32_t flag)
+{
+	int fd;
+	int rc;
+	err_type ret;
+	
+	struct sockaddr_un server_addr;
+	
+	fd = socket(AF_LOCAL, SOCK_STREAM, 0);
+	if (fd < 0) {
+		ret = et_sock_creat;
+		goto err;
+	}
+
+	rc = fcntl(fd, F_SETFD, FD_CLOEXEC);
+	if (rc < 0) {
+		ret = et_sock_set;
+		goto err;
+	}
+
+	server_addr.sun_family = AF_LOCAL;
+	strcpy(server_addr.sun_path, addr);
+
+	rc = connect(fd, 
+			 (struct sockaddr *)&server_addr,
+			 sizeof(server_addr));
+	if (rc < 0) {
+		ret = et_sock_conn;
+		goto err;
+	}
+
+	rc = write(fd, buff, len);
+	if (rc < 0) {
+		if (errno == EPIPE) {
+			return et_sock_conn;
+		} else {
+			return et_sock_send;
+		}
+	} else if (rc != len) {
+		return et_sock_send;
+	}	
+
+	if (mask_exst(flag, UNIX_SOCK_F_WAIT_REPLY)) {
+		*rfd = fd;
+	} else {
+		close(fd);
+	}
+	return et_ok;
+	
+err:
+	if (fd)
+		close(fd);
+	return ret;
+}
+
+err_type awoke_socket_recv_wait(int fd, uint32_t tm)
+{
+	int rc;
+	fd_set rfds;
+	struct timeval tv;
+
+	FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+
+	tv.tv_sec = tm/1000;
+	tv.tv_usec = (tm%1000)*1000;
+
+	rc = select(fd+1, &rfds, NULL, NULL, &tv);
+	if ((rc == 1) && (FD_ISSET(fd, &rfds)))
+		return et_ok;
+	else
+		return et_sock_recv;	
+}
+

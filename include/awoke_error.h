@@ -28,6 +28,8 @@ typedef enum
     et_flow_pull,
     et_sem_create,
     et_sem_init,
+    et_worker_mutex,
+    et_worker_condition,
 } err_type;
 
 

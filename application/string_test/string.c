@@ -34,7 +34,6 @@
 #include "awoke_socket.h"
 #include "awoke_event.h"
 
-#include "zw_quaternion.h"
 
 #define STR_ALARM_A	"43"
 #define STR_ALARM_B	"sensor_horizontal_adjust"
@@ -299,6 +298,317 @@ void list_dot(double a[][2], double *b, double *c)
 	c[1] = a[1][0]*b[0] + a[1][1]*b[1];
 }
 
+void sn_test()
+{
+	FILE *fp;
+
+	fp = fopen("mifiinfo", "r");
+	if (!fp) {
+		log_err("file not exist");
+		return;
+	}
+
+	while (!feof(fp)) {
+		char line[1024];
+		char serial_no[128];
+		fgets(line, 1024, fp);
+		if (strstr(line, "<serial_no>")) {
+			sscanf(line, "%*[^>]>%[^<]", serial_no);
+			log_debug("serial_no %s", serial_no);
+		}
+	}
+
+	fclose(fp);
+	return;
+}
+
+void snr_none(char *snr, int length)
+{
+	int i;
+	int len = 0;
+	int max_len = length;
+
+	len += snprintf(snr, max_len, "50,50");
+
+	for (i=0; i<49; i++) {
+		len += snprintf(&(snr[len]), max_len-len, ",50,50");
+	}
+
+	return;
+}
+
+void snr_none_test()
+{
+	char snr[1024] = {0x0};
+
+	snr_none(snr, 1024);
+
+	log_debug("snr : %s, size %d", snr, strlen(snr));
+
+	return;
+}
+
+typedef struct _fifo {
+	int a;
+	int b;
+	uint8_t flag;
+#define FIFO_F_NONE	0x00
+#define FIFO_F_PUSH	0x01
+#define FIFO_SIZE 	8
+}fifo;
+fifo xfifo[FIFO_SIZE];
+fifo *pfifo;
+
+#define fifo_foreach(block, size, c) 				\
+		int __i;									\
+		c = &block[0];								\
+													\
+		for (__i = 0;								\
+			__i < size;								\
+			__i++, 									\
+			c = &block[__i])						\		
+
+
+void fifo_init()
+{
+	fifo *p;
+	
+	fifo_foreach(xfifo, FIFO_SIZE, p) {
+		p->a = 0;
+		p->b = 0;
+		p->flag = FIFO_F_NONE;
+	}
+	
+	pfifo = xfifo;
+}
+
+bool fifo_full()
+{
+	return ((pfifo == &xfifo[FIFO_SIZE-1]) && (pfifo->flag == FIFO_F_PUSH));
+}
+
+bool fifo_end()
+{
+	return (pfifo == &xfifo[FIFO_SIZE-1]);
+}
+
+fifo *fifo_curr()
+{
+	return pfifo;
+}
+
+bool _fifo_curr_move()
+{
+	pfifo++;
+}
+
+bool fifo_curr_move()
+{
+	if (fifo_end()) {
+		log_debug("fifo end");
+		return FALSE;
+	}
+	else
+		_fifo_curr_move();
+	return TRUE;
+}
+
+void fifo_dump()
+{
+	fifo *p;
+	log_debug("fifo dump -------->");
+	fifo_foreach(xfifo, FIFO_SIZE, p) {
+		log_debug("a %d, b %d", p->a, p->b);
+	}
+	log_debug("fifo dump <--------\n");
+}
+
+void fifo_push(int a, int b)
+{
+	fifo *curr;
+	
+	if (fifo_full()) {
+		log_debug("fifo full");
+		fifo_init();
+	}
+
+	curr = fifo_curr();
+	curr->a = a;
+	curr->b = b;
+	curr->flag = FIFO_F_PUSH;
+	fifo_curr_move();
+	log_debug("push %d %d ok", a, b);
+}
+
+void fifo_test()
+{
+	fifo_init();
+	fifo_dump();
+	fifo_push(1, 2);
+	fifo_push(3, 4);
+	fifo_dump();
+	fifo_push(5, 6);
+	fifo_push(7, 8);
+	fifo_dump();
+	fifo_push(9, 10);
+	fifo_push(11, 12);
+	fifo_dump();
+	fifo_push(13, 14);
+	fifo_push(15, 16);
+	fifo_dump();
+	fifo_push(17, 18);
+	fifo_push(19, 20);
+	fifo_dump();
+	fifo_push(21, 22);
+	fifo_push(23, 24);
+	fifo_push(25, 26);
+	fifo_push(27, 28);
+	fifo_push(29, 30);
+	fifo_push(31, 32);
+	fifo_dump();
+	fifo_push(33, 34);
+	fifo_push(35, 36);
+	fifo_dump();
+}
+
+void int_test()
+{
+	double k = 2;
+	int a = 6;
+	int b = 10;
+	log_debug("a %d b %d", a*(1-k), b*k);
+}
+
+#define pkt_dump(data, len) do {\
+		int __i;\
+		for (__i=0; __i<len; __i++) {\
+			if (!(__i%16)) {\
+				printf("\n");\
+			}\
+			printf("0x%2x ", data[__i]);\
+		}\
+		printf("\n");\
+	}while(0)
+
+#define _pkt_push(data, p, bytes) do {\
+		memcpy(p, (char *)&data, bytes);\
+		p+= bytes;\
+	}while(0)
+#define pkt_push_byte(data, p) 		_pkt_push(data, p, 1)
+#define pkt_push_word(data, p) 		_pkt_push(data, p, 2)
+#define pkt_push_dword(data, p) 	_pkt_push(data, p, 4)
+
+#define _pkt_push_safe(data, p, bytes, end) do {\
+		if ((end - p) >= bytes)\
+			memcpy(p, (char *)&data, bytes);\
+		p+= bytes;\
+	}while(0)
+#define pkt_push_byte_safe(data, p, end) 	_pkt_push_safe(data, p, 1, end)
+#define pkt_push_word_safe(data, p, end) 	_pkt_push_safe(data, p, 2, end)
+#define pkt_push_dword_safe(data, p, end) 	_pkt_push_safe(data, p, 4, end)
+
+void pkg_test()
+{
+	uint8_t packet[12];
+
+	char *head = packet;
+	char *end = &packet[12-1];
+	char *p = head;
+
+	uint8_t type = 0x25;
+	uint16_t port = 0x8837;
+	int32_t time = 0x13324525;
+	int32_t time2 = 0x89989656;
+	int32_t time3 = 0x77657567;
+	
+	pkt_push_byte_safe(type, p ,end);
+	pkt_push_word_safe(port, p ,end);
+	pkt_push_dword_safe(time, p ,end);
+	pkt_push_dword_safe(time2, p ,end);
+	pkt_dump(packet, p-head);
+	log_debug("packet len %d", p-head);
+}
+
+static int16_t alarm_create(uint8_t status, uint8_t type)
+{
+	return (status << type);
+}
+
+void uint16_test()
+{
+	uint8_t alarm_type = alarm_create(0x1, 0x05);
+	log_debug("%d", alarm_type);
+}
+
+void pgd_test()
+{
+	#define pgd_index(addr)		((addr) >> 21)
+	
+}
+
+void sensor_threshold_set()
+{
+	uint16_t thd = 1025;
+
+	uint8_t thds;
+
+	thds = thd >> 4;
+
+	log_debug("thds %d", thds);
+}
+
+void undef_test()
+{
+	typedef struct _report {
+	#define F_ACK	0x0001
+	#define F_PUSH	0x0002
+		uint32_t flag;
+		uint8_t buf[1024];
+	#undef F_ACK
+	#undef F_PUSH
+	}report;
+
+	report rp;
+}
+
+typedef struct _test_data {
+	char *name;
+	char buff[1024];
+	int data;
+}test_data;
+
+test_data data_list[] = {
+	{"abc", {0x0}, 5},
+	{"adc", {0x0}, 5},
+};
+
+void bt_name_set_test()
+{
+	log_debug("data name %s", data_list[0].name);
+	data_list[0].data = 25;
+
+	char data[128];
+	char *line = awoke_string_dup("AT+SBTNAME=12353");
+
+	log_debug("bt_name_set_test in");
+
+	if (NULL != strstr(line, "AT+SBTNAME")) {
+		log_debug("find set command, %s", line);
+		char *dt = strtok(line, "=");
+		if (dt) {
+			char *dt = strtok(NULL, "=");
+			log_debug("data %s", dt);
+			memcpy(data, dt, strlen(dt));
+			log_debug("data %s", data);
+		} else {
+			log_err("strtok error");
+		}		
+	}
+
+	if (line)
+		free(line);
+}
+
 int main(int argc, char **argv)
 {
 	log_level(LOG_DBG);
@@ -313,6 +623,26 @@ int main(int argc, char **argv)
 	//kernel_modules_test();
 
 	//mat_transpose();
+
+	//sn_test();
+
+	//snr_none_test();
+
+	//fifo_test();
+
+	//int_test();
+
+	//pkg_test();
+
+	//uint16_test();
+
+	//pgd_test();
+
+	//sensor_threshold_set();
+
+	//undef_test();
+
+	bt_name_set_test();
 	
 	return 0;
 }
