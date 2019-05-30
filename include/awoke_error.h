@@ -30,6 +30,7 @@ typedef enum
     et_sem_init,
     et_worker_mutex,
     et_worker_condition,
+    et_aes_enc,
 } err_type;
 
 

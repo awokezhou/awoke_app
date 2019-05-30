@@ -19,9 +19,11 @@
 #define _worker_mutex_init(mutex, val) pthread_mutex_init(mutex, val)
 #define worker_mutex_lock(mutex) pthread_mutex_lock(mutex)
 #define worker_mutex_unlock(mutex) pthread_mutex_unlock(mutex)
+#define worker_mutex_destroy(mutex) pthread_mutex_destroy(mutex)
 #define _worker_cond_init(cond, val) pthread_mutex_init(cond, val)
 #define worker_condition_wait(cond, mutex) pthread_cond_wait(cond, mutex)
 #define worker_condition_notify(cond) pthread_cond_signal(cond)
+#define worker_condition_destroy(cond) pthread_cond_destroy(cond)
 
 #define worker_attr_init(attr) 	pthread_attr_init(attr)
 #define worker_attr_setdetachstate(attr, stat) 		pthread_attr_setdetachstate(attr, stat)

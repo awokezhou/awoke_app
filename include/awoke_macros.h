@@ -38,6 +38,38 @@
 #define mask_pull(mask, flag)	((mask) &= (~flag))
 #define mask_only(mask, flag)   (!((mask) & (~(flag))))
 
+#define buf_dump(buf, len) do {\
+		int __i;\
+		for (__i=0; __i<len; __i++) {\
+			if (!(__i%16) && __i>1) {\
+				printf("\n");\
+			}\
+			printf("%2x ", buf[__i]);\
+		}\
+		printf("\n");\
+	}while(0)
+
+#define _buf_push(data, p, bytes) do {\
+					memcpy(p, (uint8_t *)&data, bytes);\
+					p+= bytes;\
+				}while(0)
+#define buf_push_byte(data, p) 	_buf_push(data, p, 1)
+#define buf_push_word(data, p) 	_buf_push(data, p, 2)
+#define buf_push_dwrd(data, p) 	_buf_push(data, p, 4)
+
+#define _buf_push_safe(data, p, len, end) do {\
+		if ((end-p+1) >= len)\
+			memcpy(p, (uint8_t *)&data, len);\
+		else if ((end-p+1) == 0)\
+			memcpy(p, (uint8_t *)&data, len);\
+		p+= len;\
+	}while(0)
+#define buf_push_byte_safe(data, p, end) 		_buf_push_safe(data, p, 1, 	end)
+#define buf_push_word_safe(data, p, end) 		_buf_push_safe(data, p, 2, 	end)
+#define buf_push_dwrd_safe(data, p, end) 		_buf_push_safe(data, p, 4, 	end)
+#define buf_push_stri_safe(data, p, end, ln)	_buf_push_safe(data, p, ln, end)
+
+#define array_size(array)	((sizeof(array))/(sizeof(array[0])))
 
 #endif /* __AWOKE_MACROS_H__ */
 

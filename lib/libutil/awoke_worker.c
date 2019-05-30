@@ -86,6 +86,12 @@ void awoke_worker_destroy(awoke_worker *wk)
 	worker_join(wk->wid, &ret);
 
 	worker_attr_destroy(&wk->attr);
+
+	worker_mutex_destroy(&wk->mutex);
+
+	worker_condition_destroy(&wk->cond);
+
+	worker_clean(&wk);
 }
 
 static bool worker_should_stop(awoke_worker *wk)
@@ -95,7 +101,7 @@ static bool worker_should_stop(awoke_worker *wk)
 
 bool awoke_worker_should_stop(awoke_worker *wk)
 {
-	return (wk->_force_stop);
+	return worker_should_stop(wk);
 }
 
 static void worker_should_suspend(awoke_worker *wk)
@@ -112,14 +118,7 @@ static void worker_should_suspend(awoke_worker *wk)
 
 void awoke_worker_should_suspend(awoke_worker *wk)
 {
-	worker_mutex_lock(&wk->mutex);
-	
-	while (!wk->_running) {
-		log_debug("worker %s condition wait", wk->name);
-		worker_condition_wait(&wk->cond, &wk->mutex);
-	}
-	
-	worker_mutex_unlock(&wk->mutex);	
+	return worker_should_suspend(wk);
 }
 
 static err_type run_once(awoke_worker *wk)

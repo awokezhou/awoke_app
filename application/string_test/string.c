@@ -609,6 +609,31 @@ void bt_name_set_test()
 		free(line);
 }
 
+void timestamp_json_test()
+{
+	char buff[256];
+	time_t now;
+	long ts;
+	ts = time(&now);
+
+	sprintf(buff, "%ld", ts);
+	log_debug("buff %s, ts %ld", buff, ts);
+}
+
+void uint16_set()
+{
+	uint16_t shork = 12880;
+	uint8_t value = 0;
+
+	shork = (shork-10000);
+
+	log_debug("shork %d", shork);
+
+	
+	value = shork >> 4;
+	log_debug("value %d", value);	
+}
+
 int main(int argc, char **argv)
 {
 	log_level(LOG_DBG);
@@ -642,7 +667,11 @@ int main(int argc, char **argv)
 
 	//undef_test();
 
-	bt_name_set_test();
+	//bt_name_set_test();
+
+	//timestamp_json_test();
+
+	uint16_set();
 	
 	return 0;
 }
