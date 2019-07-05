@@ -1,9 +1,3 @@
-//This code is based on tiny-aes from https://github.com/kokke/tiny-AES128-C/
-// Modified by Shi Jie and Fang Chengfang
-
-#include <stdint.h>
-#include <string.h> // CBC mode, for memset
-//#include "aes_test.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -28,35 +22,10 @@
 #include <sys/mman.h>
 #include <sys/sem.h>
 
-
-#include "awoke_type.h"
-#include "awoke_error.h"
-#include "awoke_memory.h"
-#include "awoke_list.h"
-#include "awoke_macros.h"
-#include "awoke_log.h"
-#include "awoke_vector.h"
-#include "awoke_string.h"
-#include "awoke_package.h"
-
 #include "sec_aes.h"
-
-/*
-#define MBEDTLS_AES_ENCRYPT     1
-#define MBEDTLS_AES_DECRYPT     0
-
-#define MBEDTLS_ERR_AES_INVALID_KEY_LENGTH                -0x0020
-#define MBEDTLS_ERR_AES_INVALID_INPUT_LENGTH              -0x0022
+#include "sec_padding.h"
 
 
-typedef struct
-{
-    unsigned char *rk;
-}
-mbedtls_aes_context;
-*/
-
-#if 0
 /*****************************************************************************/
 /* Defines:                                                                  */
 /*****************************************************************************/
@@ -613,62 +582,442 @@ int mbedtls_aes_crypt_cbc( mbedtls_aes_context *ctx,
 }
 
 #endif /* MBEDTLS_CIPHER_MODE_CBC */
-#endif
 
-#define KEY_LEN	16
-#define BUFF_LEN 16
-
-#define random_1(a,b) ((rand()%(b-a))+a)
-
-void buff_full_with_byte_rand(uint8_t *input, int len)
+uint8_t *awoke_string_padding(uint8_t *s, char c, int align, int *rlen) 
 {
 	int i;
-	uint8_t *head = input;
-	uint8_t *p = head;
-	uint8_t *end = &input[len-1];
-	srand((int)time(NULL));
+	uint8_t *p;
+	uint8_t *new_s;
+	size_t len;
+	size_t align_len;
+
+	if ((!s) || (align <= 0))
+        return NULL;
 	
-	for (i=0; i<len; i++) {
-		uint8_t full = random_1(0,100);
-		buf_push_byte_safe(full, p, end);
+	len = strlen(s);
+	if (len==align)
+		align_len = align;
+	else
+		align_len = ((len/align)+1)*align;
+	new_s = mem_alloc_z(align_len);
+	p = new_s;
+	uint8_t *end = &new_s[align_len-1];
+	buf_push_stri_safe(*s, p, end, len);
+
+	for (i=0; i<align_len-len; i++) {
+		buf_push_byte_safe(c, p, end);
 	}
-	buf_dump(input, len);
+	*rlen = align_len;
+	return new_s;
+}
+
+uint8_t *awoke_byte_padding(uint8_t *buf, int buf_len, uint8_t c, int align, int *rlen)
+{
+	int i;
+	uint8_t *p;
+	uint8_t *new_buf;
+	size_t align_len;	
+
+	if ((!buf) || (align <= 0))
+        return NULL;
+	if (buf_len==align)
+		align_len = align;
+	else
+		align_len = ((buf_len/align)+1)*align;
+	new_buf = mem_alloc_z(align_len);
+	p = new_buf;
+	memcpy(p, buf, buf_len);
+	p += buf_len;
+	for (i=0; i<align_len-buf_len; i++) {
+		buf_push_byte(c, p);
+	}
+	*rlen = align_len;
+	return new_buf;
+}
+
+err_type aes_cbc_enc_string(uint8_t *key, uint8_t *inv, int key_len, 
+								   uint8_t *str, uint8_t **out)
+{
+	int len;
+	int safe_key_len;
+	int safe_inv_len;
+	int safe_str_len;
+	uint8_t *safe_key;
+	uint8_t *safe_inv;
+	uint8_t *safe_str;
+	uint8_t *safe_enc;
+	mbedtls_aes_context ctx;
+	
+	if (!key || !inv || !str || key_len<=0)
+		return et_aes_enc;
+
+	len = strlen(key);
+	if (len > key_len)
+		return et_aes_enc;
+	len = strlen(inv);
+	if (len > key_len)
+		return et_aes_enc;
+
+	log_debug("aes_cbc_enc_string in");
+	
+	safe_key = awoke_string_padding(key, ' ', key_len, &safe_key_len);
+	if (!safe_key)
+		goto err;
+
+	safe_inv = awoke_string_padding(inv, ' ', key_len, &safe_inv_len);
+	if (!safe_inv)
+		goto err;
+
+	safe_str = awoke_string_padding(str, ' ', key_len, &safe_str_len);
+	if (!safe_str)
+		goto err;
+
+	mbedtls_aes_init(&ctx);
+	safe_enc = mem_alloc_z(safe_str_len);
+
+	printf("key:%s, len:%d\n", key, strlen(key));
+	buf_dump(key, strlen(key));
+	printf("\n");
+	printf("safe_key:%s, len:%d\n", safe_key, strlen(safe_key));
+	buf_dump(safe_key, safe_key_len);
+	printf("\n");
+
+	printf("inv:%s, len:%d\n", inv, strlen(inv));
+	buf_dump(inv, strlen(inv));
+	printf("\n");
+	printf("safe_inv:%s, len:%d\n", safe_inv, strlen(safe_inv));
+	buf_dump(safe_inv, safe_inv_len);
+	printf("\n");
+
+	printf("plain:%s, len:%d\n", str, strlen(str));
+	buf_dump(str, strlen(str));
+	printf("\n");
+	printf("safe plain:%s, len:%d\n", safe_str, strlen(safe_str));
+	buf_dump(safe_str, safe_str_len);
+	printf("\n");
+
+	mbedtls_aes_setkey_enc(&ctx, safe_key, 128);
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, safe_str_len, 
+		safe_inv, safe_str, safe_enc);
+	
+	printf("cipher:%s, len:%d\n", safe_enc, strlen(safe_enc));
+	printf("0x%2x, cipher len %d\n", safe_enc[15], safe_str_len);
+	buf_dump(safe_enc, safe_str_len);
+	printf("\n");
+	
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_str) mem_free(safe_str);
+	
+	*out = safe_enc;
+	log_debug("aes_cbc_enc_string ok");
+	return et_ok;
+	
+err:
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_str) mem_free(safe_str);
+	if (safe_enc) mem_free(safe_enc);
+	return et_aes_enc;
+}
+
+err_type aes_cbc_dec_string(uint8_t *key, uint8_t *inv, int key_len, 
+								   uint8_t *str, uint8_t **out)
+{
+	int len;
+	int safe_key_len;
+	int safe_inv_len;
+	int safe_str_len;
+	uint8_t *safe_key;
+	uint8_t *safe_inv;
+	uint8_t *safe_dec;
+	mbedtls_aes_context ctx;
+
+	if (!key || !inv || !str || key_len<=0)
+		return et_aes_enc;
+
+	len = strlen(key);
+	if (len > key_len)
+		return et_aes_enc;
+	len = strlen(inv);
+	if (len > key_len)
+		return et_aes_enc;
+
+	printf("\n\n");
+	log_debug("aes_cbc_dec_string in");
+	
+	safe_key = awoke_string_padding(key, ' ', key_len, &safe_key_len);
+	if (!safe_key)
+		goto err;
+
+	safe_inv = awoke_string_padding(inv, ' ', key_len, &safe_inv_len);
+	if (!safe_inv)
+		goto err;	
+
+	mbedtls_aes_init(&ctx);
+	safe_dec = mem_alloc_z(strlen(str));
+
+	printf("cipher:%s, len:%d\n", str, strlen(str));
+	buf_dump(str, strlen(str));
+	printf("\n");
+
+	mbedtls_aes_setkey_enc(&ctx, safe_key, 128);
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, strlen(str), 
+		safe_inv, str, safe_dec);
+
+	printf("plain:%s, len:%d\n", safe_dec, strlen(safe_dec));
+	buf_dump(safe_dec, strlen(safe_dec));
+	printf("\n");		
+		
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	*out = safe_dec;
+	log_debug("aes_cbc_dec_string ok");
+	return et_ok;
+err:
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_dec) mem_free(safe_dec);
+	return et_aes_enc;
+}
+								   
+err_type aes_cbc_enc_byte(uint8_t *key, int key_len, 
+							    uint8_t *inv, int inv_len, int align, 
+							    uint8_t *buf, int buf_len, uint8_t *out,
+							    int *out_len)
+{
+	log_debug("g_aes_128_vec");
+	buf_dump(inv, inv_len);
+
+   	int len;
+   	int safe_key_len;
+   	int safe_inv_len;
+   	int safe_buf_len;
+   	uint8_t *safe_key;
+   	uint8_t *safe_inv;
+	uint8_t *safe_buf;
+	uint8_t *safe_out;
+	mbedtls_aes_context ctx;
+
+	if (!key || !inv || !buf || key_len<=0)
+		return et_aes_enc;
+
+	if (key_len > align)
+		return et_aes_enc;
+	if (inv_len > align)
+		return et_aes_enc;
+
+	log_debug("aes_cbc_enc_byte in");
+
+	mbedtls_aes_init(&ctx);
+
+	safe_key = awoke_byte_padding(key, key_len, 0x0, align, &safe_key_len);
+	if (!safe_key)
+		goto err;
+
+	safe_inv = awoke_byte_padding(inv, inv_len, 0x0, align, &safe_inv_len);
+	if (!safe_inv)
+		goto err;
+
+	/*safe_buf = awoke_byte_padding(buf, buf_len, 0x0, align, &safe_buf_len);
+	if (!safe_buf)
+		goto err;
+
+	safe_out = mem_alloc_z(safe_buf_len);*/
+	#define AES_128_ALIGN(len)	((((len)>>4)+1)<<4)    
+	safe_buf_len = AES_128_ALIGN(buf_len);
+
+	printf("key len %d, byte:\n", key_len);
+	buf_dump(key, key_len);
+	printf("\n");
+	printf("safe key len %d, byte:\n", safe_key_len);
+	buf_dump(safe_key, safe_key_len);
+	printf("\n");
+
+	printf("inv len %d, byte:\n", inv_len);
+	buf_dump(inv, inv_len);
+	printf("\n");
+	printf("safe inv len %d, byte:\n", safe_inv_len);
+	buf_dump(safe_inv, safe_inv_len);
+	printf("\n");
+
+	printf("plain len %d, byte:\n", buf_len);
+	buf_dump(buf, buf_len);
+	printf("\n");
+	/*
+	printf("safe plain len %d, byte:\n", safe_buf_len);
+	buf_dump(safe_buf, safe_buf_len);
+	printf("\n");*/
+
+	mbedtls_aes_setkey_enc(&ctx, safe_key, 128);
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, safe_buf_len, 
+		safe_inv, buf, out);	
+
+	printf("cipher len %d, byte:\n", safe_buf_len);
+	buf_dump(out, safe_buf_len);
+	printf("\n");	
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_buf) mem_free(safe_buf);
+	//*out = safe_out;
+	*out_len = safe_buf_len;
+	log_debug("aes_cbc_enc_byte ok");
+	printf("\n");	
+	return et_ok;
+err:
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_buf) mem_free(safe_buf);
+	return et_ok;
+}
+
+err_type aes_cbc_dec_byte(uint8_t *key, int key_len, 
+								uint8_t *inv, int inv_len, int align, 
+								uint8_t *buf, int buf_len, uint8_t *out,
+								int *out_len)
+{
+   	int len;
+   	int safe_key_len;
+   	int safe_inv_len;
+   	uint8_t *safe_key;
+   	uint8_t *safe_inv;
+	uint8_t *safe_out;
+	mbedtls_aes_context ctx;
+
+	if (!key || !inv || !buf || key_len<=0)
+		return et_aes_enc;
+
+	if (key_len > align)
+		return et_aes_enc;
+	if (inv_len > align)
+		return et_aes_enc;	
+
+	printf("\n\n");
+	log_debug("aes_cbc_dec_byte in");
+
+	mbedtls_aes_init(&ctx);
+
+	safe_key = awoke_byte_padding(key, key_len, 0x0, align, &safe_key_len);
+	if (!safe_key)
+		goto err;
+
+	safe_inv = awoke_byte_padding(inv, inv_len, 0x0, align, &safe_inv_len);
+	if (!safe_inv)
+		goto err;
+
+	//safe_out = mem_alloc_z(buf_len);
+
+	printf("cipher len %d, byte:\n", buf_len);
+	buf_dump(buf, buf_len);
+	printf("\n");
+
+	mbedtls_aes_setkey_enc(&ctx, safe_key, 128);
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, buf_len, 
+		safe_inv, buf, out);		
+
+	printf("plain len %d, byte:\n", buf_len);
+	buf_dump(out, buf_len);
+	printf("\n");	
+
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	//*out = safe_out;
+	*out_len = buf_len;
+	log_debug("aes_cbc_dec_byte ok");
+	return et_ok;
+	
+err:
+	if (safe_key) mem_free(safe_key);
+	if (safe_inv) mem_free(safe_inv);
+	if (safe_out) mem_free(safe_out);
+	return et_aes_enc;
 }
 
 static uint8_t g_aes_128_vec[16] = {0x1};
 static uint8_t g_aes_128_key[16] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,
 									0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x00};
 
-int main(int argc, char *argv[])
+uint16_t hqnb_security_aes128_enc(uint8_t *in, uint16_t len, uint8_t *out)
 {
-	log_level(LOG_DBG);
-	log_mode(LOG_TEST);
-	
-	uint16_t cipher_len;
-	uint16_t plain_len;
-	
-	uint8_t plain[13] = {
-		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
-	};
+	uint16_t align_len;
+	mbedtls_aes_context ctx;   
 
-	uint8_t cipher[48] = {0x0};
-	uint8_t dec_data[16] = {0x0};
+	if (!in || len==0)
+		return -1;
 
-	log_debug("plain(len:%d) dump:", array_size(plain));
-	buf_dump(plain, array_size(plain));
+	uint8_t vec[16];
+	uint8_t key[16];
+
+	memcpy(vec, g_aes_128_vec, 16);
+	memcpy(key, g_aes_128_key, 16);
 	
-	cipher_len = sec_aes128_enc(g_aes_128_key, g_aes_128_vec, plain, array_size(plain), 
-							    cipher, array_size(cipher));
-	
-	log_debug("cipher(len:%d) dump:", cipher_len);
-	buf_dump(cipher, cipher_len);
-	
-	plain_len = sec_aes128_dec(g_aes_128_key, g_aes_128_vec, cipher, cipher_len, 
-							   dec_data, array_size(dec_data));
-	
-	log_debug("dec_plain(len:%d) dump:", plain_len);
-	buf_dump(dec_data, plain_len);
-	
-	return 0;
+	    
+	align_len = SEC_AES128_ALIGN(len);
+
+	mbedtls_aes_init(&ctx);
+	mbedtls_aes_setkey_enc(&ctx, key, 128);	
+
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, align_len, 
+		vec, in, out);
+	mbedtls_aes_free(&ctx);
+
+	return align_len;
 }
 
+int sec_aes128_enc_bytes(uint8_t *key, uint8_t *inv, uint8_t *bytes, 
+						 uint16_t len, uint8_t *out, uint16_t out_len)
+{
+	uint16_t align_len;
+	mbedtls_aes_context ctx;  
+
+	if (!key || !inv || !bytes || !out || len==0)
+		return -1;
+
+	uint8_t _inv[SEC_AES128_KEY_LEN];
+	uint8_t _key[SEC_AES128_KEY_LEN];
+
+	memcpy(_inv, inv, SEC_AES128_KEY_LEN);
+	memcpy(_key, key, SEC_AES128_KEY_LEN);
+
+	align_len = SEC_AES128_ALIGN(len);
+	if (align_len > out_len)
+		return -1;
+
+	mbedtls_aes_init(&ctx);
+	mbedtls_aes_setkey_enc(&ctx, _key, SEC_AES128_KEYBITS);	
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, align_len, 
+		_inv, bytes, out);
+
+	mbedtls_aes_free(&ctx);
+
+	return align_len;
+}
+
+int sec_aes128_dec_bytes(uint8_t *key, uint8_t *inv, uint8_t *bytes, 
+						 uint16_t len, uint8_t *out, uint16_t out_len)
+{
+	mbedtls_aes_context ctx;  
+
+	if (!key || !inv || !bytes || !out || len==0)
+		return -1;
+
+	if (len > out_len)
+		return -1;
+	
+	uint8_t _inv[SEC_AES128_KEY_LEN];
+	uint8_t _key[SEC_AES128_KEY_LEN];
+
+	memcpy(_inv, inv, SEC_AES128_KEY_LEN);
+	memcpy(_key, key, SEC_AES128_KEY_LEN);
+
+	mbedtls_aes_init(&ctx);
+	mbedtls_aes_setkey_dec(&ctx, _key, SEC_AES128_KEYBITS);
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, len, 
+		_inv, bytes, out);
+
+	mbedtls_aes_free(&ctx);
+
+	return len;
+}
+
+int 

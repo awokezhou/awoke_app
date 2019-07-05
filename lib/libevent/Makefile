@@ -1,4 +1,8 @@
 
+CURR_DIR := $(shell pwd)
+BUILD_DIR:=$(subst /lib, /lib,$(CURR_DIR))
+BUILD_DIR:=$(word 1, $(BUILD_DIR))
+include $(BUILD_DIR)/make.common
 
 LIB_OBJ_PATH := $(LIB_PATH)/librtmsg/obj
 LIB_LIB_PATH := $(LIB_PATH)/librtmsg/lib

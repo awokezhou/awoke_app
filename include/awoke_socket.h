@@ -43,6 +43,13 @@ typedef struct _sock_map{
 }sock_map; 
 
 int awoke_socket_server(uint8_t, const char *, uint32_t, bool);
+int awoke_socket_accept_unix(int);
+int awoke_socket_accpet(int);
+int awoke_socket_set_nonblocking(int);
+bool awoke_sock_fd_read_ready(int);
+int awoke_socket_create(int, int, int);
+err_type awoke_unix_message_send(char *, char *, int, int *, uint32_t);
+err_type awoke_socket_recv_wait(int fd, uint32_t tm);
 
 
 #endif /* __AWOKE_SOCKET_H__ */

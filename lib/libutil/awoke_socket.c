@@ -49,7 +49,7 @@ int awoke_socket_set_nonblocking(int sockfd)
     return 0;
 }
 
-inline int awoke_socket_accpet(int server_fd)
+int awoke_socket_accpet(int server_fd)
 {
     int remote_fd;
     struct sockaddr sock_addr;
@@ -60,7 +60,7 @@ inline int awoke_socket_accpet(int server_fd)
     return remote_fd;
 }
 
-inline int awoke_socket_accept_unix(int server_fd)
+int awoke_socket_accept_unix(int server_fd)
 {
 	int remote_fd;
 	struct sockaddr_un sock_addr;

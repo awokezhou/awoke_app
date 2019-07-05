@@ -2,7 +2,6 @@
 #define __AWOKE_LOG_H__
 
 
-inline void awoke_log_level_set(int level);
 void awoke_log(int level, const char *func, int line, const char *format, ...);
 
 

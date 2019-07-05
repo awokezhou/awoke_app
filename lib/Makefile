@@ -1,5 +1,5 @@
 
-MAKE_PART := libutil librtmsg libevent
+MAKE_PART := libutil librtmsg libevent libsecurity
 .PHONY: $(MAKE_PART)
 all: $(MAKE_PART)
 

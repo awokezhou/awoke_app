@@ -144,7 +144,7 @@ err_type vector_file_write(vector *vec)
 	int len;
 	char buff[1024] = {"\n"};
 
-	fd = open("vector_file", O_WRONLY|O_CREAT);
+	fd = open("vector_file", O_WRONLY|O_CREAT, S_IRWXU|S_IRUSR|S_IXUSR|S_IROTH|S_IXOTH);
 	if (fd < 0) {
 		log_err("open file error");
 		return et_file_open;
@@ -490,6 +490,7 @@ void int_test()
 		printf("\n");\
 	}while(0)
 
+
 #define _pkt_push(data, p, bytes) do {\
 		memcpy(p, (char *)&data, bytes);\
 		p+= bytes;\
@@ -498,6 +499,7 @@ void int_test()
 #define pkt_push_word(data, p) 		_pkt_push(data, p, 2)
 #define pkt_push_dword(data, p) 	_pkt_push(data, p, 4)
 
+
 #define _pkt_push_safe(data, p, bytes, end) do {\
 		if ((end - p) >= bytes)\
 			memcpy(p, (char *)&data, bytes);\
@@ -505,7 +507,7 @@ void int_test()
 	}while(0)
 #define pkt_push_byte_safe(data, p, end) 	_pkt_push_safe(data, p, 1, end)
 #define pkt_push_word_safe(data, p, end) 	_pkt_push_safe(data, p, 2, end)
-#define pkt_push_dword_safe(data, p, end) 	_pkt_push_safe(data, p, 4, end)
+#define pkt_push_dwrd_safe(data, p, end) 	_pkt_push_safe(data, p, 4, end)
 
 void pkg_test()
 {
@@ -523,8 +525,8 @@ void pkg_test()
 	
 	pkt_push_byte_safe(type, p ,end);
 	pkt_push_word_safe(port, p ,end);
-	pkt_push_dword_safe(time, p ,end);
-	pkt_push_dword_safe(time2, p ,end);
+	pkt_push_dwrd_safe(time, p ,end);
+	pkt_push_dwrd_safe(time2, p ,end);
 	pkt_dump(packet, p-head);
 	log_debug("packet len %d", p-head);
 }
@@ -634,6 +636,232 @@ void uint16_set()
 	log_debug("value %d", value);	
 }
 
+#define PT_HEADER_LEN	21
+#define IOT_HEADER_LEN	4
+
+typedef struct _pt_header {
+    uint8_t type;
+    uint8_t index;
+    uint8_t ver;
+    uint8_t dev;
+    uint8_t manu;
+    uint8_t initiator;
+    uint8_t opt;
+    bool needAck;
+    uint8_t encrypt;
+    uint16_t payloadlen;
+    uint32_t time;
+	uint8_t imei[8];
+
+} pt_header;
+
+typedef struct _iot_header {
+    uint16_t id;
+    uint16_t len;
+} iot_header;
+
+void xxx_pt_header(pt_header *hdr, int priv_len)
+{
+	uint8_t imei[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+	hdr->type = 0x10;
+	hdr->index = 1;
+	hdr->ver = 0x0;
+	hdr->dev = 0x02;
+	hdr->encrypt = 0x0;
+	hdr->manu = 0x01;
+	hdr->initiator = 0;
+	hdr->opt = 0x3;
+	hdr->needAck = FALSE;
+	hdr->payloadlen = priv_len;
+	hdr->time = 1560390134;
+	memcpy(hdr->imei, imei, 8);
+}
+
+int xxx_ptl_encode_pt_priv_data(uint8_t *buf)
+{
+	int i;
+	uint8_t *pos = buf;
+	uint8_t data = 0x25;
+
+	uint16_t msg_id = 0x0600;
+	//msg_id = htons(msg_id);
+	pkt_push_word(msg_id, pos);
+
+	for (i=0; i<128; i++) {
+		pkt_push_byte(data, pos);
+	}
+
+	return (pos-buf);
+}
+
+void xxx_iot_header(iot_header *hdr, int priv_len)
+{
+	hdr->id = 0x43;
+	hdr->len = priv_len;
+}
+
+void package_sample_header(uint8_t *buf, int offset, int priv_len,
+								    void (*priv_pt_header)(pt_header *, int))
+{
+	pt_header header;
+	uint8_t *p = buf + offset;
+	
+	priv_pt_header(&header, priv_len);
+	//pt_header_encode(&header, p, PT_HEADER_LEN);
+	return;
+}
+
+void package_iot_header(uint8_t *buf, int offset, int priv_len, 
+							    void (*priv_iot_header)(iot_header *, int))
+{
+	iot_header header;
+	uint8_t *p = buf + offset;
+	
+	priv_iot_header(&header, priv_len);
+	//iot_header_encode(&header, p, IOT_HEADER_LEN);
+}
+
+int package_priv_data(uint8_t *buf, int len, int (*encode_fn)(uint8_t *))
+{
+	uint8_t *p = buf + len;
+	return encode_fn(p);
+}
+
+void package_test()
+{
+	uint8_t original_buf[512];
+	uint32_t priv_len;
+
+	priv_len = package_priv_data(original_buf, IOT_HEADER_LEN+PT_HEADER_LEN, 
+		xxx_ptl_encode_pt_priv_data);
+	log_debug("priv_len %d", priv_len);
+
+	package_iot_header(original_buf, 0, priv_len+PT_HEADER_LEN, xxx_iot_header);
+	log_debug("package_iot_header");
+	
+	package_sample_header(original_buf, IOT_HEADER_LEN, priv_len, xxx_pt_header);
+	log_debug("package_sample_header");
+
+	int dump_len = priv_len+PT_HEADER_LEN+IOT_HEADER_LEN;
+	pkt_dump(original_buf, dump_len);
+}
+
+typedef enum {
+	ss_none = 0,
+	ss_i2c,
+	ss_uart
+} ss_type;
+
+typedef struct _ss_desc {
+	ss_type type;
+	int try_max;
+	err_type (*init)();
+	err_type (*read)(uint32_t *);
+} ss_desc;
+
+static err_type ss_i2c_init()
+{
+	log_debug("i2c init");
+	return et_ok;
+}
+
+static err_type ss_i2c_read(uint32_t *data)
+{
+	log_debug("i2c read in");
+	return et_fail;
+}
+
+static err_type ss_uart_init()
+{
+	log_debug("uart init in");
+	return et_ok;
+}
+
+static err_type ss_uart_read(uint32_t *data)
+{
+	log_debug("uart read in");
+	return et_ok;
+}
+
+struct _ss_desc i2c_desc = {
+	.type = ss_i2c,
+	.try_max = 5,
+	.init = ss_i2c_init,
+	.read = ss_i2c_read,
+};
+
+struct _ss_desc uart_desc = {
+	.type = ss_uart,
+	.try_max = 1,
+	.init = ss_uart_init,
+	.read = ss_uart_read,
+};
+
+static struct _ss_desc *g_desc;
+
+static err_type ss_read()
+{
+	uint32_t data;
+	return g_desc->read(&data);
+}
+
+static void ss_desc_set(struct _ss_desc *desc)
+{
+	log_debug("ss mode change to %d", desc->type);
+	g_desc = desc;
+}
+
+static err_type ss_try_read()
+{
+	int i;
+	err_type ret;
+
+	log_debug("ss try read");
+	
+	for (i=0; i<g_desc->try_max; i++) {
+		ret = ss_read();
+		if (ret == et_ok) {
+			log_debug("ss try read ok");
+			return et_ok;
+		}
+	}
+
+	log_debug("ss try read error");
+	return et_fail;
+}
+
+static void ss_init()
+{
+	log_debug("ss init");
+	ss_desc_set(&i2c_desc);
+
+	g_desc->init();
+
+	if (g_desc->type == ss_i2c)
+		log_debug("ss type i2c");
+	else if (g_desc->type == ss_uart)
+		log_debug("ss type uart");
+	
+	if (ss_try_read() != et_ok) {
+		ss_desc_set(&uart_desc);
+	}
+}
+
+void sensors_support()
+{	
+	int i;
+	err_type ret;
+	
+	ss_init();
+	
+	for (i=0; i<10; i++) {
+		ret = ss_read();
+		if (ret != et_ok) {
+			log_debug("ss read error");
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	log_level(LOG_DBG);
@@ -671,7 +899,11 @@ int main(int argc, char **argv)
 
 	//timestamp_json_test();
 
-	uint16_set();
+	//uint16_set();
+
+	//package_test();
+
+	sensors_support();
 	
 	return 0;
 }

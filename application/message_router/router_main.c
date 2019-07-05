@@ -211,10 +211,6 @@ err_type router_init(rt_manager *manager)
 	err_type ret = et_ok;
 	rt_param *param = manager->param;
 
-	log_level(param->log_level);
-	log_mode(param->log_mode);
-	log_info("application message-router launched...");
-
 	router_signal_init(manager);
 	log_debug("signal init ok");
 
@@ -413,6 +409,10 @@ int main(int argc, char **argv)
 	err_type ret = et_ok;
 	rt_param *param;
 	rt_manager *manager;
+
+	log_level(param->log_level);
+	log_mode(param->log_mode);
+	log_info("application message-router launched...");
 
 	param = router_param_parse(argc, argv);
 	if (!param) {

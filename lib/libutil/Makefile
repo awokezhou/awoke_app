@@ -1,4 +1,9 @@
 
+CURR_DIR := $(shell pwd)
+BUILD_DIR:=$(subst /lib, /lib,$(CURR_DIR))
+BUILD_DIR:=$(word 1, $(BUILD_DIR))
+include $(BUILD_DIR)/make.common
+
 LIB_OBJ_PATH := $(LIB_PATH)/libutil/obj
 LIB_LIB_PATH := $(LIB_PATH)/libutil/lib
 
@@ -16,7 +21,6 @@ prepare:
 	echo "-------------prepare--------------"
 	if [ ! -d ${LIB_OBJ_PATH} ];then mkdir obj;fi;
 	if [ ! -d ${LIB_LIB_PATH} ];then mkdir lib;fi;
-
 
 .PHONY: compile
 compile: $(OBJ_FILES)

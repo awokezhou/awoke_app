@@ -10,14 +10,14 @@
 static int sg_log_level = LOG_ERR;
 static int sg_log_mode  = LOG_SYS;
 	
-inline void log_level_set(int level)
+void log_level_set(int level)
 {
 	if (level > LOG_BUG || level < LOG_DBG)
 		return;
 	sg_log_level = level;
 }
 
-static inline int log_level_get()
+static int log_level_get()
 {
 	return sg_log_level;
 }
@@ -27,19 +27,19 @@ static bool log_level_invalid(int level)
 	return (log_level_get() > level);
 }
 
-inline void log_mode_set(int mode)
+void log_mode_set(int mode)
 {
 	if (mode > LOG_SYS || mode < LOG_TEST)
 		return;	
 	sg_log_mode = mode;
 }
 
-static inline int log_mode_get()
+static int log_mode_get()
 {
 	return sg_log_mode;
 }
 
-static inline bool log_mode_test()
+static bool log_mode_test()
 {
 	return (log_mode_get()==LOG_TEST);
 }
