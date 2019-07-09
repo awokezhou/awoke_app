@@ -1019,5 +1019,3 @@ int sec_aes128_dec_bytes(uint8_t *key, uint8_t *inv, uint8_t *bytes,
 
 	return len;
 }
-
-int 
