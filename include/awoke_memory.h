@@ -49,14 +49,28 @@ static inline void mem_free(void *ptr)
 
 typedef struct
 {
-    char *data;
+    char *p;
     unsigned long len;
 } mem_ptr_t;
 
-static inline void mem_ptr_reset(mem_ptr_t * p)
+#define mem_ptr_none()	{0,0}
+
+#define mem_ptr_dump(ptr) (ptr.len, ptr.p)
+
+static inline mem_ptr_t mem_mk_ptr(const char *str)
 {
-    p->data = NULL;
-    p->len = 0;
+	mem_ptr_t ret = {str, 0};
+
+	if (str != NULL) ret.len = strlen(str);
+
+	return ret;
+}
+
+static inline void mem_ptr_copy(mem_ptr_t *dst, mem_ptr_t *src)
+{
+	dst->p = src->p;
+	dst->len = src->len;
 }
 
 #endif /* __AWOKE_MEMORY_H__ */
+

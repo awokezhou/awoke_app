@@ -49,6 +49,20 @@ int awoke_socket_set_nonblocking(int sockfd)
     return 0;
 }
 
+int awoke_socket_set_timeout(int sockfd, int timeout)
+{
+	struct timeval tm;
+
+	tm.tv_sec = timeout;
+	
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tm, sizeof(tm)) < 0) {
+		 log_err("Can't set timemout");
+		 return -1;
+	}
+
+	return 0;
+}
+
 int awoke_socket_accpet(int server_fd)
 {
     int remote_fd;
