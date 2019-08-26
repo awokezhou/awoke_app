@@ -636,20 +636,23 @@ void buff_full_with_byte_rand(uint8_t *input, int len)
 }
 
 static uint8_t g_aes_128_vec[16] = {0x1};
-static uint8_t g_aes_128_key[16] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,
-									0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x00};
+static uint8_t g_aes_128_key[16] = {0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 
+									0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x10};
 
 int main(int argc, char *argv[])
 {
 	log_level(LOG_DBG);
 	log_mode(LOG_TEST);
+
 	
 	uint16_t cipher_len;
 	uint16_t plain_len;
 	
-	uint8_t plain[13] = {
-		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
+	uint8_t plain[8] = {
+		//869060030200269
+		0x68, 0x9, 0x6, 0x30, 0x20, 0x0, 0x62, 0x9
 	};
+
 
 	uint8_t cipher[48] = {0x0};
 	uint8_t dec_data[16] = {0x0};
@@ -657,17 +660,49 @@ int main(int argc, char *argv[])
 	log_debug("plain(len:%d) dump:", array_size(plain));
 	buf_dump(plain, array_size(plain));
 	
-	cipher_len = sec_aes128_enc(g_aes_128_key, g_aes_128_vec, plain, array_size(plain), 
+	cipher_len = sec_aes128_enc_bytes(g_aes_128_key, g_aes_128_vec, plain, array_size(plain), 
 							    cipher, array_size(cipher));
 	
 	log_debug("cipher(len:%d) dump:", cipher_len);
 	buf_dump(cipher, cipher_len);
 	
-	plain_len = sec_aes128_dec(g_aes_128_key, g_aes_128_vec, cipher, cipher_len, 
+	plain_len = sec_aes128_dec_bytes(g_aes_128_key, g_aes_128_vec, cipher, cipher_len, 
 							   dec_data, array_size(dec_data));
 	
 	log_debug("dec_plain(len:%d) dump:", plain_len);
 	buf_dump(dec_data, plain_len);
+	
+
+	/*
+	err_type ret; 
+	uint8_t key[16] = "ckz7eU3stoIEGYIw";
+	uint8_t imei[16];
+	uint8_t *out;
+	uint8_t *in;
+	
+	//sprintf(key, "%s", "ckz7eU3stoIEGYIw");
+	sprintf(imei, "%s", "869060030200269");
+
+	log_debug("key %s", key);
+	log_debug("imei %s", imei);
+	
+	ret = aes_cbc_enc_string(key, g_aes_128_vec, 16, imei, &out);
+	if (ret != et_ok) {
+		log_err("enc error");
+		return -1;
+	}
+
+	log_debug("cipher %s, len %d", out, strlen(out));
+	log_debug("key %s", key);
+
+	ret = aes_cbc_dec_string(key, g_aes_128_vec, 16, out, &in);
+	if (ret != et_ok) {
+		log_err("enc error");
+		return -1;
+	}
+
+	log_debug("dec_plain %s", in);
+	*/
 	
 	return 0;
 }

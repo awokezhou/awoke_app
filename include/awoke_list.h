@@ -2,7 +2,6 @@
 #define __AWOKE_LIST_H__
 
 
-
 /*! \brief structure that must be placed at the begining of any structure
  *         that is to be put into the linked list.
  */
@@ -119,6 +118,119 @@ static inline void list_unlink(struct _awoke_list *entry)
              tmp = list_entry(pos->member.next, typeof(*pos), member); \
              &pos->member != (head);                    \
              pos = tmp, tmp = list_entry(pos->member.next, typeof(*pos), member))
+
+
+typedef struct _sl_list {
+	struct _sl_list *next;
+} sl_list;
+
+#define SL_LIST_INIT(name) {&name}
+
+static inline void sl_list_init(struct _sl_list *list)
+{
+    list->next = NULL;
+}
+
+static inline int sl_list_empty(const struct _sl_list *head)
+{
+	return (!head->next);
+}
+
+static inline void sl_list_append(struct _sl_list *new, struct _sl_list *existing)
+{
+	sl_list *p = existing;
+
+	while (p->next != NULL) {
+		p = p->next;
+	}
+
+	p->next = new;
+	new->next = NULL;
+}
+
+static inline int sl_list_size(struct _sl_list *existing)
+{
+	int count = 0;
+	sl_list *p = existing->next;
+
+	while (p != NULL) {
+		p = p->next;
+		count++;
+	}
+
+	return count;
+}
+
+static inline void sl_list_reverse(struct _sl_list *existing)
+{
+	int size;
+	struct _sl_list *p1, *p2;
+	struct _sl_list *p = existing->next;
+	struct _sl_list *head = existing;
+
+	if (sl_list_size(existing) <= 2) {
+		p->next->next = p;
+		head->next = p->next;
+		p->next = NULL;
+		return;
+	}
+
+	p1 = p;
+	p = p->next;
+	p2 = p->next;
+	p1->next = NULL;
+	
+	while(p2->next != NULL) {
+		printf("x\n");
+		p->next = p1;
+		p1 = p;
+		p = p2;
+		p2 = p2->next;
+	}
+
+	p->next = p1;
+	p2->next = p;
+	head->next = p2;
+}
+
+static inline void sl2_list_reverse(struct _sl_list *existing)
+{
+	printf("sl_list_reverse\n");
+	int i = 0;
+	struct _sl_list *map[5];
+	printf("0.1\n");
+	int size = sl_list_size(existing);
+	printf("0.2, size %d\n", size);
+	struct _sl_list *p = existing->next;
+
+	printf("1\n");
+
+	while (p != NULL) {
+		printf("1.1 %d\n", i);
+		map[i] = p;
+		p = p->next;
+		i++;
+	}
+
+	printf("2\n");
+
+	for (i=0; i<size-1; i++) {
+		printf("2.1 %d\n", i);
+		map[i+1]->next = map[i];
+	}
+
+	printf("3\n");
+	
+	map[0]->next = NULL;
+	existing->next = map[size-1];
+}
+
+#define sl_list_foreach(pos, head, member)				\
+	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+	     &pos->member.next != NULL; 					\
+	     pos = list_entry(pos->member.next, typeof(*pos), member))
+
+
 
 
 #endif  /*__AWOKE_LIST_H__ */

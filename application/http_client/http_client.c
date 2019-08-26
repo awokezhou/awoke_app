@@ -520,6 +520,14 @@ void _http_client_test(const char *url, const char *body, const char *method)
 		return -1;
 	}
 
+	log_debug("scheme %.*s, user_info %.*s, host %.*s, path %.*s, query %.*s, fragment %.*s",
+		scheme.len, scheme.p,
+		user_info.len, user_info.p,
+		host.len, host.p,
+		path.len, path.p,
+		query.len, query.p,
+		fragment.len, fragment.p);
+
 	req.method = mem_mk_ptr(method);
 	req.path = path;
 	req.protocol = mem_mk_ptr(HTTP_PROTOCOL_11_STR);
@@ -598,7 +606,7 @@ void http_client_test()
 				"}";
 				*/
 
-	_http_client_test("http://47.99.107.151:8990/nb/direct-connect/receive", 
+	_http_client_test("http://www.szhqiot.top/nb/direct-connect/receive", 
 			     mybpdy, 
 			     METHOD_POST_STR);
 
@@ -721,7 +729,26 @@ void mongoose_test(int argc, char **argv)
 	log_info("url %s", g_url);
 	log_info("method %s", g_method);
 
-	char *mybpdy = 		"{"\
+	cJSON *json_root, *json_msg;
+	int type = 1;
+	char *imei = "865484023020613";
+	json_root = cJSON_CreateObject();
+	char *value = "50550030100000080110001001B01845EC96880303"\
+		          "07180150008000000000132648507A8E8525C0000000001845EBF0000000000";
+
+	cJSON_AddItemToObject(json_root, "msg", json_msg = cJSON_CreateObject());	
+	cJSON_AddNumberToObject(json_msg, "type", type);
+	cJSON_AddStringToObject(json_msg, "imei", imei);
+	cJSON_AddNumberToObject(json_msg, "at", 1466133706841);
+	cJSON_AddStringToObject(json_msg, "value", value);
+
+	cJSON_AddNumberToObject(json_root, "data_src", 1);
+	cJSON_AddNumberToObject(json_root, "ver", 0);
+	cJSON_AddStringToObject(json_root, "msg_signature", "message signature");
+	cJSON_AddStringToObject(json_root, "nonce", "abcdefgh");
+
+	char *mybpdy = cJSON_Print(json_root);
+	/*char *mybpdy = 		"{"\
 							"\"at\":1561961036488232,"\
 							"\"imei\":\"860803031708510\","\
 							"\"type\":1,"\
@@ -729,7 +756,7 @@ void mongoose_test(int argc, char **argv)
 							"\"value\":\"50550030100000080110001001B01845EC96880303"\
 							"07180150008000000000132648507A8E8525C0000000001845EBF0000000000\","\
 							"\"dev_id\":530711111"\
-						"}";
+						"}";*/
 	
 	mg_connect_http(&mgr, ev_handler, g_url, NULL, mybpdy);
 
@@ -761,13 +788,13 @@ int main(int argc, char **argv)
 	log_mode(LOG_TEST);
 	log_level(LOG_DBG);
 
-	/*mongoose_test(argc, argv);*/
+	mongoose_test(argc, argv);
 
 	//http_request_test();
 
 	//log_debug("will http_client_test");
 
-	http_client_test();
+	//http_client_test();
 
 	//cJSON_test();
 

@@ -71,5 +71,19 @@
 
 #define array_size(array)	((sizeof(array))/(sizeof(array[0])))
 
+#define array_foreach(head, size, p)				\
+		int __i;									\
+		p = &head[0];								\
+													\
+		for (__i = 0;								\
+			 __i < size;							\
+			 __i++, 								\
+				p = &head[__i]) 					\
+
+#define print_ip_format "%d.%d.%d.%d"
+#define print_ip(addr)	\
+				addr[0], addr[1], addr[2], addr[3]
+
+
 #endif /* __AWOKE_MACROS_H__ */
 

@@ -862,6 +862,526 @@ void sensors_support()
 	}
 }
 
+uint32_t __create_flags(int status)
+{
+	return (uint32_t)status;
+}
+
+#define TCP_SERVER	1
+#define TCP_CLIENT	0
+enum {
+	TCP_NONE,
+	TCP_CONNECT,
+	TCP_ACK,
+	TCP_ERR,
+} STATUS;
+#define tcp_clientflags(status)	\
+	((TCP_CLIENT << 8) | __create_flags(status))
+
+#define tcp_flagsstatus_set(flags, status) do {\
+		flags &= 0xf0;\
+		flags |= status;\
+	} while(0)
+	
+#define tcp_flagsstatus(flags) ((flags) & 0x0f)
+
+void flags_test()
+{
+	uint32_t flags;
+	/*
+	 * | server/client | ack | keep-alive | non-block | 
+	 */
+	flags = tcp_clientflags(TCP_NONE);
+	log_debug("flags:0x%x", flags);
+	tcp_flagsstatus_set(flags, TCP_CONNECT);
+	uint8_t status = tcp_flagsstatus(flags);
+	log_debug("status:%d", status);
+}
+
+int _smp_push(mem_ptr_t *ptr, int max, const char *fmt, ...)
+{
+	int len;
+	va_list ap;
+	max-= ptr->len;
+	
+	va_start(ap, fmt);
+	len = vsnprintf(ptr->p, max, fmt, ap);
+	max -= len;
+	va_end(ap);
+
+	ptr->len += len;
+	ptr->p += len;
+
+	log_debug("len:%d", len);
+	
+	return len;	
+}
+
+int smp_push_string(mem_ptr_t *ptr, char *string, int max)
+{
+	return _smp_push(ptr, max, "%s", string);
+}
+
+int smp_push_int(mem_ptr_t *ptr, int data, int max)
+{
+	return _smp_push(ptr, max, "%d", data);
+}
+
+int smp_push_hex(mem_ptr_t *ptr, uint32_t data, int max)
+{
+	return _smp_push(ptr, max, "%x", data);
+}
+
+build_ptr smp_ptr_iot_header(int len)
+{
+	char header[32];
+	
+	build_ptr bp = build_ptr_init(header, 32);
+
+	build_ptr_hex(bp, 5055);
+	build_ptr_number(bp, len);
+
+	return bp;
+}
+
+build_ptr smp_ptr_pt_header(int len)
+{
+	char header[32];
+	
+	build_ptr bp = build_ptr_init(header, 32);
+
+	build_ptr_hex(bp, 0x4055);
+	build_ptr_number(bp, len);
+
+	return bp;
+}
+
+
+static int hex2byte(char *dst, char *src) {
+    while(*src) {
+        if(' ' == *src) {
+            src++;
+            continue;
+        }
+        sscanf(src, "%02X", dst);
+        src += 2;
+        dst++;
+    }
+    return 0;
+}
+
+build_ptr smp_ptr_data()
+{
+	char data[512];
+
+	build_ptr bp = build_ptr_init(data, 512);
+
+	build_ptr_number(bp, 22);
+	build_ptr_hex(bp, 0x55313131);
+	build_ptr_number(bp, 1531341425);
+	build_ptr_number(bp, 22);
+	build_ptr_number(bp, 22);
+	build_ptr_number(bp, 22);
+
+	return bp;
+}
+
+void smp_ptr_test()
+{
+	build_ptr data = smp_ptr_data();
+	build_ptr pt_header = smp_ptr_pt_header(data.len);
+	build_ptr iot_header = smp_ptr_iot_header(data.len+pt_header.len);
+
+	log_debug("data:%*.s", data.len, data.p);
+	log_debug("pt:%*.s", pt_header.len, pt_header.p);
+	log_debug("iot:%*.s", iot_header.len, iot_header.p);
+}
+
+void address_type_test()
+{	
+	int len;
+	char *host = "www.baidu.com";
+	unsigned int a, b, c, d, port = 0;
+	
+	if (sscanf(host, "%u.%u.%u.%u", &a, &b, &c, &d) == 4) {
+		log_debug("ip address");
+	} else {
+		log_debug("hostname address");
+	}
+}
+
+
+typedef struct _struct_t {
+	int nr;
+#define STATUS_MAX_NR 	3
+	uint8_t status[STATUS_MAX_NR];
+} status_t;
+
+static void status_push(status_t *p, uint8_t s)
+{
+	int i;
+	int offset = p->nr;
+
+	if (offset == STATUS_MAX_NR) offset = 0;
+
+	for (i=STATUS_MAX_NR-1; i>=1; i--) {
+		p->status[i] = p->status[i-1];
+	}
+	p->status[0] = s;
+}
+
+void status_test()
+{
+
+	status_t status;
+	uint8_t s1, s2, s3;
+
+	s1 = 0x01;
+	s2 = 0x02;
+	s3 = 0x03;
+
+	memset(&status, 0x0, sizeof(status_t));
+
+	status_push(&status, s1);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, s2);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, s3);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, s2);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, s1);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, 0x23);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, 0x73);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, 0x74);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, 0x41);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+	status_push(&status, 0xad);
+	log_debug("status 0x%x 0x%x 0x%x", status.status[2], status.status[1], status.status[0]);
+}
+
+void ipaddr_test()
+{
+	struct sockaddr_in sock_addr;
+	uint8_t ipaddr[4];
+	char ipaddr_str[16];
+
+	sprintf(ipaddr_str, "8.8.8.8");
+	log_debug("ipaddr_str %s", ipaddr_str);
+	sock_addr.sin_addr.s_addr = inet_addr(ipaddr_str);
+	log_debug("sock_addr %s", inet_ntoa(sock_addr.sin_addr));
+	memcpy(ipaddr, &sock_addr.sin_addr, 4);
+	log_debug("ipaddr %d.%d.%d.%d", ipaddr[0], ipaddr[1], ipaddr[2], ipaddr[3]);
+}
+
+void awoke_list_test()
+{
+	typedef struct _lnode {
+		int x;
+		awoke_list _head;
+	} lnode;
+
+	awoke_list xlist;
+	lnode *p;
+	lnode *f;
+	lnode *new1 = mem_alloc_z(sizeof(lnode));
+
+	list_init(&xlist);
+
+	new1->x = 2;
+	list_prepend(&new1->_head, &xlist);
+
+	lnode *new2 = mem_alloc_z(sizeof(lnode));
+	new2->x = 3;
+	list_prepend(&new2->_head, &xlist);
+
+	list_for_each_entry(p, &xlist, _head) {
+		log_debug("x %d", p->x);
+	}
+
+	list_for_each_entry_safe(p, f, &xlist, _head) {
+		list_unlink(&p->_head);
+		memset(p, 0x0, sizeof(lnode));
+		//free(p);
+		break;
+	}	
+
+	list_for_each_entry(p, &xlist, _head) {
+		log_debug("x %d", p->x);
+	}	
+}
+
+static int ctoi(char c)
+{
+    int i;
+
+    i = (int)c - '0';
+    if (i < 0 || i > 9)
+    {
+        i = 0;
+    }
+    return i;
+}
+
+int string_convert_BCD_to_str(char *out, const uint8_t *in, uint16_t b_len)
+{
+	int i;
+    int out_len = 0;
+
+    if (out == NULL || in == NULL || b_len == 0)
+    {
+        return -1;
+    }
+
+    for (i = 0; i < b_len/2; i++)
+    {
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[i] & 0x0F));        // lower nibble
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[i] & 0xF0) >> 4);   // upper nibbl
+    }
+    // If it is an odd number add one digit more
+    if ((b_len & 0x1) != 0)
+    {
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[b_len/2] & 0x0F));  // lower nibble
+    }
+    out[out_len] = '\0'; // It is a string so add the null terminated character
+    return out_len;
+}
+
+int string_convert_str_to_BCD(uint8_t *bin_data, const char *str_data, uint16_t bin_len)
+{
+	int i;
+    int out_len;
+
+    uint8_t digit1;
+    uint8_t digit2;
+
+    if (bin_data == NULL || str_data == NULL || bin_len == 0)
+    {
+        return -1;
+    }
+
+    for ( out_len = 0; out_len +1 < bin_len; out_len += 2)       //lint !e440  False positive complaint about bit_len not being modified.
+    {
+        if ((str_data[out_len] < '0') || (str_data[out_len] > '9') || (str_data[out_len + 1] < '0') || (str_data[out_len + 1] > '9'))
+        {
+            return -1;
+        }
+
+        digit1 = (uint8_t)ctoi(str_data[out_len]);
+        digit2 = (uint8_t)ctoi(str_data[out_len + 1]);
+        bin_data[out_len/2] = digit1 | ((digit2 << 4) & 0xFF);
+    }
+    // If it is an odd number add the last digit and a 0
+    if ((bin_len & 0x1) != 0)
+    {
+        if ((str_data[bin_len - 1] < '0') || (str_data[bin_len - 1] > '9'))
+        {
+            return -1;
+        }
+
+        bin_data[bin_len/2] = (uint8_t)ctoi(str_data[bin_len - 1]); // just digit 1, digit2 = 0
+    }
+    return bin_len;
+}
+
+#include "awoke_package.h"
+
+void bcd_test()
+{
+	
+	uint8_t hex[8] = {0x68, 0x9, 0x6, 0x30, 0x20, 0x0, 0x62, 0x9};
+	//uint8_t hex[16];
+	char str[] = "869060030200269";
+	char _str[32];
+	string_convert_BCD_to_str(_str, hex, 15);
+	//string_convert_str_to_BCD(hex, str, 15);
+	log_debug("_str %s", _str);
+	//pkg_dump(hex, 8);
+}
+
+void string_to_hex_test()
+{
+	char str[32] = "23344556";
+	uint8_t hex[8] = {0x0};
+
+	awoke_string_to_hex(str, hex, 16);
+	pkg_dump(hex, 8);
+
+	//uint8_t hex[8] = {0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89};
+	//awoke_string_from_hex(hex, str, 8);
+	//log_debug("str %s", str);
+}
+
+typedef enum {
+	tx_alert = 1,
+	tx_gps,
+	tx_wifi,
+	tx_cell,
+} tx_type;
+
+typedef struct _tx_unit {
+	tx_type type;
+	uint32_t flag;
+	void *data;
+	int data_len;
+} tx_unit;
+
+typedef struct _tx_queue {
+	int front;
+	int rear;
+#define TX_QUEUE_SIZE	8
+	tx_unit _queue[TX_QUEUE_SIZE];
+} tx_queue;
+
+
+#define tx_queue_foreach(q, u)						\
+		int __k;									\
+		int __f;									\
+		if (__f<0)									\
+			__f = 0;								\
+		u = &q->_queue[__f];						\
+													\
+		for (__k = __f;								\
+		 	(__k <= q->rear)||(__k<0);				\
+		 	__k++,									\
+		 	u = &q->_queue[__k])					\
+
+bool tx_queue_full(tx_queue *q)
+{
+	return ((q->rear+1-q->front) == TX_QUEUE_SIZE);
+}
+
+bool tx_queue_empty(tx_queue *q)
+{
+	return (q->front ==  q->rear);
+}
+
+void tx_queue_eq(tx_queue *q, tx_unit *u)
+{
+	if (tx_queue_full(q)) {
+		log_debug("queue full, can't eq");
+		return;
+	}
+
+	if (tx_queue_empty(q)) {
+		q->rear = 0;
+		memcpy(&q->_queue[q->rear], u, sizeof(tx_unit));
+	} else {
+		if (q->front < 0) 
+			q->front = 0;
+		q->rear++;
+		memcpy(&q->_queue[q->rear], u, sizeof(tx_unit));
+	}
+	
+	return;
+}
+
+void tx_queue_dq(tx_queue *q, tx_unit *u)
+{
+	if (q->rear==0) {
+		q->front = -1;
+		q->rear = -1;
+	}
+	
+	if (tx_queue_empty(q)) {
+		log_debug("queue empty, can't dq");
+		return;
+	}
+
+	memcpy(u, &q->_queue[q->rear], sizeof(tx_unit));
+	q->rear--;
+
+	return;
+}
+
+void tx_queue_init(tx_queue *q)
+{
+	memset(q->_queue, 0x0, sizeof(tx_unit)*TX_QUEUE_SIZE);
+
+	q->front = -1;
+	q->rear = -1;
+}
+
+void deque_dump(tx_queue *q)
+{
+	tx_unit *unit;
+	log_debug("deque dump -->");
+	log_debug("queue front:%d, rear:%d", q->front, q->rear);
+	if (tx_queue_empty(q))
+		return;
+	tx_queue_foreach(q, unit) {
+		log_debug("unit: %d", unit->type);
+	}
+	log_debug("\n");
+}
+
+void tx_queue_test()
+{
+	tx_unit u;
+	tx_unit a, b, c, d;
+	tx_queue queue;
+
+	tx_queue_init(&queue);
+
+	a.type = tx_alert;
+	b.type = tx_gps;
+	c.type = tx_wifi;
+	d.type = tx_cell;
+
+	deque_dump(&queue);
+	
+	tx_queue_eq(&queue, &a);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &c);
+	tx_queue_eq(&queue, &d);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &a);
+	tx_queue_eq(&queue, &c);
+	
+	deque_dump(&queue);
+
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+
+	deque_dump(&queue);
+
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &b);
+	tx_queue_eq(&queue, &a);
+	tx_queue_eq(&queue, &c);
+
+	deque_dump(&queue);
+
+	tx_queue_dq(&queue, &u);
+
+	deque_dump(&queue);
+
+	tx_queue_eq(&queue, &c);
+
+	deque_dump(&queue);
+	
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+	tx_queue_dq(&queue, &u);
+}
+
 int main(int argc, char **argv)
 {
 	log_level(LOG_DBG);
@@ -903,8 +1423,28 @@ int main(int argc, char **argv)
 
 	//package_test();
 
-	sensors_support();
-	
+	//sensors_support();
+
+	//flags_test();
+
+	//smp_ptr_test();
+
+	//address_type_test();
+
+	//status_test();
+
+	//ipaddr_test();
+
+	//awoke_list_test();
+
+	//signature_test();
+
+	//bcd_test();
+
+	//string_to_hex_test();
+
+	tx_queue_test();
+
 	return 0;
 }
 
