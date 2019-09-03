@@ -1,6 +1,6 @@
 
-EXEC = bin/string_test
-LIBS = -lutil -lrtmsg -levent -lpthread -lsecurity
+EXEC = bin/ry
+LIBS = -lutil -lrtmsg -levent -lpthread
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
@@ -13,9 +13,6 @@ AWOKE_DIR:=$(word 1, $(AWOKE_DIR))
 
 include $(AWOKE_DIR)/make.common
 
-INCLUDE_PATHS := -I.\
-				-I$(LIB_PATH)/libsecurity/include
-				
 all: prepare compile build
 
 
@@ -29,7 +26,7 @@ prepare:
 compile:$(OBJ_FILES)
 $(OBJ_FILES): obj/%.o:%.c
 obj/%.o:%.c
-	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -I$(INCLUDE_FILES) -c $< -o $@
+	$(CC) $(CFLAGS) -I$(INCLUDE_FILES) -c $< -o $@
 
 
 .PHONY: build

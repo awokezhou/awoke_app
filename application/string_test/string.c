@@ -1205,11 +1205,11 @@ void bcd_test()
 
 void string_to_hex_test()
 {
-	char str[32] = "23344556";
-	uint8_t hex[8] = {0x0};
+	char str[256] = "@@\\u0001\\u0001\\u00028\\b\\u0003\\bw\\u0000\\u0000h?00?q\\u0017\\u0006\\u0000\\u0000\\u0000\\u0000\\u0000\\u0001\\u0000R##";
+	uint8_t hex[128] = {0x0};
 
-	awoke_string_to_hex(str, hex, 16);
-	pkg_dump(hex, 8);
+	awoke_string_to_hex(str, hex, 128);
+	pkg_dump(hex, 128);
 
 	//uint8_t hex[8] = {0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89};
 	//awoke_string_from_hex(hex, str, 8);
@@ -1231,8 +1231,9 @@ typedef struct _tx_unit {
 } tx_unit;
 
 typedef struct _tx_queue {
-	int front;
-	int rear;
+	int curr;
+#define QUEUE_F_RB	0x0002
+	uint16_t flag;
 #define TX_QUEUE_SIZE	8
 	tx_unit _queue[TX_QUEUE_SIZE];
 } tx_queue;
@@ -1240,83 +1241,91 @@ typedef struct _tx_queue {
 
 #define tx_queue_foreach(q, u)						\
 		int __k;									\
-		int __f;									\
-		if (__f<0)									\
-			__f = 0;								\
-		u = &q->_queue[__f];						\
+		u = &q->_queue[q->curr];					\
 													\
-		for (__k = __f;								\
-		 	(__k <= q->rear)||(__k<0);				\
-		 	__k++,									\
+		for (__k = q->curr;							\
+		 	(__k>=0);								\
+		 	__k--,									\
 		 	u = &q->_queue[__k])					\
 
-bool tx_queue_full(tx_queue *q)
-{
-	return ((q->rear+1-q->front) == TX_QUEUE_SIZE);
-}
 
 bool tx_queue_empty(tx_queue *q)
 {
-	return (q->front ==  q->rear);
+	return ((q->curr+1) == 0);
+}
+
+bool tx_queue_full(tx_queue *q)
+{
+	return ((q->curr+1) == TX_QUEUE_SIZE);
+}
+
+void tx_queue_dq(tx_queue *q, tx_unit *u)
+{
+	int i;
+	
+	if (tx_queue_empty(q)) {
+		memset(u, 0x0, sizeof(tx_unit));
+		return;
+	}
+
+	memcpy(u, &q->_queue[0], sizeof(tx_unit));
+	
+	for (i=0; i<q->curr; i++) {
+		q->_queue[i] = q->_queue[i+1];
+	}
+	memset(&q->_queue[q->curr], 0x0, sizeof(tx_unit));
+	q->curr--;
+	return;
 }
 
 void tx_queue_eq(tx_queue *q, tx_unit *u)
 {
 	if (tx_queue_full(q)) {
-		log_debug("queue full, can't eq");
-		return;
-	}
-
-	if (tx_queue_empty(q)) {
-		q->rear = 0;
-		memcpy(&q->_queue[q->rear], u, sizeof(tx_unit));
-	} else {
-		if (q->front < 0) 
-			q->front = 0;
-		q->rear++;
-		memcpy(&q->_queue[q->rear], u, sizeof(tx_unit));
+		if (mask_exst(q->flag, QUEUE_F_RB)) {
+			tx_unit _front;
+			tx_queue_dq(q, &_front);
+		} else {
+			return;
+		}
 	}
 	
+	q->curr = (q->curr+1)%TX_QUEUE_SIZE;
+	memcpy(&q->_queue[q->curr], u, sizeof(tx_unit));
 	return;
 }
 
-void tx_queue_dq(tx_queue *q, tx_unit *u)
+void tx_queue_init(tx_queue *q, uint16_t flag)
 {
-	if (q->rear==0) {
-		q->front = -1;
-		q->rear = -1;
-	}
-	
-	if (tx_queue_empty(q)) {
-		log_debug("queue empty, can't dq");
-		return;
-	}
+	memset(&q->_queue, 0x0, sizeof(tx_queue));
 
-	memcpy(u, &q->_queue[q->rear], sizeof(tx_unit));
-	q->rear--;
-
-	return;
+	q->curr = -1;
+	mask_push(q->flag, flag);
 }
 
-void tx_queue_init(tx_queue *q)
+void queue_dump(tx_queue *q)
 {
-	memset(q->_queue, 0x0, sizeof(tx_unit)*TX_QUEUE_SIZE);
-
-	q->front = -1;
-	q->rear = -1;
-}
-
-void deque_dump(tx_queue *q)
-{
+	int max;
+	int len;
+	int size;
 	tx_unit *unit;
-	log_debug("deque dump -->");
-	log_debug("queue front:%d, rear:%d", q->front, q->rear);
-	if (tx_queue_empty(q))
+	size = q->curr+1;
+	char *pos;
+	char dump[256] = {'\0'};
+	
+	if (!size)
 		return;
+
+	len = 0;	
+	max = 256;
+	pos = dump;
+	
 	tx_queue_foreach(q, unit) {
-		log_debug("unit: %d", unit->type);
+		len = snprintf(pos, max, "%d ", unit->type);
+		pos += len;
+		max -= len;
 	}
-	log_debug("\n");
+	log_debug("queue size:%d, data: [%s]", size, dump);
+	printf("\n");
 }
 
 void tx_queue_test()
@@ -1325,15 +1334,16 @@ void tx_queue_test()
 	tx_unit a, b, c, d;
 	tx_queue queue;
 
-	tx_queue_init(&queue);
+	tx_queue_init(&queue, QUEUE_F_RB);
 
-	a.type = tx_alert;
-	b.type = tx_gps;
-	c.type = tx_wifi;
-	d.type = tx_cell;
+	a.type = 1;
+	b.type = 2;
+	c.type = 3;
+	d.type = 4;
 
-	deque_dump(&queue);
-	
+	queue_dump(&queue);
+
+	log_debug("eq [3 1 2 2 2 2 2 4 3 2 1] --> ");
 	tx_queue_eq(&queue, &a);
 	tx_queue_eq(&queue, &b);
 	tx_queue_eq(&queue, &c);
@@ -1346,40 +1356,178 @@ void tx_queue_test()
 	tx_queue_eq(&queue, &a);
 	tx_queue_eq(&queue, &c);
 	
-	deque_dump(&queue);
+	queue_dump(&queue);
+	
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
 
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
-	tx_queue_dq(&queue, &u);
+	queue_dump(&queue);
 
-	deque_dump(&queue);
-
+	log_debug("eq [3 1 2 2] --> ");
 	tx_queue_eq(&queue, &b);
 	tx_queue_eq(&queue, &b);
 	tx_queue_eq(&queue, &a);
 	tx_queue_eq(&queue, &c);
 
-	deque_dump(&queue);
+	queue_dump(&queue);
 
 	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
 
-	deque_dump(&queue);
+	queue_dump(&queue);
 
+	log_debug("eq [3] --> ");
 	tx_queue_eq(&queue, &c);
 
-	deque_dump(&queue);
+	queue_dump(&queue);
 	
 	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
 	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
 	tx_queue_dq(&queue, &u);
+	log_debug("dq --> [%d] ", u.type);
+
+	queue_dump(&queue);
+}
+
+typedef struct _rb_queue {
+	int curr;
+#define TX_QUEUE_SIZE	8
+	tx_unit _queue[TX_QUEUE_SIZE];
+} rb_queue;
+
+bool rb_queue_empty(rb_queue *q)
+{
+	return ((q->curr+1) == 0);
+}
+
+bool rb_queue_full(rb_queue *q)
+{
+	return ((q->curr+1) == TX_QUEUE_SIZE);
+}
+
+void rb_queue_init(rb_queue *q)
+{
+	memset(&q->_queue, 0x0, sizeof(rb_queue));
+	q->curr = -1;
+}
+
+void rb_queue_dq(rb_queue *q, tx_unit *u)
+{
+	int i;
+	
+	if (rb_queue_empty(q)) {
+		memset(u, 0x0, sizeof(tx_unit));
+		return;
+	}
+
+	memcpy(u, &q->_queue[0], sizeof(tx_unit));
+	
+	for (i=0; i<q->curr; i++) {
+		q->_queue[i] = q->_queue[i+1];
+	}
+	memset(&q->_queue[q->curr], 0x0, sizeof(tx_unit));
+	q->curr--;
+	return;
+}
+
+void rb_queue_eq(rb_queue *q, tx_unit *u)
+{	
+	if (rb_queue_full(q)) {
+		tx_unit _front;
+		rb_queue_dq(q, &_front);		
+	}
+
+	q->curr = (q->curr+1)%TX_QUEUE_SIZE;
+	memcpy(&q->_queue[q->curr], u, sizeof(tx_unit));
+}
+
+void rb_queue_test()
+{
+	rb_queue queue;
+	tx_unit u;
+	tx_unit a, b, c, d;
+
+	a.type = 1;
+	b.type = 2;
+	c.type = 3;
+	d.type = 4;
+	
+	rb_queue_init(&queue);
+
+	log_debug("eq [2 3 3 4 3 2 1] --> ");
+	rb_queue_eq(&queue, &a);
+	rb_queue_eq(&queue, &b);
+	rb_queue_eq(&queue, &c);
+	rb_queue_eq(&queue, &d);
+	rb_queue_eq(&queue, &c);
+	rb_queue_eq(&queue, &c);
+	rb_queue_eq(&queue, &b);
+
+	queue_dump(&queue);
+
+	log_debug("eq [3 1 1] --> ");
+	rb_queue_eq(&queue, &a);
+	rb_queue_eq(&queue, &a);
+	rb_queue_eq(&queue, &c);
+
+	queue_dump(&queue);
+
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+
+	queue_dump(&queue);
+
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+
+	queue_dump(&queue);
+
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	rb_queue_dq(&queue, &u);
+	log_debug("dq [%d] --> ", u.type);
+	
+	log_debug("dq [%d] --> ", u.type);
+}
+
+#include "sec_base64.h"
+void base64_test()
+{
+	size_t len;
+	char buff[128];
+	char *str = "QEABAQMDCQMIdwAAaIAwMJBxFwYAAAAAAAEAhSMj";
+	
+	sec_base64_decode(buff, sizeof(buff), &len, str, strlen(str));
+
+	pkg_dump(buff, len);
 }
 
 int main(int argc, char **argv)
@@ -1443,7 +1591,11 @@ int main(int argc, char **argv)
 
 	//string_to_hex_test();
 
-	tx_queue_test();
+	//tx_queue_test();
+
+	//rb_queue_test();
+
+	base64_test();
 
 	return 0;
 }
