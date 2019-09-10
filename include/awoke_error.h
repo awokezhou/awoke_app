@@ -9,6 +9,8 @@ typedef enum
     et_param,
     et_nomem,
     et_exist,
+    et_full,
+    et_empty,
     et_sock_set,
     et_sock_creat,
     et_sock_bind,

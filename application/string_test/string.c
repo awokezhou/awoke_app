@@ -168,7 +168,7 @@ void event_test()
 	err_type ret = et_ok;
 	awoke_event *event;
 	awoke_event_loop *evl;
-	int client_fd;
+	int client_fd = -1;
 	awoke_event listener;
 	awoke_event conn;
 
@@ -397,7 +397,7 @@ fifo *fifo_curr()
 	return pfifo;
 }
 
-bool _fifo_curr_move()
+void _fifo_curr_move()
 {
 	pfifo++;
 }
@@ -956,20 +956,6 @@ build_ptr smp_ptr_pt_header(int len)
 	return bp;
 }
 
-
-static int hex2byte(char *dst, char *src) {
-    while(*src) {
-        if(' ' == *src) {
-            src++;
-            continue;
-        }
-        sscanf(src, "%02X", dst);
-        src += 2;
-        dst++;
-    }
-    return 0;
-}
-
 build_ptr smp_ptr_data()
 {
 	char data[512];
@@ -1205,11 +1191,11 @@ void bcd_test()
 
 void string_to_hex_test()
 {
-	char str[256] = "@@\\u0001\\u0001\\u00028\\b\\u0003\\bw\\u0000\\u0000h?00?q\\u0017\\u0006\\u0000\\u0000\\u0000\\u0000\\u0000\\u0001\\u0000R##";
-	uint8_t hex[128] = {0x0};
+	char *str = "1223222222222222222";
+	uint8_t hex[64] = {0x0};
 
-	awoke_string_to_hex(str, hex, 128);
-	pkg_dump(hex, 128);
+	awoke_string_to_hex(str, hex, 20);
+	pkg_dump(hex, 10);
 
 	//uint8_t hex[8] = {0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89};
 	//awoke_string_from_hex(hex, str, 8);
@@ -1522,12 +1508,29 @@ void rb_queue_test()
 void base64_test()
 {
 	size_t len;
-	char buff[128];
-	char *str = "QEABAQMDCQMIdwAAaIAwMJBxFwYAAAAAAAEAhSMj";
+	uint8_t buff[128];
+	char *str = "QEABASApCQMIdwAAaIAwMJBxFwYAAAAAABQAMAUAAAAAAAEAAAAAAAAAAEwAAK0jIw==";
 	
 	sec_base64_decode(buff, sizeof(buff), &len, str, strlen(str));
 
 	pkg_dump(buff, len);
+}
+#include "cJSON.h"
+void cjson_test()
+{
+	int remainder;
+	int len;
+	char *str = "[http] array:array\":[{\"ack\":1,\"expire_at\":1567933248,\"value\":\"10022B0A010001001D5d722";	
+	char *p = str;
+	char *str_remainder = NULL;
+	char *end;
+	
+	str_remainder = strstr(p, "HTTP/1.1");
+	if (!str_remainder)
+		return;
+	str_remainder += strlen("HTTP/1.1");
+	sscanf(str_remainder, " %d[^ ]", &remainder);
+	log_debug("state %d", remainder);
 }
 
 int main(int argc, char **argv)
@@ -1589,13 +1592,15 @@ int main(int argc, char **argv)
 
 	//bcd_test();
 
-	//string_to_hex_test();
+	string_to_hex_test();
 
 	//tx_queue_test();
 
 	//rb_queue_test();
 
-	base64_test();
+	//base64_test();
+
+	//cjson_test();
 
 	return 0;
 }
