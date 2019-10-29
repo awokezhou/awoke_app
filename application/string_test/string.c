@@ -1181,12 +1181,12 @@ void bcd_test()
 	
 	uint8_t hex[8] = {0x68, 0x9, 0x6, 0x30, 0x20, 0x0, 0x62, 0x9};
 	//uint8_t hex[16];
-	char str[] = "869060030200269";
+	char str[] = "860803030918938";
 	char _str[32];
 	string_convert_BCD_to_str(_str, hex, 15);
-	//string_convert_str_to_BCD(hex, str, 15);
+	string_convert_str_to_BCD(hex, str, 15);
 	log_debug("_str %s", _str);
-	//pkg_dump(hex, 8);
+	pkg_dump(hex, 8);
 }
 
 void string_to_hex_test()
@@ -1509,8 +1509,9 @@ void base64_test()
 {
 	size_t len;
 	uint8_t buff[128];
-	char *str = "QEABASApCQMIdwAAaIAwMJBxFwYAAAAAABQAMAUAAAAAAAEAAAAAAAAAAEwAAK0jIw==";
-	
+	char *str = "QEABARQDCAAKExEiaIAwMJCBOQgzRAAAAAD9IyM=";
+
+	log_debug("str[%d]:%s", strlen(str), str);
 	sec_base64_decode(buff, sizeof(buff), &len, str, strlen(str));
 
 	pkg_dump(buff, len);
@@ -1590,9 +1591,10 @@ int main(int argc, char **argv)
 
 	//signature_test();
 
-	//bcd_test();
+	bcd_test();
 
-	string_to_hex_test();
+
+	//string_to_hex_test();
 
 	//tx_queue_test();
 

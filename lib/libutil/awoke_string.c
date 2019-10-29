@@ -118,6 +118,18 @@ static int string_htoi(char *src)
   	return n;	
 }
 
+static int ctoi(char c)
+{
+    int i;
+
+    i = (int)c - '0';
+    if (i < 0 || i > 9)
+    {
+        i = 0;
+    }
+    return i;
+}
+
 int awoke_string_to_hex(char *string, uint8_t *hex, uint16_t hex_len)
 {
 	int i;
@@ -142,5 +154,66 @@ int awoke_string_to_hex(char *string, uint8_t *hex, uint16_t hex_len)
     }
 
     return len;
+}
+
+int awoke_string_bcd2str(char *out, const uint8_t *in, uint16_t b_len)
+{
+	int i;
+    int out_len = 0;
+
+    if (out == NULL || in == NULL || b_len == 0)
+    {
+        return -1;
+    }
+
+    for (i = 0; i < b_len/2; i++)
+    {
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[i] & 0x0F));        // lower nibble
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[i] & 0xF0) >> 4);   // upper nibbl
+    }
+    // If it is an odd number add one digit more
+    if ((b_len & 0x1) != 0)
+    {
+        out_len += sprintf(out + out_len, "%u", (uint8_t)(in[b_len/2] & 0x0F));  // lower nibble
+    }
+    out[out_len] = '\0'; // It is a string so add the null terminated character
+    return out_len;
+}
+
+int awoke_string_str2bcd(uint8_t *bin_data, const char *str_data, uint16_t bin_len)
+{
+	int i;
+    int out_len;
+
+    uint8_t digit1;
+    uint8_t digit2;
+
+    if (bin_data == NULL || str_data == NULL || bin_len == 0)
+    {
+        return -1;
+    }
+
+    for ( out_len = 0; out_len +1 < bin_len; out_len += 2)       //lint !e440  False positive complaint about bit_len not being modified.
+    {
+        if ((str_data[out_len] < '0') || (str_data[out_len] > '9') || (str_data[out_len + 1] < '0') || (str_data[out_len + 1] > '9'))
+        {
+            return -1;
+        }
+
+        digit1 = (uint8_t)ctoi(str_data[out_len]);
+        digit2 = (uint8_t)ctoi(str_data[out_len + 1]);
+        bin_data[out_len/2] = digit1 | ((digit2 << 4) & 0xFF);
+    }
+    // If it is an odd number add the last digit and a 0
+    if ((bin_len & 0x1) != 0)
+    {
+        if ((str_data[bin_len - 1] < '0') || (str_data[bin_len - 1] > '9'))
+        {
+            return -1;
+        }
+
+        bin_data[bin_len/2] = (uint8_t)ctoi(str_data[bin_len - 1]); // just digit 1, digit2 = 0
+    }
+    return bin_len;
 }
 

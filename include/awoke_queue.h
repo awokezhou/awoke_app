@@ -36,6 +36,7 @@ err_type awoke_queue_enq(awoke_queue *q, void *u);
 awoke_queue *awoke_queue_create(size_t node_size, int node_nr, uint16_t flag);
 void awoke_queue_clean(awoke_queue **q);
 
+
 #endif /* __AWOKE_QUEUE_H__ */
 
 

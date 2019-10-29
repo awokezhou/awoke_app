@@ -44,11 +44,8 @@ static void test_queue_dump(awoke_queue *q)
 	printf("\n");
 }
 
-int main(int argc, char *argv[])
+void normal_queue()
 {
-	log_mode(LOG_TEST);
-	log_level(LOG_DBG);
-
 	awoke_queue *queue;
 	test_unit u1, u2, u3, u4, u;
 
@@ -63,7 +60,6 @@ int main(int argc, char *argv[])
 	u2.a = 2;
 	u3.a = 3;
 	u4.a = 4;
-
 
 	awoke_queue_enq(queue, &u1);
 	awoke_queue_enq(queue, &u2);
@@ -94,6 +90,14 @@ int main(int argc, char *argv[])
 	test_queue_dump(queue);
 	
 	awoke_queue_clean(&queue);
+}
+
+int main(int argc, char *argv[])
+{
+	log_mode(LOG_TEST);
+	log_level(LOG_DBG);
+
+	normal_queue();
 
 	return 0;
 }

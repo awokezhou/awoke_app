@@ -1,6 +1,6 @@
 
-EXEC = bin/ry
-LIBS = -lutil -lrtmsg -levent -lpthread -lsecurity
+EXEC = bin/step_counter
+LIBS = -lutil -lpthread -lsecurity
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 

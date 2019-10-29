@@ -61,6 +61,9 @@ int main(int argc, char **argv)
 {
 	listener *e;
 	listener *t;
+
+	log_mode(LOG_TEST);
+	log_level(LOG_DBG);
 	
 	awoke_list test_list;
 	list_init(&test_list);
@@ -74,6 +77,9 @@ int main(int argc, char **argv)
 	}
 
 	listener *first = list_entry_first(&test_list, listener, _head);
+	log_debug("first port %d, name %s", first->port, first->name);
+	list_unlink(&first->_head);
+	first = list_entry_first(&test_list, listener, _head);
 	log_debug("first port %d, name %s", first->port, first->name);
 
 	listener *last = dlist_entry_last(&test_list, listener, _head);

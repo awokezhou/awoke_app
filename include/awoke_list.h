@@ -51,12 +51,12 @@ static inline int list_empty(const struct _awoke_list *head)
  */
 static inline void list_append(struct _awoke_list *new, struct _awoke_list *existing)
 {
-   existing->next->prev = new;
-
-   new->next = existing->next;
-   new->prev = existing;
-
-   existing->next = new;
+	existing->prev->next = new;
+	
+	new->next = existing;
+	new->prev = existing->prev;
+	
+	existing->prev = new;
 }
 
 
@@ -69,12 +69,12 @@ static inline void list_append(struct _awoke_list *new, struct _awoke_list *exis
  */
 static inline void list_prepend(struct _awoke_list *new, struct _awoke_list *existing)
 {
-   existing->prev->next = new;
+   existing->next->prev = new;
 
-   new->next = existing;
-   new->prev = existing->prev;
+   new->next = existing->next;
+   new->prev = existing;
 
-   existing->prev = new;
+   existing->next = new;
 }
 
 

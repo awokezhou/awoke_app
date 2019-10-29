@@ -35,6 +35,8 @@
 #include "awoke_event.h"
 #include "awoke_package.h"
 
+#include "sec_base64.h"
+
 
 static int ry_queue_size(ry_queue *q);
 
@@ -161,15 +163,21 @@ static void ry_datetime_get(ry_msg_header *hdr)
 	time_t now;
 	now = time(NULL);
 	date = localtime(&now);
-	memcpy(&hdr->date, date, sizeof(struct tm));
+	hdr->date.tm_sec 	= date->tm_sec;
+	hdr->date.tm_min 	= date->tm_min;
+	hdr->date.tm_hour 	= date->tm_hour;
+	hdr->date.tm_wday 	= date->tm_wday;
+	hdr->date.tm_mday 	= date->tm_mday;
+	hdr->date.tm_mon 	= date->tm_mon;
+	hdr->date.tm_year 	= date->tm_year+1900-2000;
 	
 	log_info("date: %d-%d-%d %d:%d:%d", 
-		date->tm_year+1900,
-		date->tm_mon+1,
-		date->tm_mday,
-		date->tm_hour,
-		date->tm_min,
-		date->tm_sec);
+		hdr->date.tm_year,
+		hdr->date.tm_mon,
+		hdr->date.tm_mday,
+		hdr->date.tm_hour,
+		hdr->date.tm_min,
+		hdr->date.tm_sec);
 }
 
 static void ry_imei_get(ry_msg_header *hdr)
@@ -251,11 +259,12 @@ static err_type ry_msg_du_monitor_package(ry_message *msg, uint8_t **ppos,
 	uint8_t *pos = head;
 	ry_dataunit *m = NULL;
 	ry_msg_dtunit *du = &msg->dtunit;
+	ry_msg_header *h = &msg->header;
 	
 	ry_queue_foreach(&(g_store->du_queue), m) {
 
 		log_debug("m->pressure %d", m->pressure);
-
+		
 		// type flag 
 		uint16_t type_flag = htons(du->type_flag);
 		pkg_push_word_safe(type_flag, pos, end);
@@ -294,15 +303,21 @@ static err_type ry_msg_du_monitor_package(ry_message *msg, uint8_t **ppos,
 		pkg_push_byte_safe(m->sys_state, pos, end);	
 
 		// occur time
-		pkg_push_byte_safe(m->occur_time.tm_sec, pos, end);
-		pkg_push_byte_safe(m->occur_time.tm_min, pos, end);
-		pkg_push_byte_safe(m->occur_time.tm_hour, pos, end);
-		pkg_push_byte_safe(m->occur_time.tm_mday, pos, end);
-		pkg_push_byte_safe(m->occur_time.tm_mon, pos, end);
-		pkg_push_byte_safe(m->occur_time.tm_year, pos, end);	
+		uint8_t _tm_sec = (uint8_t)h->date.tm_sec;
+		uint8_t _tm_min = (uint8_t)h->date.tm_min;
+		uint8_t _tm_hour = (uint8_t)h->date.tm_hour;
+		uint8_t _tm_mday = (uint8_t)h->date.tm_mday;
+		uint8_t _tm_mon = (uint8_t)h->date.tm_mon;
+		uint8_t _tm_year = (uint8_t)h->date.tm_year;
+		pkg_push_byte_safe(_tm_sec, pos, end);
+		pkg_push_byte_safe(_tm_min, pos, end);
+		pkg_push_byte_safe(_tm_hour, pos, end);
+		pkg_push_byte_safe(_tm_mday, pos, end);
+		pkg_push_byte_safe(_tm_mon, pos, end);
+		pkg_push_byte_safe(_tm_year, pos, end); 	
 	}
 
-	msg->dtunit_len = 1 + pos - head;
+	msg->dtunit_len = pos - head + 1;
 	return et_ok;
 }
 
@@ -322,12 +337,19 @@ static err_type ry_msg_header_package(ry_message *msg)
 	pkg_push_word_safe(version, pos, end);
 
 	// time
-	pkg_push_byte_safe(h->date.tm_sec, pos, end);
-	pkg_push_byte_safe(h->date.tm_min, pos, end);
-	pkg_push_byte_safe(h->date.tm_hour, pos, end);
-	pkg_push_byte_safe(h->date.tm_mday, pos, end);
-	pkg_push_byte_safe(h->date.tm_mon, pos, end);
-	pkg_push_byte_safe(h->date.tm_year, pos, end);					
+	uint8_t _tm_sec = (uint8_t)h->date.tm_sec;
+	uint8_t _tm_min = (uint8_t)h->date.tm_min;
+	uint8_t _tm_hour = (uint8_t)h->date.tm_hour;
+	uint8_t _tm_mday = (uint8_t)h->date.tm_mday;
+	uint8_t _tm_mon = (uint8_t)h->date.tm_mon;
+	uint8_t _tm_year = (uint8_t)h->date.tm_year;
+	log_debug("year %d %d", h->date.tm_year, _tm_year);
+	pkg_push_byte_safe(_tm_sec, pos, end);
+	pkg_push_byte_safe(_tm_min, pos, end);
+	pkg_push_byte_safe(_tm_hour, pos, end);
+	pkg_push_byte_safe(_tm_mday, pos, end);
+	pkg_push_byte_safe(_tm_mon, pos, end);
+	pkg_push_byte_safe(_tm_year, pos, end);					
 
 	// manufacturer
 	uint16_t manufacturer = htons(h->manufacturer);
@@ -420,7 +442,11 @@ err_type ry_construst_msg()
 		goto err;
 	}
 
-	pkg_dump(msg->original_buf, msg->original_len+10);
+	pkg_dump(msg->original_buf, msg->original_len);
+	size_t len;
+	char buff[1024];
+	sec_base64_encode(buff, sizeof(buff), &len, msg->original_buf, msg->original_len);
+	log_debug("buff:%s", buff);
 	mem_free(msg);
 	return et_ok;
 
@@ -461,16 +487,240 @@ err_type ry_store_init()
 	return et_ok;
 }
 
-int main(int argc, char **argv)
+err_type ry_data_load(char *buf, int buff_len)
 {
-	log_level(LOG_DBG);
-	log_mode(LOG_TEST);
+	int i;
+	char *pos;
+	int max_len;
+	int len = 0;
+	int line_nr = 0;
+	char line[1024];
+	
+	FILE *in = fopen("data", "r");
+	if (!in) {
+		log_err("Could not open file: %s\n", "data");
+		return et_file_open;
+	}
 
+	while (!feof(in) && fgets(line, 1024, in)) {
+        ++line_nr;
+    }
+    fseek(in, 0, SEEK_SET);
+
+	pos = buf;
+	max_len = buff_len;
+
+	for (i=0; i<line_nr; i++) {
+		
+		if (fgets(line, 1024, in) == NULL) {
+	        perror("fgets");
+	        exit(1);
+	    }
+
+		if (max_len <= 0)
+			break;
+		
+		len = snprintf(pos, max_len, "%s", line);
+		pos += len;
+		max_len -= len;
+	}
+
+	fclose(in);
+	return et_ok;
+}
+
+static err_type du_unpack(int dunr, uint8_t **ptr)
+{
+	uint8_t *p = *ptr;
+	int du_nr = 0;
+	ry_msg_dtunit du;
+	ry_dataunit ddu;
+
+	pkg_pull_byte(du.order_type, p);
+	log_debug("order type: 0x%x", du.order_type);
+
+	printf("-------- data unit --------\n");
+
+	int i;
+
+	for (i=0; i<dunr; i++) {
+
+		pkg_pull_word(du.type_flag, p);
+		du.type_flag = htons(du.type_flag);
+		log_debug("type flag: 0x%x", du.type_flag);
+
+		pkg_pull_word(du.component_code, p);
+		du.component_code = htons(du.component_code);
+		log_debug("component code: 0x%x", du.component_code);
+
+		pkg_pull_word(ddu.batt_level, p);
+		ddu.batt_level = htons(ddu.batt_level);
+		log_debug("batt level: %d", ddu.batt_level);
+
+		pkg_pull_word(ddu.rssi, p);
+		ddu.rssi = htons(ddu.rssi);
+		log_debug("rssi: %d", ddu.rssi);
+
+		pkg_pull_word(ddu.rssi_percent, p);
+		ddu.rssi_percent = htons(ddu.rssi_percent);
+		log_debug("rssi percent: %d", ddu.rssi_percent);
+
+		pkg_pull_word(ddu.snr, p);
+		ddu.snr = htons(ddu.snr);
+		log_debug("snr: %d", ddu.snr);
+
+		pkg_pull_byte(ddu.ecl, p);
+		log_debug("ecl: %d", ddu.ecl);
+
+		pkg_pull_byte(ddu.batt_percent, p);
+		log_debug("batt percent: %d", ddu.batt_percent);
+
+		pkg_pull_word(ddu.pressure, p);
+		ddu.pressure = htons(ddu.pressure);
+		log_debug("pressure: %d", ddu.pressure);
+
+		pkg_pull_byte(ddu.sys_state, p);
+		log_debug("system state: %d", ddu.sys_state);
+
+		uint8_t tm_sec;
+		uint8_t tm_min;
+		uint8_t tm_hour;
+		uint8_t tm_mday;
+		uint8_t tm_mon;
+		uint8_t tm_year;
+		pkg_pull_byte(tm_sec, p);
+		pkg_pull_byte(tm_min, p);
+		pkg_pull_byte(tm_hour, p);
+		pkg_pull_byte(tm_mday, p);
+		pkg_pull_byte(tm_mon, p);
+		pkg_pull_byte(tm_year, p);		
+		log_debug("occur time: %d-%d-%d %d:%d:%d", 
+			tm_year,
+			tm_mon,
+			tm_mday,
+			tm_hour,
+			tm_min,
+			tm_sec);		
+	}
+
+	*ptr = p;
+	printf("-------- data unit --------\n");
+	
+	return et_ok;
+}
+
+static err_type _ry_unpack(uint8_t *buff, int len)
+{
+	uint8_t *p = buff;
+	ry_msg_header h;
+	uint8_t tm_sec;
+	uint8_t tm_min;
+	uint8_t tm_hour;
+	uint8_t tm_mday;
+	uint8_t tm_mon;
+	uint8_t tm_year;
+	int dataunit_nr;
+	uint16_t dataunit_len;
+	
+	pkg_pull_word(h.prefix, p);
+	h.prefix = htons(h.prefix);
+
+	pkg_pull_word(h.version, p);
+	h.version = htons(h.version);
+
+	// time
+	pkg_pull_byte(tm_sec, p);
+	pkg_pull_byte(tm_min, p);
+	pkg_pull_byte(tm_hour, p);
+	pkg_pull_byte(tm_mday, p);
+	pkg_pull_byte(tm_mon, p);
+	pkg_pull_byte(tm_year, p);		
+
+	pkg_pull_word(h.manufacturer, p);
+	h.manufacturer = htons(h.manufacturer);
+
+	char imei_str[32] = {'\0'};
+	pkg_pull_bytes(h.imei, p, 8);
+	awoke_string_bcd2str(imei_str, h.imei, 15);
+
+	pkg_pull_word(h.dev_type, p);
+	h.dev_type = htons(h.dev_type);	
+
+	pkg_pull_byte(h.command, p);
+
+	pkg_pull_byte(h.f_ack, p);
+
+	pkg_pull_word(dataunit_len, p);
+	dataunit_len = htons(dataunit_len);		
+
+	// debug
+	log_debug("prefix: 0x%x", h.prefix);
+	log_debug("version: 0x%x", h.version);	
+	log_debug("date: %d-%d-%d %d:%d:%d", 
+		tm_year,
+		tm_mon,
+		tm_mday,
+		tm_hour,
+		tm_min,
+		tm_sec);
+	log_debug("manufacturer: 0x%x", h.manufacturer);
+	log_debug("imei: %s", imei_str);
+	log_debug("device type: 0x%x", h.dev_type);
+	log_debug("command: 0x%x", h.command);
+	log_debug("ack flag: 0x%x", h.f_ack);
+	log_debug("data unit len: 0x%x", dataunit_len);
+
+	dataunit_nr = (dataunit_len-1)/23;
+
+	if (dataunit_len) {
+		du_unpack(dataunit_nr, &p);
+	}
+
+	pkg_pull_byte(h.checksum, p);
+	pkg_pull_word(h.postfix, p);
+	h.postfix = htons(h.postfix);	
+	log_debug("checksum: 0x%x", h.checksum);
+	log_debug("postfix: 0x%x", h.postfix);
+}
+
+static err_type ry_pkt_unpack(char *str)
+{
+	size_t len;
+	uint8_t buff[128];
+
+	sec_base64_decode(buff, sizeof(buff), &len, str, strlen(str));
+	pkg_dump(buff, len);
+
+	_ry_unpack(buff, len);
+}
+
+void ry_pack_test()
+{
 	ry_store_init();
 
 	ry_push_data();
 
 	ry_construst_msg();
+}
+
+void ry_unpack_test()
+{
+	char buff[1024] = {'\0'};
+
+	ry_data_load(buff, 1024);
+	log_debug("buff[%d]:\n%s", strlen(buff), buff);
+
+	ry_pkt_unpack(buff);	
+}
+
+int main(int argc, char **argv)
+{
+	log_level(LOG_DBG);
+	log_mode(LOG_TEST);
+
+	//ry_pack_test();
+
+	ry_unpack_test();
 
 	return 0;
 }

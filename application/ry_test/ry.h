@@ -21,9 +21,9 @@ typedef struct _ry_wpdata {
 typedef struct _ry_dataunit {
 	uint16_t batt_level;
 	uint16_t rssi;			 
-	uint16_t rssi_percent;			 
+	int16_t rssi_percent;			 
 	uint16_t rsrq;			/* sgnal quality level */
-	uint16_t snr;			/* SNR */
+	int16_t snr;			/* SNR */
 	uint8_t batt_percent;
 	uint8_t ecl;			/* ECL */
 	uint16_t pressure;
