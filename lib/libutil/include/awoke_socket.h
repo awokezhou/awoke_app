@@ -14,9 +14,9 @@
 
 
 #include "awoke_type.h"
-#include "awoke_memory.h"
-#include "awoke_log.h"
 #include "awoke_error.h"
+#include "awoke_macros.h"
+#include "awoke_memory.h"
 
 #define SOCK_LOCAL			0x01
 #define SOCK_INTERNET_TCP	0x02

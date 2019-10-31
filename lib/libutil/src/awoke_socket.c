@@ -1,6 +1,8 @@
 #include <sys/un.h>
 
 #include "awoke_socket.h"
+#include "awoke_log.h"
+
 
 static sock_map sk_map[] = 
 {

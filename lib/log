@@ -1,0 +1,113 @@
+make -C libutil
+make[1]: Entering directory '/home/share/project/awoke_app/lib/libutil'
+echo "-------------prepare--------------"
+-------------prepare--------------
+if [ ! -d /home/share/project/awoke_app/lib/libutil/obj ];then mkdir obj;fi;
+if [ ! -d /home/share/project/awoke_app/lib/libutil/lib ];then mkdir lib;fi;
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_network.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_network.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_random.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_random.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_queue.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_queue.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_worker.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_worker.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_randm.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_randm.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_socket.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_socket.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_log.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_log.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_package.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_package.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_string.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_string.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libutil/include  -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libutil/src/awoke_waitev.c -o /home/share/project/awoke_app/lib/libutil/obj/awoke_waitev.o
+echo "-------------build--------------"
+-------------build--------------
+gcc -shared -fPIC -Wl,--whole-archive,-soname,/home/share/project/awoke_app/lib/libutil/lib/libutil.so -O -Wall  -I/home/share/project/awoke_app/include -o /home/share/project/awoke_app/lib/libutil/lib/libutil.so /home/share/project/awoke_app/lib/libutil/obj/awoke_network.o /home/share/project/awoke_app/lib/libutil/obj/awoke_random.o /home/share/project/awoke_app/lib/libutil/obj/awoke_queue.o /home/share/project/awoke_app/lib/libutil/obj/awoke_worker.o /home/share/project/awoke_app/lib/libutil/obj/awoke_randm.o /home/share/project/awoke_app/lib/libutil/obj/awoke_socket.o /home/share/project/awoke_app/lib/libutil/obj/awoke_log.o /home/share/project/awoke_app/lib/libutil/obj/awoke_package.o /home/share/project/awoke_app/lib/libutil/obj/awoke_string.o /home/share/project/awoke_app/lib/libutil/obj/awoke_waitev.o -Wl,--no-whole-archive
+echo "-------------install--------------"
+-------------install--------------
+cp /home/share/project/awoke_app/lib/libutil/lib/libutil.so /home/share/project/awoke_app/lib
+make[1]: Leaving directory '/home/share/project/awoke_app/lib/libutil'
+make -C librtmsg
+make[1]: Entering directory '/home/share/project/awoke_app/lib/librtmsg'
+echo "-------------prepare--------------"
+-------------prepare--------------
+if [ ! -d /home/share/project/awoke_app/lib/librtmsg/obj ];then mkdir obj;fi;
+if [ ! -d /home/share/project/awoke_app/lib/librtmsg/lib ];then mkdir lib;fi;
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/librtmsg/include -I/home/share/project/awoke_app/lib/libutil/include -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/librtmsg/src/awoke_rtmsg.c -o /home/share/project/awoke_app/lib/librtmsg/obj/awoke_rtmsg.o
+echo "-------------build--------------"
+-------------build--------------
+gcc -shared -fPIC -Wl,--whole-archive,-soname,/home/share/project/awoke_app/lib/librtmsg/lib/librtmsg.so -O -Wall  -I/home/share/project/awoke_app/include -o /home/share/project/awoke_app/lib/librtmsg/lib/librtmsg.so /home/share/project/awoke_app/lib/librtmsg/obj/awoke_rtmsg.o -Wl,--no-whole-archive -lutil
+echo "-------------install--------------"
+-------------install--------------
+cp /home/share/project/awoke_app/lib/librtmsg/lib/librtmsg.so /home/share/project/awoke_app/lib
+make[1]: Leaving directory '/home/share/project/awoke_app/lib/librtmsg'
+make -C libevent
+make[1]: Entering directory '/home/share/project/awoke_app/lib/libevent'
+echo "-------------prepare--------------"
+-------------prepare--------------
+if [ ! -d /home/share/project/awoke_app/lib/libevent/obj ];then mkdir obj;fi;
+if [ ! -d /home/share/project/awoke_app/lib/libevent/lib ];then mkdir lib;fi;
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libevent/include -I/home/share/project/awoke_app/lib/libutil/include    -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libevent/src/awoke_event.c -o /home/share/project/awoke_app/lib/libevent/obj/awoke_event.o
+echo "-------------build--------------"
+-------------build--------------
+gcc -shared -fPIC -Wl,--whole-archive,-soname,/home/share/project/awoke_app/lib/libevent/lib/libevent.so -O -Wall  -I/home/share/project/awoke_app/include -o /home/share/project/awoke_app/lib/libevent/lib/libevent.so /home/share/project/awoke_app/lib/libevent/obj/awoke_event.o -Wl,--no-whole-archive -lutil
+echo "-------------install--------------"
+-------------install--------------
+cp /home/share/project/awoke_app/lib/libevent/lib/libevent.so /home/share/project/awoke_app/lib
+make[1]: Leaving directory '/home/share/project/awoke_app/lib/libevent'
+make -C libsecurity
+make[1]: Entering directory '/home/share/project/awoke_app/lib/libsecurity'
+echo "-------------prepare--------------"
+-------------prepare--------------
+if [ ! -d /home/share/project/awoke_app/lib/libsecurity/obj ];then mkdir obj;fi;
+if [ ! -d /home/share/project/awoke_app/lib/libsecurity/lib ];then mkdir lib;fi;
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libsecurity/include -I/home/share/project/awoke_app/lib/libutil/include -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libsecurity/src/sec_padding.c -o /home/share/project/awoke_app/lib/libsecurity/obj/sec_padding.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libsecurity/include -I/home/share/project/awoke_app/lib/libutil/include -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libsecurity/src/sec_aes.c -o /home/share/project/awoke_app/lib/libsecurity/obj/sec_aes.o
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libsecurity/include -I/home/share/project/awoke_app/lib/libutil/include -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libsecurity/src/sec_base64.c -o /home/share/project/awoke_app/lib/libsecurity/obj/sec_base64.o
+echo "-------------build--------------"
+-------------build--------------
+gcc -shared -fPIC -Wl,--whole-archive,-soname,/home/share/project/awoke_app/lib/libsecurity/lib/libsecurity.so -O -Wall  -I/home/share/project/awoke_app/include -o /home/share/project/awoke_app/lib/libsecurity/lib/libsecurity.so /home/share/project/awoke_app/lib/libsecurity/obj/sec_padding.o /home/share/project/awoke_app/lib/libsecurity/obj/sec_aes.o /home/share/project/awoke_app/lib/libsecurity/obj/sec_base64.o -Wl,--no-whole-archive -lutil
+echo "-------------install--------------"
+-------------install--------------
+cp /home/share/project/awoke_app/lib/libsecurity/lib/libsecurity.so /home/share/project/awoke_app/lib
+make[1]: Leaving directory '/home/share/project/awoke_app/lib/libsecurity'
+make -C libpattern
+make[1]: Entering directory '/home/share/project/awoke_app/lib/libpattern'
+echo "-------------prepare--------------"
+-------------prepare--------------
+if [ ! -d /home/share/project/awoke_app/lib/libpattern/obj ];then mkdir obj;fi;
+if [ ! -d /home/share/project/awoke_app/lib/libpattern/lib ];then mkdir lib;fi;
+echo "-------------compile--------------"
+-------------compile--------------
+gcc -O -Wall  -I/home/share/project/awoke_app/include -I. -I/home/share/project/awoke_app/lib/libpattern/include -I/home/share/project/awoke_app/lib/libutil/include -I/home/share/project/awoke_app/include -fPIC -c /home/share/project/awoke_app/lib/libpattern/src/condition_action.c -o /home/share/project/awoke_app/lib/libpattern/obj/condition_action.o
+echo "-------------build--------------"
+-------------build--------------
+gcc -shared -fPIC -Wl,--whole-archive,-soname,/home/share/project/awoke_app/lib/libpattern/lib/libpattern.so -O -Wall  -I/home/share/project/awoke_app/include -o /home/share/project/awoke_app/lib/libpattern/lib/libpattern.so /home/share/project/awoke_app/lib/libpattern/obj/condition_action.o -Wl,--no-whole-archive -lutil
+echo "-------------install--------------"
+-------------install--------------
+cp /home/share/project/awoke_app/lib/libpattern/lib/libpattern.so /home/share/project/awoke_app/lib
+make[1]: Leaving directory '/home/share/project/awoke_app/lib/libpattern'

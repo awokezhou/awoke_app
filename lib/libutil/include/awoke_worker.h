@@ -4,10 +4,10 @@
 #include <pthread.h> 
 
 #include "awoke_type.h"
-#include "awoke_memory.h"
-#include "awoke_log.h"
-#include "awoke_error.h"
 #include "awoke_list.h"
+#include "awoke_error.h"
+#include "awoke_memory.h"
+#include "awoke_macros.h"
 
 #define WORKER_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
 

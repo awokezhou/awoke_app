@@ -1,7 +1,6 @@
 
-
-EXEC = bin/message_router
-LIBS = -lutil -lrtmsg -levent -lpthread
+EXEC = bin/benchmark
+LIBS = -lutil -lpthread -lsecurity -levent -lrtmsg -lpattern
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
@@ -16,7 +15,9 @@ include $(AWOKE_DIR)/make.common
 
 INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
                  -I$(LIB_PATH)/libevent/include \
-                 -I$(LIB_PATH)/librtmsg/include 
+                 -I$(LIB_PATH)/librtmsg/include \
+                 -I$(LIB_PATH)/libpattern/include \
+				 -I$(LIB_PATH)/libsecurity/include
 
 all: prepare compile build
 

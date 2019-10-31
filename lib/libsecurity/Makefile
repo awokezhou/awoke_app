@@ -19,7 +19,8 @@ SRC_FILES_NODIR= $(notdir $(SRC_FILES))
 OBJ_FILES= $(patsubst %.c,$(LIB_OBJ_PATH)/%.o,$(SRC_FILES_NODIR))
 
 INCLUDE_PATHS := -I.\
-				-I$(LIB_INC_PATH) 
+				 -I$(LIB_INC_PATH) \
+                 -I$(LIB_PATH)/libutil/include
 
 all: prepare compile build install
 
@@ -34,7 +35,7 @@ prepare:
 compile: $(OBJ_FILES)
 $(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : $(LIB_SRC_PATH)/%.c
 	echo "-------------compile--------------"
-	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE_PATHS) $(INC_PATH) -fPIC -c $< -o $@
 
 .PHONY: build
 build:$(LIB)

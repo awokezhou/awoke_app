@@ -7,8 +7,8 @@
 #include "awoke_log.h"
 #include "awoke_type.h"
 
-static int sg_log_level = LOG_ERR;
-static int sg_log_mode  = LOG_SYS;
+static int sg_log_level = LOG_DBG;
+static int sg_log_mode  = LOG_TEST;
 	
 void log_level_set(int level)
 {

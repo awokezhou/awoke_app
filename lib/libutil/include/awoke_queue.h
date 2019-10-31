@@ -6,6 +6,7 @@
 
 #include "awoke_type.h"
 #include "awoke_error.h"
+#include "awoke_macros.h"
 #include "awoke_memory.h"
 
 typedef struct _awoke_queue {		/* FIFO standard queue */

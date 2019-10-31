@@ -4,14 +4,22 @@ BUILD_DIR:=$(subst /lib, /lib,$(CURR_DIR))
 BUILD_DIR:=$(word 1, $(BUILD_DIR))
 include $(BUILD_DIR)/make.common
 
-LIB_OBJ_PATH := $(LIB_PATH)/libutil/obj
-LIB_LIB_PATH := $(LIB_PATH)/libutil/lib
+LIB_NAME = libutil
 
-LIB = $(LIB_LIB_PATH)/libutil.so
+LIB_OBJ_PATH := $(LIB_PATH)/$(LIB_NAME)/obj
+LIB_LIB_PATH := $(LIB_PATH)/$(LIB_NAME)/lib
+LIB_SRC_PATH := $(LIB_PATH)/$(LIB_NAME)/src
+LIB_INC_PATH := $(LIB_PATH)/$(LIB_NAME)/include
 
-SRC_FILES = $(wildcard *.c)
-OBJ_FILES = $(patsubst %.c, $(LIB_OBJ_PATH)/%.o, $(SRC_FILES))
+LIB = $(LIB_LIB_PATH)/$(LIB_NAME).so
 
+
+SRC_FILES= $(wildcard $(LIB_SRC_PATH)/*.c)
+SRC_FILES_NODIR= $(notdir $(SRC_FILES))
+OBJ_FILES= $(patsubst %.c,$(LIB_OBJ_PATH)/%.o,$(SRC_FILES_NODIR))
+
+INCLUDE_PATHS := -I$(ROOT_PATH)/include \
+				 -I$(LIB_INC_PATH) 
 
 all: prepare compile build install
 
@@ -24,8 +32,9 @@ prepare:
 
 .PHONY: compile
 compile: $(OBJ_FILES)
-$(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : %.c
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+$(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : $(LIB_SRC_PATH)/%.c
+	echo "-------------compile--------------"
+	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -fPIC -c $< -o $@
 
 .PHONY: build
 build:$(LIB)
@@ -41,4 +50,4 @@ install:
 
 .PHONY: clean
 clean:
-	rm $(OBJ_FILES) $(LIB) $(LIB_PATH)/libutil.so
+	rm $(OBJ_FILES) $(LIB) $(LIB_PATH)/$(LIB_NAME).so

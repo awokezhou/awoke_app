@@ -33,6 +33,9 @@ typedef enum
     et_worker_mutex,
     et_worker_condition,
     et_aes_enc,
+
+	et_waitev_create,
+	et_waitev_finish,
 } err_type;
 
 

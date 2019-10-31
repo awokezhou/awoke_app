@@ -1,4 +1,6 @@
+
 #include "awoke_worker.h"
+#include "awoke_log.h"
 
 static err_type worker_mutex_init(awoke_worker *wk)
 {

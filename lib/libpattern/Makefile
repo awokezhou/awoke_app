@@ -4,7 +4,7 @@ BUILD_DIR:=$(subst /lib, /lib,$(CURR_DIR))
 BUILD_DIR:=$(word 1, $(BUILD_DIR))
 include $(BUILD_DIR)/make.common
 
-LIB_NAME = libevent
+LIB_NAME = libpattern
 
 LIB_OBJ_PATH := $(LIB_PATH)/$(LIB_NAME)/obj
 LIB_LIB_PATH := $(LIB_PATH)/$(LIB_NAME)/lib
@@ -20,9 +20,7 @@ OBJ_FILES= $(patsubst %.c,$(LIB_OBJ_PATH)/%.o,$(SRC_FILES_NODIR))
 
 INCLUDE_PATHS := -I.\
 				 -I$(LIB_INC_PATH) \
-                 -I$(LIB_PATH)/libutil/include   
-
-SYMBOL_PATHS  := -L$(INC_PATH)
+                 -I$(LIB_PATH)/libutil/include
 
 all: prepare compile build install
 
@@ -52,5 +50,5 @@ install:
 	cp $(LIB) $(LIB_PATH)
 
 .PHONY: clean
-clean: 
+clean:
 	rm $(OBJ_FILES) $(LIB) $(LIB_PATH)/$(LIB_NAME).so
