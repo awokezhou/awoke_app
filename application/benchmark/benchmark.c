@@ -1,4 +1,22 @@
 
+#include <stdio.h>
+#include <time.h> 
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <pthread.h> 
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <linux/input.h>
+#include <arpa/inet.h>
+#include <math.h>
+#include <sys/stat.h>
+#include <unistd.h>   
+#include <assert.h>
 #include <getopt.h>
 
 #include "benchmark.h"
@@ -16,14 +34,14 @@ static void usage(int ex)
 
 static err_type wait_test1_fn(awoke_wait_ev *ev)
 {
-	static int a = 0;
+	waitev_test_t *p = ev->data;
 
-	a++;
+	p->count++;
 
-	log_debug("a %d", a);
+	log_debug("count %d", p->count);
 
-	if (a >= 5) {
-		log_debug("a > 5, finish");
+	if (p->count >= 5) {
+		log_debug("count > 5, finish");
 		return et_waitev_finish;
 	}
 
@@ -33,13 +51,139 @@ static err_type wait_test1_fn(awoke_wait_ev *ev)
 err_type awoke_wait_test()
 {
 	log_debug("awoke_wait_test");
-	awoke_wait_ev *ev = awoke_waitev_create("wait-test", 5, WAIT_EV_F_SLEEP, wait_test1_fn, NULL);
+	waitev_test_t t;
+	t.count = 0;
+	awoke_wait_ev *ev = awoke_waitev_create("wait-test", 5, WAIT_EV_F_SLEEP, wait_test1_fn, NULL, (void *)&t);
 	if (!ev) {
 		log_err("ev create error");
 		return et_waitev_create;
 	}
 
 	return awoke_waitev(ev);
+}
+
+err_type benchmark_event_chn_work(awoke_worker *wk)
+{
+	uint8_t msg = 0x45;
+	event_channel_test_t *t = wk->data;
+	
+	t->count++;
+	log_debug("count %d", t->count);
+
+	
+	if (!(t->count%3)) {
+		write(t->notif_ch[1], &msg, sizeof(msg));
+		log_info("worker %s send msg 0x%x", wk->name, msg);
+	}
+}
+
+err_type benchmark_event_channel_test()
+{
+	int rc;
+	uint8_t msg;
+	err_type ret;
+	awoke_event *event;
+	awoke_event_loop *evl;
+	event_channel_test_t *t;
+
+	t = mem_alloc_z(sizeof(event_channel_test_t));
+
+	log_debug("event channel test");
+
+	t->evl = awoke_event_loop_create(8);
+	if (!t->evl) {
+		log_err("event loop create error");
+		return et_evl_create;
+	}
+
+	ret = awoke_event_channel_create(t->evl, 
+									 &t->notif_ch[0],
+									 &t->notif_ch[1],
+								     &t->notif);
+	if (ret != et_ok) {
+		log_err("event channel create error, ret %d", ret);
+		return et_evl_create;
+	}
+	log_debug("main event channel create ok");
+
+	awoke_worker *wk = awoke_worker_create("evchn", 3, 
+										   WORKER_FEAT_PERIODICITY,
+										   benchmark_event_chn_work,
+										   (void *)t);
+	log_debug("worker create ok");
+
+	while (1) {
+		awoke_event_wait(t->evl, 1000);
+		awoke_event_foreach(event, t->evl) {
+			if (event->type == EVENT_NOTIFICATION) {
+				log_debug("NOTIFICATION");
+				rc = read(event->fd, &msg, sizeof(msg));
+				if (rc < 0) {
+					log_err("read error");
+					continue;
+				}
+				if (event->fd == t->notif_ch[0]) {
+					log_info("notification: 0x%x", msg);
+				}
+			}
+		}
+	}
+}
+
+err_type *benchmark_test_work(void *data)
+{
+	log_debug("run");
+}
+
+err_type benchmark_test_worker_wait(struct _awoke_wait_ev *ev)
+{
+	if (ev->_reference >= 10) {
+		return et_waitev_finish;
+	}
+
+	return et_ok;
+}
+
+err_type benchmark_worker_test()
+{
+	awoke_worker *wk = awoke_worker_create("worker-test", 2, WORKER_FEAT_PERIODICITY|WORKER_FEAT_SUSPEND,
+								  		   benchmark_test_work, NULL);
+	awoke_worker_start(wk);
+
+	sleep(10);
+
+	awoke_worker_stop(wk);
+	awoke_worker_destroy(wk);
+}
+
+static void *pthread_test_handle(void *arg)
+{
+	printf("pthread start!\n");
+
+	sleep(2);
+
+	return NULL;
+} 
+
+err_type benchmark_pthread_test()
+{
+	pthread_t tidp;
+
+	if ((pthread_create(&tidp, NULL, pthread_test_handle, NULL)) == -1) {
+		printf("create error!\n");
+		return -1;
+	}
+
+	sleep(1);
+
+	printf("mian continue!\n");
+
+	if (pthread_join(tidp, NULL)) {
+		printf("thread is not exit...\n");
+		return -2;
+	}
+
+	return et_ok;
 }
 
 int main(int argc, char *argv[])
@@ -53,6 +197,9 @@ int main(int argc, char *argv[])
 	static const struct option long_opts[] = {
         {"waitev-test",			no_argument,	NULL,   arg_waitev_test},
         {"condaction-test",  	no_argument,  	NULL,   arg_condaction_test},
+        {"event-channel",		no_argument,	NULL,	arg_event_channel},
+        {"worker",				no_argument,	NULL,	arg_worker},
+        {"pthread",				no_argument,	NULL,	arg_pthread},
         {NULL, 0, NULL, 0}
     };	
 
@@ -65,6 +212,15 @@ int main(int argc, char *argv[])
                 
             case arg_condaction_test:
                 break;
+
+			case arg_event_channel:
+				return benchmark_event_channel_test();
+
+			case arg_worker:
+				return benchmark_worker_test();
+
+			case arg_pthread:
+				return benchmark_pthread_test();
 
             case '?':
             case 'h':

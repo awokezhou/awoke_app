@@ -34,6 +34,8 @@ typedef enum
     et_worker_condition,
     et_aes_enc,
 
+	et_pipe,
+
 	et_waitev_create,
 	et_waitev_finish,
 } err_type;

@@ -44,7 +44,7 @@ static inline void awoke_event_loop_ctx_clean(awoke_event_ctx **ctx)
     return;
 }
 
-static inline void awoke_event_loop_clean(awoke_event_loop **loop)
+void awoke_event_loop_clean(awoke_event_loop **loop)
 {
     awoke_event_loop *ploop;
 
@@ -113,13 +113,20 @@ err_type awoke_event_add(awoke_event_loop *loop, int fd,
                  int type, uint32_t mask, void *data)
 {
     awoke_event *event;
-    awoke_event_ctx *ctx = loop->ctx;
 
-    if (!loop || !data)
+	if (!loop) {
+		return et_param;
+	}
+
+	awoke_event_ctx *ctx = loop->ctx;
+
+    if (!loop || !data) {
         return et_param;
+    }
         
-    if (fd > FD_SETSIZE)
+    if (fd > FD_SETSIZE) {
         return et_param;
+    }
 
     if (mask & EVENT_READ) {
         FD_SET(fd, &ctx->rfds);
@@ -266,22 +273,24 @@ awoke_event_loop *awoke_event_loop_create(int size)
 
     ctx = awoke_event_loop_ctx_create(size);
     if (!ctx) {
+		log_err("ctx create error");
         return NULL;
     }
 
     loop = mem_alloc_z(sizeof(awoke_event_loop));
     if (!loop) {
+		log_err("loop create error");
         goto err;
     }
 
     loop->events = mem_alloc_z(sizeof(awoke_event) * size);
     if (!loop->events) {
+		log_err("events create error");
         goto err;
     }
 
     loop->size   = size;
     loop->ctx   = ctx;
-
     return loop;
 
 
@@ -295,3 +304,36 @@ err:
     return NULL;
 }
 
+err_type awoke_event_channel_create(awoke_event_loop *loop, 
+									 int *r_fd, int *w_fd, void *data)
+{
+	int rc;
+	err_type ret;
+	int fd[2];
+	awoke_event *event;
+	
+	rc = pipe(fd);
+	if (rc < 0) {
+		return et_pipe;
+	}
+
+	event = data;
+	event->fd = fd[0];
+	event->type = EVENT_NOTIFICATION;
+	event->mask = EVENT_EMPTY;
+
+	ret = awoke_event_add(loop, fd[0], 
+						  EVENT_NOTIFICATION, EVENT_READ, event);
+	if (ret != et_ok) {
+		close(fd[0]);
+		close(fd[1]);
+		return ret;
+	}
+
+	event->mask = EVENT_READ;
+	
+	*r_fd = fd[0];
+	*w_fd = fd[1];
+
+	return et_ok;
+}

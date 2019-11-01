@@ -1,9 +1,10 @@
 #ifndef __AWOKE_EVENT_H__
 #define __AWOKE_EVENT_H__
 
+#include "awoke_log.h"
 #include "awoke_type.h"
 #include "awoke_list.h"
-
+#include "awoke_error.h"
 
 #define EVENT_QUEUE_SIZE        128
 
@@ -46,6 +47,11 @@ typedef struct _awoke_event {
     awoke_list _head;
 } awoke_event;
 
+typedef struct _awoke_event_channel {
+	awoke_event event;
+	int channel_r;
+	int channel_w;
+} awoke_event_channel;
 
 typedef struct _awoke_event_ctx {
     int max_fd;
@@ -93,7 +99,13 @@ static inline void AWOKE_EVENT_NEW(awoke_event *e)
 }
 
 
+awoke_event_loop *awoke_event_loop_create(int size);
+err_type awoke_event_add(awoke_event_loop *loop, int fd,
+                 int type, uint32_t mask, void *data);
 int awoke_event_wait(awoke_event_loop *loop, uint32_t tm);
+err_type awoke_event_channel_create(awoke_event_loop *loop, 
+									 int *r_fd, int *w_fd, void *data);
+void awoke_event_loop_clean(awoke_event_loop **loop);
 
 
 #endif /* __WEB_EVENT_H__ */

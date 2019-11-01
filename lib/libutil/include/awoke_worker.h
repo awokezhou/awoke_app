@@ -5,9 +5,11 @@
 
 #include "awoke_type.h"
 #include "awoke_list.h"
+#include "awoke_event.h"
 #include "awoke_error.h"
 #include "awoke_memory.h"
 #include "awoke_macros.h"
+#include "awoke_string.h"
 
 #define WORKER_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
 
@@ -32,26 +34,51 @@
 #define worker_attr_destroy(attr) pthread_attr_destroy(attr)
 
 typedef struct _awoke_worker {
+
 	char *name;
 	worker_id wid;
 	uint32_t tick;
-#define WORKER_FEAT_PERIODICITY	0x0001
-#define WORKER_FEAT_SUSPEND		0x0002
-#define WORKER_FEAT_TICK_SEC	0x0010
-#define WORKER_FEAT_TICK_USEC	0x0020
+	
+#define WORKER_FEAT_PERIODICITY		0x0001
+#define WORKER_FEAT_SUSPEND			0x0002
+#define WORKER_FEAT_EVENT_CHANNEL	0x0004
+#define WORKER_FEAT_TICK_SEC		0x0010
+#define WORKER_FEAT_TICK_USEC		0x0020
 #define WORKER_FEAT_CUSTOM_DEFINE	0x0100
 	uint16_t features;
+
 	bool _running;
 	bool _force_stop;
+	
 	worker_mutex mutex;
 	worker_cond cond;
 	worker_attr attr;
+	
 	err_type (*handler)();
+	
+	void *data;
+
+	awoke_event *evl;
+	awoke_event notif;
+
+	int notif_ch[2];
+	
 	awoke_list _head;
 } awoke_worker;
 
 typedef struct _awoke_worker_context {
 	struct _awoke_worker *worker;
 }awoke_worker_context;
+
+
+void awoke_worker_start(awoke_worker *wk);
+void awoke_worker_stop(awoke_worker *wk);
+void awoke_worker_suspend(awoke_worker *wk);
+void awoke_worker_resume(awoke_worker *wk);
+void awoke_worker_destroy(awoke_worker *wk);
+bool awoke_worker_should_stop(awoke_worker *wk);
+void awoke_worker_should_suspend(awoke_worker *wk);
+awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
+		uint16_t features, err_type (*handler)(), void *data);
 
 #endif /* __AWOKE_WORKER_H__ */

@@ -12,14 +12,18 @@ LIB_SRC_PATH := $(LIB_PATH)/$(LIB_NAME)/src
 LIB_INC_PATH := $(LIB_PATH)/$(LIB_NAME)/include
 
 LIB = $(LIB_LIB_PATH)/$(LIB_NAME).so
-
+LIBS = -lpthread
 
 SRC_FILES= $(wildcard $(LIB_SRC_PATH)/*.c)
 SRC_FILES_NODIR= $(notdir $(SRC_FILES))
 OBJ_FILES= $(patsubst %.c,$(LIB_OBJ_PATH)/%.o,$(SRC_FILES_NODIR))
 
 INCLUDE_PATHS := -I$(ROOT_PATH)/include \
-				 -I$(LIB_INC_PATH) 
+				    -I$(LIB_INC_PATH) \
+				    -I$(LIB_PATH)/libevent/include 
+
+LIB_DIR := -L$(LIB_PATH) \
+			-L$(SYSTEM_LIB_PATH)
 
 all: prepare compile build install
 
@@ -40,7 +44,7 @@ $(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : $(LIB_SRC_PATH)/%.c
 build:$(LIB)
 $(LIB): $(OBJ_FILES)
 	echo "-------------build--------------"
-	$(CC) -shared -fPIC -Wl,--whole-archive,-soname,$@ $(CFLAGS) -o $@ $(OBJ_FILES) -Wl,--no-whole-archive
+	$(CC) -shared -fPIC -Wl,--whole-archive,-soname,$@ $(CFLAGS) -o $@ $(OBJ_FILES) -Wl,--no-whole-archive -L/usr/lib/x86_64-linux-gnu $(LIBS)
 	
 
 .PHONY: install

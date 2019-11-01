@@ -40,6 +40,10 @@ static void worker_clean(awoke_worker **wk)
 	if (p->name)
 		mem_free(p->name);
 
+	if (mask_exst(p->features, WORKER_FEAT_EVENT_CHANNEL)) {
+		awoke_event_loop_clean(&p->evl);
+	}
+
 	mem_free(p);
 	p = NULL;
 }
@@ -56,6 +60,7 @@ void awoke_worker_stop(awoke_worker *wk)
 {
 	worker_mutex_lock(&wk->mutex);
 	wk->_force_stop = TRUE;
+	log_debug("worker %s stop", wk->name);
 	worker_mutex_unlock(&wk->mutex);
 }
 
@@ -125,10 +130,10 @@ void awoke_worker_should_suspend(awoke_worker *wk)
 
 static err_type run_once(awoke_worker *wk)
 {
-	return wk->handler();
+	return wk->handler(wk);
 }
 
-static void worker_run(void *context)
+static void *worker_run(void *context)
 {
 	err_type ret;
 	awoke_worker_context *ctx = context;
@@ -154,7 +159,7 @@ static void worker_run(void *context)
 }
 
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
-		uint16_t features, err_type (*handler)())
+		uint16_t features, err_type (*handler)(), void *data)
 {
 	int r;
 	err_type ret;
@@ -166,14 +171,39 @@ awoke_worker *awoke_worker_create(char *name, uint32_t tick,
 	}
 
 	context = mem_alloc_z(sizeof(awoke_worker_context));
+	if (!context) {
+		log_err("alloc context error");
+		goto err;
+	}
 	context->worker = wk;
 
 	wk->name = awoke_string_dup(name);
+	if (!wk->name) {
+		log_err("name dup error");
+		goto err;
+	}
 	wk->tick = tick;
 	wk->features = features;
 	wk->_running = FALSE;
 	wk->_force_stop = FALSE;
 	wk->handler = handler;
+	wk->data = data;
+
+	if (mask_exst(wk->features, WORKER_FEAT_EVENT_CHANNEL)) {
+		wk->evl = awoke_event_loop_create(8);
+		if (!wk->evl) {
+			goto err;
+		}
+
+		ret = awoke_event_channel_create(wk->evl, 
+										 &wk->notif_ch[0],
+										 &wk->notif_ch[1],
+										 &wk->notif);
+		if (ret != et_ok) {
+			log_err("worker %s event channel create error, ret %d", wk->name, ret);
+			goto err;
+		}
+	}
 
 	ret = worker_mutex_init(wk);
 	if (ret != et_ok) {
@@ -200,7 +230,7 @@ awoke_worker *awoke_worker_create(char *name, uint32_t tick,
 	}
 
 	log_debug("worker %s create ok, tick %d", wk->name, wk->tick);
-
+	
 	return wk;
 	
 err:

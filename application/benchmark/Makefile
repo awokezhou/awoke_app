@@ -1,13 +1,12 @@
 
 EXEC = bin/benchmark
-LIBS = -lutil -lpthread -lsecurity -levent -lrtmsg -lpattern
+LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
 INCLUDE_FILES = include
 
 CURR_DIR := $(shell pwd)
-$(warning $(CURR_DIR))
 AWOKE_DIR:=$(subst /application, /application,$(CURR_DIR))
 AWOKE_DIR:=$(word 1, $(AWOKE_DIR))
 
@@ -38,7 +37,7 @@ obj/%.o:%.c
 .PHONY: build
 build:$(EXEC)
 $(EXEC):$(OBJ_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) $(LIBS) -lm
+	$(CC) $(CFLAGS) -o $@ $^ -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) -L/usr/lib/x86_64-linux-gnu $(LIBS) -lm
 
 .PHONY: clean
 clean:
