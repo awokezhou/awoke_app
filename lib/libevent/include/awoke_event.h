@@ -47,11 +47,11 @@ typedef struct _awoke_event {
     awoke_list _head;
 } awoke_event;
 
-typedef struct _awoke_event_channel {
+typedef struct _awoke_event_pipech {
 	awoke_event event;
-	int channel_r;
-	int channel_w;
-} awoke_event_channel;
+	int ch_r;
+	int ch_w;
+} awoke_event_pipech;
 
 typedef struct _awoke_event_ctx {
     int max_fd;
@@ -105,6 +105,7 @@ err_type awoke_event_add(awoke_event_loop *loop, int fd,
 int awoke_event_wait(awoke_event_loop *loop, uint32_t tm);
 err_type awoke_event_channel_create(awoke_event_loop *loop, 
 									 int *r_fd, int *w_fd, void *data);
+err_type awoke_event_pipech_create(awoke_event_loop *loop, awoke_event_pipech *ch);
 void awoke_event_loop_clean(awoke_event_loop **loop);
 
 

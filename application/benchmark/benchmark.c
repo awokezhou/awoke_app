@@ -64,23 +64,32 @@ err_type awoke_wait_test()
 
 err_type benchmark_event_chn_work(awoke_worker *wk)
 {
-	uint8_t msg = 0x45;
+	uint8_t r_msg = 0x00;
+	uint8_t w_msg = 0x45;
+	awoke_event *event;
 	event_channel_test_t *t = wk->data;
-	
-	t->count++;
-	log_debug("count %d", t->count);
 
-	
-	if (!(t->count%3)) {
-		write(t->notif_ch[1], &msg, sizeof(msg));
-		log_info("worker %s send msg 0x%x", wk->name, msg);
+	log_debug("worker %s run", wk->name);
+
+	awoke_event_wait(wk->evl, 1000);
+	awoke_event_foreach(event, wk->evl) {
+		if (event->type == EVENT_NOTIFICATION) {
+			read(event->fd, &r_msg, sizeof(r_msg));
+			if (event->fd == wk->pipe_channel.ch_r) {
+				log_info("notification: 0x%x", r_msg);
+			}
+		}
 	}
+
+	write(t->pipe_channel.ch_w, &w_msg, sizeof(w_msg));
+	log_debug("worker %s send msg to main", wk->name);
 }
 
 err_type benchmark_event_channel_test()
 {
 	int rc;
-	uint8_t msg;
+	uint8_t r_msg = 0x00;
+	uint8_t w_msg= 0x45;
 	err_type ret;
 	awoke_event *event;
 	awoke_event_loop *evl;
@@ -96,10 +105,7 @@ err_type benchmark_event_channel_test()
 		return et_evl_create;
 	}
 
-	ret = awoke_event_channel_create(t->evl, 
-									 &t->notif_ch[0],
-									 &t->notif_ch[1],
-								     &t->notif);
+	ret = awoke_event_pipech_create(t->evl, &t->pipe_channel);
 	if (ret != et_ok) {
 		log_err("event channel create error, ret %d", ret);
 		return et_evl_create;
@@ -107,23 +113,25 @@ err_type benchmark_event_channel_test()
 	log_debug("main event channel create ok");
 
 	awoke_worker *wk = awoke_worker_create("evchn", 3, 
-										   WORKER_FEAT_PERIODICITY,
+										   WORKER_FEAT_PERIODICITY|WORKER_FEAT_PIPE_CHANNEL,
 										   benchmark_event_chn_work,
 										   (void *)t);
 	log_debug("worker create ok");
 
 	while (1) {
-		awoke_event_wait(t->evl, 1000);
+		awoke_event_wait(t->evl, 2000);
 		awoke_event_foreach(event, t->evl) {
 			if (event->type == EVENT_NOTIFICATION) {
-				log_debug("NOTIFICATION");
-				rc = read(event->fd, &msg, sizeof(msg));
+				//log_debug("NOTIFICATION");
+				rc = read(event->fd, &r_msg, sizeof(r_msg));
 				if (rc < 0) {
 					log_err("read error");
 					continue;
 				}
-				if (event->fd == t->notif_ch[0]) {
-					log_info("notification: 0x%x", msg);
+				if (event->fd == t->pipe_channel.ch_r) {
+					log_info("notification: 0x%x", r_msg);
+					write(wk->pipe_channel.ch_w, &w_msg, sizeof(w_msg));
+					log_debug("main send msg to worker %s", wk->name);
 				}
 			}
 		}
@@ -188,10 +196,11 @@ err_type benchmark_pthread_test()
 
 int main(int argc, char *argv[])
 {
-
 	int opt;
 	bencmark_func bmfn = NULL;
 
+	log_id("benchmark");
+	log_mode(LOG_SYS);
 	log_debug("bencmark");
 
 	static const struct option long_opts[] = {

@@ -19,7 +19,7 @@ typedef struct _build_ptr {
 
 #define build_ptr_none()	{NULL, NULL, 0, 0}
 
-#define build_ptr_init(s, max)	{(s), (s), max, strlen(s)}
+#define build_ptr_init(s, max)	{(s), (s), max, 0}
 
 static inline build_ptr build_ptr_make(char *s, int max)
 {
@@ -38,22 +38,18 @@ static inline int __build_ptr(build_ptr *ptr, const char *fmt, ...)
 	va_list ap;
 	
 	va_start(ap, fmt);
-	if (ptr->max <= 0)
-		return -1;
 	len = vsnprintf(ptr->p, ptr->max, fmt, ap);
+	va_end(ap);	
 	ptr->max -= len;
-	va_end(ap);
-
-	ptr->len += len;
 	ptr->p += len;
-	
+	ptr->len += len;
 	return len;		
 }
 
-#define build_ptr_string(p, s)	(__build_ptr(&p, "%s", s))
-#define build_ptr_number(p, n)	(__build_ptr(&p, "%d", n))
-#define build_ptr_hex(p, h)		(__build_ptr(&p, "%x", h))
-
+#define build_ptr_string(p, s)			(__build_ptr(&p, "%s", s))
+#define build_ptr_number(p, n)			(__build_ptr(&p, "%d", n))
+#define build_ptr_hex(p, h)				(__build_ptr(&p, "%x", h))
+#define build_ptr_format(p, fmt, ...)	(__build_ptr(&p, fmt, __VA_ARGS__))
 
 
 char *awoke_string_dup(const char *s);

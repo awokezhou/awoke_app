@@ -40,7 +40,8 @@ static void worker_clean(awoke_worker **wk)
 	if (p->name)
 		mem_free(p->name);
 
-	if (mask_exst(p->features, WORKER_FEAT_EVENT_CHANNEL)) {
+	if (mask_exst(p->features, WORKER_FEAT_PIPE_CHANNEL)) {
+		awoke_event_pipech_clean(p->evl, &p->pipe_channel);
 		awoke_event_loop_clean(&p->evl);
 	}
 
@@ -140,7 +141,7 @@ static void *worker_run(void *context)
 	awoke_worker *wk = ctx->worker;
 
 	if (!mask_exst(wk->features, WORKER_FEAT_PERIODICITY)) {
-		log_debug("worker %s not periodicity", wk->name);
+		//log_debug("worker %s not periodicity", wk->name);
 		wk->handler();
 	}
 
@@ -148,7 +149,7 @@ static void *worker_run(void *context)
 		if (mask_exst(wk->features, WORKER_FEAT_SUSPEND))
 			worker_should_suspend(wk);
 		ret = run_once(wk);
-		log_debug("worker %s run once", wk->name);
+		//log_debug("worker %s run once", wk->name);
 		if (mask_exst(wk->features, WORKER_FEAT_TICK_USEC)) {
 			usleep(1000*wk->tick);
 		} else {
@@ -189,18 +190,15 @@ awoke_worker *awoke_worker_create(char *name, uint32_t tick,
 	wk->handler = handler;
 	wk->data = data;
 
-	if (mask_exst(wk->features, WORKER_FEAT_EVENT_CHANNEL)) {
+	if (mask_exst(wk->features, WORKER_FEAT_PIPE_CHANNEL)) {
 		wk->evl = awoke_event_loop_create(8);
 		if (!wk->evl) {
 			goto err;
 		}
 
-		ret = awoke_event_channel_create(wk->evl, 
-										 &wk->notif_ch[0],
-										 &wk->notif_ch[1],
-										 &wk->notif);
+		ret = awoke_event_pipech_create(wk->evl, &wk->pipe_channel);
 		if (ret != et_ok) {
-			log_err("worker %s event channel create error, ret %d", wk->name, ret);
+			log_err("worker %s pipe channel create error, ret %d", wk->name, ret);
 			goto err;
 		}
 	}

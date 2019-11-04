@@ -33,8 +33,7 @@ typedef struct _waitev_test_t {
 typedef struct _event_channel_test_t {
 	int count;
 	awoke_event_loop *evl;
-	awoke_event notif;
-	int notif_ch[2];
+	awoke_event_pipech pipe_channel;
 } event_channel_test_t;
 
 #endif /* __BENCHMARK_H__ */

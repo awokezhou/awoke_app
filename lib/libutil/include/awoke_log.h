@@ -2,6 +2,8 @@
 #define __AWOKE_LOG_H__
 
 
+#include "awoke_string.h"
+
 void awoke_log(int level, const char *func, int line, const char *format, ...);
 
 
@@ -22,6 +24,10 @@ void awoke_log(int level, const char *func, int line, const char *format, ...);
 #define ANSI_WHITE      "\033[97m"
 #define ANSI_RESET      "\033[0m"
 
+#define LOG_FILE_SIZE		8092
+#define LOG_FILE_PATH		"/home/share/project/awoke_app/log/"
+#define LOG_FILE_POSTFIX	".log"
+
 #define log_debug(...)      awoke_log(LOG_DBG,    __func__, __LINE__, __VA_ARGS__)
 #define log_info(...)       awoke_log(LOG_INFO,   __func__, __LINE__, __VA_ARGS__)
 #define log_err(...)        awoke_log(LOG_ERR,    __func__, __LINE__, __VA_ARGS__)
@@ -30,7 +36,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...);
 
 #define log_level(level)			log_level_set(level)
 #define log_mode(mode)				log_mode_set(mode)
-
+#define log_id(id)					log_id_set(id)
 
 
 #endif /* __AWOKE_LOG_H__ */

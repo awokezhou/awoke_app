@@ -41,7 +41,7 @@ typedef struct _awoke_worker {
 	
 #define WORKER_FEAT_PERIODICITY		0x0001
 #define WORKER_FEAT_SUSPEND			0x0002
-#define WORKER_FEAT_EVENT_CHANNEL	0x0004
+#define WORKER_FEAT_PIPE_CHANNEL	0x0004
 #define WORKER_FEAT_TICK_SEC		0x0010
 #define WORKER_FEAT_TICK_USEC		0x0020
 #define WORKER_FEAT_CUSTOM_DEFINE	0x0100
@@ -58,10 +58,9 @@ typedef struct _awoke_worker {
 	
 	void *data;
 
-	awoke_event *evl;
-	awoke_event notif;
-
-	int notif_ch[2];
+	awoke_event_loop *evl;
+	
+	awoke_event_pipech pipe_channel;	
 	
 	awoke_list _head;
 } awoke_worker;

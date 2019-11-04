@@ -166,7 +166,7 @@ int awoke_event_wait(awoke_event_loop *loop, uint32_t tm)
     tv.tv_sec = tm/1000;
     tv.tv_usec = tm%1000;
 
-    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, NULL, NULL);
+    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, NULL, &tv);
     if (loop->n_events <= 0) {
         return loop->n_events;
     }
@@ -336,4 +336,16 @@ err_type awoke_event_channel_create(awoke_event_loop *loop,
 	*w_fd = fd[1];
 
 	return et_ok;
+}
+
+err_type awoke_event_pipech_create(awoke_event_loop *loop, awoke_event_pipech *ch)
+{
+	return awoke_event_channel_create(loop, &ch->ch_r, &ch->ch_w, &ch->event);
+}
+
+void awoke_event_pipech_clean(awoke_event_loop *loop, awoke_event_pipech *ch)
+{
+	awoke_event_del(loop, &ch->event);
+	close(ch->ch_r);
+	close(ch->ch_w);
 }
