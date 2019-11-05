@@ -1,6 +1,6 @@
 
 EXEC = bin/condtion_test
-LIBS = -lutil -lpattern -lpthread
+LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
@@ -13,8 +13,11 @@ AWOKE_DIR:=$(word 1, $(AWOKE_DIR))
 
 include $(AWOKE_DIR)/make.common
 
-INCLUDE_PATHS := -I.\
-				-I$(LIB_PATH)/libpattern/include
+INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
+                 -I$(LIB_PATH)/libevent/include \
+                 -I$(LIB_PATH)/librtmsg/include \
+                 -I$(LIB_PATH)/libpattern/include \
+				 -I$(LIB_PATH)/libsecurity/include
 				
 all: prepare compile build
 

@@ -36,6 +36,10 @@ typedef enum
 
 	et_pipe,
 
+	et_locked,
+	et_lock_init,
+	et_lock_timeout,
+
 	et_waitev_create,
 	et_waitev_finish,
 } err_type;

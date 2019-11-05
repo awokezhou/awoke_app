@@ -1,0 +1,14 @@
+[2019/11/04 15:07:20] [DEBUG] [main:205] bencmark
+[2019/11/04 15:07:20] [DEBUG] [benchmark_event_channel_test:101] event channel test
+[2019/11/04 15:07:20] [DEBUG] [benchmark_event_channel_test:114] main event channel create ok
+[2019/11/04 15:07:20] [DEBUG] [awoke_worker_create:238] worker  create ok, tick 0
+[2019/11/04 15:07:20] [DEBUG] [benchmark_event_channel_test:120] worker create ok
+[2019/11/04 15:07:20] [DEBUG] [benchmark_event_chn_work:73] worker  run
+[2019/11/04 15:07:21] [DEBUG] [benchmark_event_chn_work:86] worker  send msg to main
+[2019/11/04 15:07:21] [INFO] [benchmark_event_channel_test:133] notification: 0xfab62418
+[2019/11/04 15:07:21] [DEBUG] [benchmark_event_channel_test:135] main send msg to worker 󗳬
+[2019/11/04 15:07:24] [DEBUG] [benchmark_event_chn_work:73] worker  run
+[2019/11/04 15:07:24] [INFO] [benchmark_event_chn_work:80] notification: 0x32c30878
+[2019/11/04 15:07:24] [DEBUG] [benchmark_event_chn_work:86] worker  send msg to main
+[2019/11/04 15:07:24] [INFO] [benchmark_event_channel_test:133] notification: 0xfab62418
+[2019/11/04 15:07:24] [DEBUG] [benchmark_event_channel_test:135] main send msg to worker 󗳬

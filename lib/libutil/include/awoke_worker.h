@@ -69,6 +69,18 @@ typedef struct _awoke_worker_context {
 	struct _awoke_worker *worker;
 }awoke_worker_context;
 
+typedef struct _awoke_worker_pipemsg {
+	uint16_t src;
+#define WORKER_PIPE_MSG_DST_MAIN	0
+	uint16_t dst;
+	uint32_t type;
+	uint16_t f_event,
+			 f_request,
+			 f_response,
+			 f_broadcast;
+	uint32_t word;
+	uint32_t data_len;
+} awoke_worker_pipemsg;
 
 void awoke_worker_start(awoke_worker *wk);
 void awoke_worker_stop(awoke_worker *wk);

@@ -9,6 +9,20 @@ void condition_init(condition_action *ca)
 	list_init(actn_list);
 }
 
+void condition_clean(condition_action *ca)
+{
+	action *actn, *temp;
+	condition *cond;
+	awoke_list *clist = cond_list_get(ca);
+
+	list_for_each_entry(cond, clist, _head) {
+		list_for_each_entry_safe(actn, temp, &cond->_action_list, _head) {
+			list_unlink(&actn->_head);
+			mem_free(actn);
+		}
+	}
+}
+
 err_type condition_register(condition_action *ca, condition *c)
 {
 	awoke_list *p = &ca->_ca[0];

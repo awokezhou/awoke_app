@@ -31,6 +31,13 @@ static err_type test()
 	condition_action_add(&ts.test_ca, CONDITION_C1, ACTION_A1);
 
 	condition_tigger(&ts.test_ca, CONDITION_C1, NULL);
+
+	condition_clean(&ts.test_ca);
+
+	condition_tigger(&ts.test_ca, CONDITION_C1, NULL);
+
+	condition_action_add(&ts.test_ca, CONDITION_C1, ACTION_A1);
+	condition_tigger(&ts.test_ca, CONDITION_C1, NULL);
 }
 
 int main(int argc, char *argv[])
