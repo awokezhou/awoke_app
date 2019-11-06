@@ -22,7 +22,7 @@ typedef enum {
 	arg_pthread,
 	arg_bitflag,
 	arg_lock,
-
+	arg_timer_worker,
 	
 } benchmark_args;
 
@@ -63,5 +63,10 @@ typedef struct _lock_test_t {
 	awoke_worker *wk;
 } lock_test_t;
 
+
+typedef struct _timer_worker_test_t {
+	awoke_tmwkr *twk;
+	int x;
+} timer_worker_test_t;
 
 #endif /* __BENCHMARK_H__ */

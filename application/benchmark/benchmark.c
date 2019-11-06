@@ -264,8 +264,6 @@ err_type benchmark_bitflag_test()
 
 }
 
-
-
 err_type worker_lock_test(awoke_worker *wk)
 {
 	err_type ret;
@@ -318,6 +316,63 @@ err_type benchmark_lock_test()
 	awoke_worker_destroy(x.wk);
 	awoke_lock_clean(&x.mux_lock);
 	awoke_lock_clean(&x.sem_lock);
+	return et_ok;
+}
+
+static err_type timer_worker_read_obd(awoke_tmtsk *tsk, awoke_tmwkr *twk)
+{
+	timer_worker_test_t *t = twk->data;
+
+	log_debug("%s run", tsk->name);
+
+	t->x++;
+
+	return et_ok;
+}
+
+static err_type timer_worker_read_eng(awoke_tmtsk *tsk, awoke_tmwkr *twk)
+{
+	log_debug("%s run", tsk->name);
+	return et_ok;
+}
+
+static err_type timer_worker_getvin(awoke_tmtsk *tsk, awoke_tmwkr *twk)
+{
+	log_debug("%s run", tsk->name);
+	return et_ok;
+}
+
+static err_type benchmark_timer_worker_test()
+{
+	err_type ret;
+	timer_worker_test_t t;
+
+	t.twk = awoke_tmwkr_create("timer-test", 10, 
+							   WORKER_FEAT_TICK_MSEC,
+							   NULL, &t);
+	if (!t.twk) {
+		log_err("timer worker create error");
+		return et_ok;
+	}
+
+	log_debug("timer worker create ok");
+
+	ret = awoke_tmwkr_task_register("read_obd", 300, TRUE, NULL, 
+						 	  	    timer_worker_read_obd, t.twk);
+	ret = awoke_tmwkr_task_register("read_eng", 500, TRUE, NULL, 
+						 	  	    timer_worker_read_eng, t.twk);
+	ret = awoke_tmwkr_task_register("getvin", 1000, FALSE, NULL, 
+						 	  	    timer_worker_read_eng, t.twk);
+
+	awoke_tmwkr_start(t.twk);
+	
+	sleep(30);
+	log_debug("x %d", t.x);
+
+	awoke_tmwkr_stop(t.twk);
+
+	awoke_tmwkr_clean(&t.twk);
+	return et_ok;
 }
 
 int main(int argc, char *argv[])
@@ -339,6 +394,7 @@ int main(int argc, char *argv[])
         {"pthread",				no_argument,		NULL,	arg_pthread},
 		{"bitflag-test",		no_argument,		NULL,	arg_bitflag},
 		{"lock-test",			no_argument,		NULL,	arg_lock},
+		{"timer-worker-test",	no_argument,		NULL,	arg_timer_worker},
         {NULL, 0, NULL, 0}
     };	
 
@@ -379,6 +435,10 @@ int main(int argc, char *argv[])
 
 			case arg_lock:
 				bmfn = benchmark_lock_test;
+				break;
+
+			case arg_timer_worker:
+				bmfn = benchmark_timer_worker_test;
 				break;
 
             case '?':

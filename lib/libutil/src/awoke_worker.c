@@ -2,6 +2,13 @@
 #include "awoke_worker.h"
 #include "awoke_log.h"
 
+/*
+ * worker define -------------------------------- >>>>
+ * 
+ * -- Version --
+ * 1.1.0
+ */
+
 static err_type worker_mutex_init(awoke_worker *wk)
 {
 	int ret;
@@ -102,6 +109,16 @@ void awoke_worker_destroy(awoke_worker *wk)
 	worker_clean(&wk);
 }
 
+static void worker_reference(awoke_worker *wk)
+{
+	if (mask_exst(wk->features, WORKER_FEAT_REFERENCE)) {
+		wk->_reference++;
+		if (wk->_reference >= 0xfffffffe) {
+			wk->_reference = 0;
+		}
+	}
+}
+
 static bool worker_should_stop(awoke_worker *wk)
 {
 	return (wk->_force_stop);
@@ -146,11 +163,19 @@ static void *worker_run(void *context)
 	}
 
 	do {
+		
 		if (mask_exst(wk->features, WORKER_FEAT_SUSPEND))
 			worker_should_suspend(wk);
+		
 		ret = run_once(wk);
+		
+		worker_reference(wk);
+		
 		//log_debug("worker %s run once", wk->name);
+		
 		if (mask_exst(wk->features, WORKER_FEAT_TICK_USEC)) {
+			usleep(wk->tick);
+		} else if (mask_exst(wk->features, WORKER_FEAT_TICK_MSEC)){
 			usleep(1000*wk->tick);
 		} else {
 			sleep(wk->tick);
@@ -236,3 +261,174 @@ err:
 	return NULL;
 }
 
+
+
+/*
+ * timer worker define -------------------------------- >>>>
+ * 
+ * -- Summary --
+ * Timer worker is a set of smart timing task interfaces based 
+ * on awoke_worker. Timer worker use struct 'awoke_tmwkr', it 
+ * consists of a scheduler and several tasks. Scheduler is a
+ * awoke_worker with special handler 'timer_scheduler' to sched
+ * all the tasks on a list.
+ * 
+ * -- API -- 
+ * @awoke_tmwkr_create : create a timer worker  
+ * @awoke_tmwkr_start  : start a timer worker  
+ * @awoke_tmwkr_stop   : stop a timer worker  
+ * @awoke_tmwkr_clean  : clean a timer worker
+ * @awoke_tmwkr_task_register : register a task to timer worker
+ * 
+ * -- Notes --
+ * 1. timer worker will not run immediately at create time for 
+ *    safety
+ * 2. task's run time is not the clock register function set, 
+ *    but the task->clock*twk->tick
+ */
+void awoke_tmtsk_clean(awoke_tmtsk **tsk)
+{
+	awoke_tmtsk *p;
+
+	if (!tsk || !*tsk) 
+		return;
+
+	p = *tsk;	
+
+	if (p->name)
+		mem_free(p->name);
+
+	mem_free(p);
+	p = NULL;
+}
+
+void awoke_tmwkr_clean(awoke_tmwkr **twk)
+{
+	awoke_tmwkr *p;
+	awoke_tmtsk *task, *temp;
+
+	if (!twk || !*twk) 
+		return;
+
+	p = *twk;
+
+	if (p->scheduler)
+		awoke_worker_destroy(p->scheduler);
+
+	list_for_each_entry_safe(task, temp, &p->task_queue, _head) {
+		list_unlink(&task->_head);
+		awoke_tmtsk_clean(&task);
+	}
+
+	mem_free(p);
+	p = NULL;
+}
+
+err_type awoke_tmwkr_task_register(char *name, uint32_t clock, bool periodic,  
+				bool (*can_sched)(struct _awoke_tmtsk *, struct _awoke_tmwkr *),
+				err_type (*handle)(struct _awoke_tmtsk *, struct _awoke_tmwkr *), 
+				awoke_tmwkr *twk)
+{
+	awoke_tmtsk *task;
+
+	task = mem_alloc_z(sizeof(awoke_tmtsk));
+	if (!task) 
+		return et_nomem;
+
+	task->name = awoke_string_dup(name);
+	task->tid = twk->task_nr;
+	task->tick = clock;
+	task->clock = clock;
+	task->can_sched = can_sched;
+	task->handle = handle;
+	task->periodic = periodic;
+
+	twk->task_nr++;
+	list_append(&task->_head, &twk->task_queue);
+
+	return et_ok;
+}
+
+static err_type timer_scheduler(awoke_worker *wk)
+{
+	err_type ret = et_ok;
+	awoke_tmtsk *task, *temp;
+	awoke_tmwkr *twk = wk->data;
+	
+	if (list_empty(&twk->task_queue))
+		return et_ok;
+
+	list_for_each_entry_safe(task, temp, &twk->task_queue, _head) {
+	
+		task->tick--;
+		bool _can_sched = FALSE;
+
+		if (!task->tick) {
+			if (task->can_sched != NULL) 
+				_can_sched = task->can_sched(task, twk);
+			else
+				_can_sched = TRUE;
+		}
+
+		if (_can_sched) {
+			ret = task->handle(task, twk);
+			if ((ret != et_ok) && (task->err_proc != NULL)) {
+				task->err_proc(task, twk);
+			}
+			if (!task->periodic) {
+				list_unlink(&task->_head);
+				awoke_tmtsk_clean(&task);
+			}
+			task->tick = task->clock;
+		}
+	}
+}
+
+void awoke_tmwkr_start(awoke_tmwkr *twk)
+{
+	return awoke_worker_start(twk->scheduler);
+}
+
+void awoke_tmwkr_stop(awoke_tmwkr *twk)
+{
+	return awoke_worker_stop(twk->scheduler);
+}
+
+awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
+				err_type (*handler)(), void *data)
+{
+	err_type ret;
+	awoke_tmwkr *twk;
+
+	twk = mem_alloc_z(sizeof(awoke_tmwkr));
+	if (!twk)
+		return NULL;
+
+	twk->data = data;
+	twk->task_nr = 0;
+	list_init(&twk->task_queue);
+
+	if (!mask_exst(features, WORKER_FEAT_PERIODICITY))
+		mask_push(features, WORKER_FEAT_PERIODICITY);
+
+	if (!mask_exst(features, WORKER_FEAT_SUSPEND))
+		mask_push(features, WORKER_FEAT_SUSPEND);
+
+	/* scheduler create */
+	if (mask_exst(features, WORKER_FEAT_CUSTOM_DEFINE)) {
+		twk->scheduler = awoke_worker_create(name, clock, features, 
+										     handler, (void *)twk);
+	} else {
+		twk->scheduler = awoke_worker_create(name, clock, features, 
+											 timer_scheduler, (void *)twk);
+	}
+
+	if (!twk->scheduler) 
+		goto err;
+
+	return twk;
+	
+err:
+	awoke_tmwkr_clean(&twk);
+	return NULL;
+}

@@ -43,12 +43,16 @@ typedef struct _awoke_worker {
 #define WORKER_FEAT_SUSPEND			0x0002
 #define WORKER_FEAT_PIPE_CHANNEL	0x0004
 #define WORKER_FEAT_TICK_SEC		0x0010
-#define WORKER_FEAT_TICK_USEC		0x0020
+#define WORKER_FEAT_TICK_MSEC		0x0020
+#define WORKER_FEAT_TICK_USEC		0x0040
+#define WORKER_FEAT_REFERENCE		0x0080
 #define WORKER_FEAT_CUSTOM_DEFINE	0x0100
 	uint16_t features;
 
 	bool _running;
 	bool _force_stop;
+
+	uint32_t _reference;
 	
 	worker_mutex mutex;
 	worker_cond cond;
@@ -82,6 +86,25 @@ typedef struct _awoke_worker_pipemsg {
 	uint32_t data_len;
 } awoke_worker_pipemsg;
 
+typedef struct _awoke_tmwkr {
+	awoke_worker *scheduler;
+	int task_nr;
+	awoke_list task_queue;
+	void *data;
+} awoke_tmwkr;
+
+typedef struct _awoke_tmtsk {
+	char *name;
+	uint32_t tid;
+	uint32_t tick;
+	uint32_t clock;
+	bool periodic;
+	bool (*can_sched)(struct _awoke_tmtsk *, struct _awoke_tmwkr *);
+	err_type (*handle)(struct _awoke_tmtsk *, struct _awoke_tmwkr *);
+	void (*err_proc)(struct _awoke_tmtsk *, struct _awoke_tmwkr *);
+	awoke_list _head;
+} awoke_tmtsk;
+
 void awoke_worker_start(awoke_worker *wk);
 void awoke_worker_stop(awoke_worker *wk);
 void awoke_worker_suspend(awoke_worker *wk);
@@ -91,5 +114,16 @@ bool awoke_worker_should_stop(awoke_worker *wk);
 void awoke_worker_should_suspend(awoke_worker *wk);
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
 		uint16_t features, err_type (*handler)(), void *data);
+
+awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
+				err_type (*handler)(), void *data);
+void awoke_tmwkr_stop(awoke_tmwkr *twk);
+void awoke_tmwkr_start(awoke_tmwkr *twk);
+err_type awoke_tmwkr_task_register(char *name, uint32_t clock, bool periodic,  
+				bool (*can_sched)(struct _awoke_tmtsk *, struct _awoke_tmwkr *),
+				err_type (*handle)(struct _awoke_tmtsk *, struct _awoke_tmwkr *), 
+				awoke_tmwkr *twk);
+void awoke_tmwkr_clean(awoke_tmwkr **twk);
+void awoke_tmtsk_clean(awoke_tmtsk **tsk);
 
 #endif /* __AWOKE_WORKER_H__ */
