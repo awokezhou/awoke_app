@@ -321,11 +321,7 @@ err_type benchmark_lock_test()
 
 static err_type timer_worker_read_obd(awoke_tmtsk *tsk, awoke_tmwkr *twk)
 {
-	timer_worker_test_t *t = twk->data;
-
 	log_debug("%s run", tsk->name);
-
-	t->x++;
 
 	return et_ok;
 }
@@ -342,14 +338,24 @@ static err_type timer_worker_getvin(awoke_tmtsk *tsk, awoke_tmwkr *twk)
 	return et_ok;
 }
 
+static err_type timer_worker_sched_end(awoke_tmwkr *twk)
+{
+	timer_worker_test_t *t = twk->data;
+	t->x++;
+	return et_ok;
+}
+
 static err_type benchmark_timer_worker_test()
 {
 	err_type ret;
 	timer_worker_test_t t;
 
+	t.x = 0;
 	t.twk = awoke_tmwkr_create("timer-test", 10, 
 							   WORKER_FEAT_TICK_MSEC,
-							   NULL, &t);
+							   NULL, 
+							   timer_worker_sched_end, 
+							   (void *)&t);
 	if (!t.twk) {
 		log_err("timer worker create error");
 		return et_ok;
@@ -366,7 +372,7 @@ static err_type benchmark_timer_worker_test()
 
 	awoke_tmwkr_start(t.twk);
 	
-	sleep(30);
+	sleep(10);
 	log_debug("x %d", t.x);
 
 	awoke_tmwkr_stop(t.twk);

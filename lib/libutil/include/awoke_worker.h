@@ -87,9 +87,10 @@ typedef struct _awoke_worker_pipemsg {
 } awoke_worker_pipemsg;
 
 typedef struct _awoke_tmwkr {
-	awoke_worker *scheduler;
 	int task_nr;
+	awoke_worker *scheduler;
 	awoke_list task_queue;
+	err_type (*sched_end)(struct _awoke_tmwkr *);
 	void *data;
 } awoke_tmwkr;
 
@@ -115,10 +116,12 @@ void awoke_worker_should_suspend(awoke_worker *wk);
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
 		uint16_t features, err_type (*handler)(), void *data);
 
-awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
-				err_type (*handler)(), void *data);
 void awoke_tmwkr_stop(awoke_tmwkr *twk);
 void awoke_tmwkr_start(awoke_tmwkr *twk);
+awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
+									   err_type (*handler)(void *), 
+									   err_type (*sched_end)(struct _awoke_tmwkr *), 
+									   void *data);
 err_type awoke_tmwkr_task_register(char *name, uint32_t clock, bool periodic,  
 				bool (*can_sched)(struct _awoke_tmtsk *, struct _awoke_tmwkr *),
 				err_type (*handle)(struct _awoke_tmtsk *, struct _awoke_tmwkr *), 

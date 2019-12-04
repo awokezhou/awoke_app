@@ -378,9 +378,14 @@ static err_type timer_scheduler(awoke_worker *wk)
 			if (!task->periodic) {
 				list_unlink(&task->_head);
 				awoke_tmtsk_clean(&task);
+				twk->task_nr--;
 			}
 			task->tick = task->clock;
 		}
+	}
+
+	if (twk->sched_end != NULL) {
+		twk->sched_end(twk);
 	}
 }
 
@@ -395,7 +400,9 @@ void awoke_tmwkr_stop(awoke_tmwkr *twk)
 }
 
 awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
-				err_type (*handler)(), void *data)
+									   err_type (*handler)(void *), 
+									   err_type (*sched_end)(struct _awoke_tmwkr *), 
+									   void *data)
 {
 	err_type ret;
 	awoke_tmwkr *twk;
@@ -406,6 +413,7 @@ awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features,
 
 	twk->data = data;
 	twk->task_nr = 0;
+	twk->sched_end = sched_end;
 	list_init(&twk->task_queue);
 
 	if (!mask_exst(features, WORKER_FEAT_PERIODICITY))
