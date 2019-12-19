@@ -21,7 +21,6 @@
 
 #include "benchmark.h"
 
-
 static void usage(int ex)
 {	
 	printf("usage : benchamrk [option]\n\n");
@@ -48,7 +47,7 @@ static err_type wait_test1_fn(awoke_wait_ev *ev)
 	return et_ok;
 }
 
-err_type awoke_wait_test()
+err_type awoke_wait_test(void *data)
 {
 	log_debug("awoke_wait_test");
 	waitev_test_t t;
@@ -107,7 +106,7 @@ err_type benchmark_event_chn_work(awoke_worker *wk)
 	log_debug("worker %s send msg to main", wk->name);
 }
 
-err_type benchmark_event_channel_test()
+err_type benchmark_event_channel_test(void *data)
 {
 	int rc;
 	pipech_msg_header w_header;
@@ -182,7 +181,7 @@ err_type benchmark_test_worker_wait(struct _awoke_wait_ev *ev)
 	return et_ok;
 }
 
-err_type benchmark_worker_test()
+err_type benchmark_worker_test(void *data)
 {
 	awoke_worker *wk = awoke_worker_create("worker-test", 2, WORKER_FEAT_PERIODICITY|WORKER_FEAT_SUSPEND,
 								  		   benchmark_test_work, NULL);
@@ -203,7 +202,7 @@ static void *pthread_test_handle(void *arg)
 	return NULL;
 } 
 
-err_type benchmark_pthread_test()
+err_type benchmark_pthread_test(void *data)
 {
 	pthread_t tidp;
 
@@ -224,7 +223,7 @@ err_type benchmark_pthread_test()
 	return et_ok;
 }
 
-err_type benchmark_bitflag_test()
+err_type benchmark_bitflag_test(void *data)
 {
 	typedef struct _bitflag {
 		uint16_t f_active,
@@ -280,7 +279,7 @@ err_type worker_lock_test(awoke_worker *wk)
 	}
 }
 
-err_type benchmark_lock_test()
+err_type benchmark_lock_test(void *data)
 {
 	lock_test_t x;
 	x.mux_lock = awoke_lock_create(AWOKE_LOCK_T_MUX);
@@ -345,7 +344,7 @@ static err_type timer_worker_sched_end(awoke_tmwkr *twk)
 	return et_ok;
 }
 
-static err_type benchmark_timer_worker_test()
+static err_type benchmark_timer_worker_test(void *data)
 {
 	err_type ret;
 	timer_worker_test_t t;
@@ -381,9 +380,97 @@ static err_type benchmark_timer_worker_test()
 	return et_ok;
 }
 
+static uint32_t _queue_zero_filter_uint32(awoke_queue *q)
+{
+
+	int idx = 0;
+	int size = 0;
+	int zero_nr = 0;
+	int zero_percent;
+	uint32_t *data;
+	uint32_t average = 0;
+
+	size = awoke_queue_size(q);
+	
+	awoke_queue_foreach(q, data, uint32_t) {
+		idx++;
+		log_debug("data %d", *data);
+		if ((*data == 0) && ((idx!=1) && (idx!=size))) {
+			log_debug("zero_nr+=");
+			zero_nr++;
+		}
+		average += *data;
+	}
+
+	log_debug("zero_nr %d", zero_nr);
+
+	average = average/(size-zero_nr);
+
+	log_debug("average %d", average);
+
+	zero_percent = zero_nr*100/size;
+
+	log_debug("zero_percent %d", zero_percent);
+	
+	if (zero_percent > 10) {
+		average = 0;
+		awoke_queue_foreach(q, data, uint32_t) {
+			average += *data;
+		}
+		average = average/size;
+	} 
+
+	return average;
+}
+
+static err_type benchmark_queue_zero_filter_test(void *data)
+{
+	int i;
+	uint32_t *u;
+	uint32_t average;
+	uint32_t x[8] = {0, 0, 2, 8, 0, 3, 7, 0};
+	char buff[256];
+	build_ptr bp = build_ptr_init(buff, 256);
+	
+	awoke_queue *q = awoke_queue_create(sizeof(uint32_t), 10, 0x0);
+	if (!q) {
+		log_err("queue create error");
+		return et_nomem;
+	}
+
+	for (i=0; i<8; i++) {
+		awoke_queue_enq(q, &x[i]);
+	}
+
+	build_ptr_string(bp, "queue(10): [");
+	awoke_queue_foreach(q, u, uint32_t) {
+		build_ptr_format(bp, "%d ", *u);
+	}
+	build_ptr_string(bp, "]");
+	log_debug("%.*s", bp.len, bp.head);
+
+	average = _queue_zero_filter_uint32(q);
+
+	log_debug("average %d", average);
+
+	awoke_queue_clean(&q);
+
+	return et_ok;
+}
+
+static err_type benchmark_vin_parse_test(void *data)
+{
+	char *vin = data;
+	vininfo vinfo;
+	vin_parse(vin, &vinfo);
+	vininfo_dump(&vinfo);
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
+	void *data;
 	int loglevel = LOG_DBG;
 	int logmode = LOG_TEST;
 	bencmark_func bmfn = NULL;
@@ -401,6 +488,8 @@ int main(int argc, char *argv[])
 		{"bitflag-test",		no_argument,		NULL,	arg_bitflag},
 		{"lock-test",			no_argument,		NULL,	arg_lock},
 		{"timer-worker-test",	no_argument,		NULL,	arg_timer_worker},
+		{"queue-zero-filter",	no_argument, 		NULL, 	arg_queue_zero_filter},
+		{"vin-parse-test",		required_argument,	NULL,	arg_vin_parse_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -447,6 +536,15 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_timer_worker_test;
 				break;
 
+			case arg_queue_zero_filter: 
+				bmfn = benchmark_queue_zero_filter_test;
+				break;
+
+			case arg_vin_parse_test:
+				data = optarg;
+				bmfn = benchmark_vin_parse_test;
+				break;
+				
             case '?':
             case 'h':
 			case '-':
@@ -458,7 +556,7 @@ int main(int argc, char *argv[])
 	log_level(loglevel);
 	log_mode(logmode);
 
-	bmfn();
+	bmfn(data);
 
 	return 0;
 }

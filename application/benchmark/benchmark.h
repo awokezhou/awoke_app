@@ -7,10 +7,13 @@
 #include "awoke_lock.h"
 #include "awoke_error.h"
 #include "awoke_event.h"
+#include "awoke_queue.h"
 #include "awoke_waitev.h"
 #include "awoke_memory.h"
 #include "awoke_worker.h"
 #include "awoke_string.h"
+
+#include "vin_parser.h"
 #include "condition_action.h"
 
 typedef enum {
@@ -23,10 +26,12 @@ typedef enum {
 	arg_bitflag,
 	arg_lock,
 	arg_timer_worker,
+	arg_queue_zero_filter,
+	arg_vin_parse_test,
 	
 } benchmark_args;
 
-typedef err_type (*bencmark_func)();
+typedef err_type (*bencmark_func)(void *data);
 
 
 
@@ -68,5 +73,6 @@ typedef struct _timer_worker_test_t {
 	awoke_tmwkr *twk;
 	int x;
 } timer_worker_test_t;
+
 
 #endif /* __BENCHMARK_H__ */
