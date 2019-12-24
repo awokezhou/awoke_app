@@ -12,6 +12,7 @@
 #include "awoke_memory.h"
 #include "awoke_worker.h"
 #include "awoke_string.h"
+#include "awoke_http.h"
 
 #include "vin_parser.h"
 #include "condition_action.h"
@@ -28,10 +29,17 @@ typedef enum {
 	arg_timer_worker,
 	arg_queue_zero_filter,
 	arg_vin_parse_test,
-	
+	arg_http_request_test,
 } benchmark_args;
 
-typedef err_type (*bencmark_func)(void *data);
+typedef enum {
+	arg_http_none = 0,
+	arg_http_content_type,
+	arg_http_authorization,
+	arg_http_accept,
+} http_args;
+
+typedef err_type (*bencmark_func)(int argc, char *argv[]);
 
 
 

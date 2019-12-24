@@ -94,7 +94,8 @@ static vinmanu2vds g_manu2vds_map[] = {
 	{vinmanu_unknown, NULL,	0, NULL, 0},
 	{vinmanu_lsg, NULL,	0, NULL, 0},
 	{vinmanu_ldc, g_modelin_dpca_table,	array_size(g_modelin_dpca_table), NULL, 0},
-	{vinmanu_pna, g_modelin_peugeot_table, array_size(g_modelin_peugeot_table), g_bodytype_peugeot_table, vin_peugeot_bt_offset},
+	{vinmanu_pna, g_modelin_peugeot_table, array_size(g_modelin_peugeot_table), 
+	              g_bodytype_peugeot_table, vin_peugeot_bt_offset},
 };
 
 vininfo_section *vin_manufac_table()

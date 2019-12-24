@@ -25,7 +25,8 @@ typedef struct _awoke_wait_ev {
 
 err_type awoke_wait_test1();
 awoke_wait_ev *awoke_waitev_create(char *name, int tick, uint8_t flags, 
-			err_type (*run_once)(struct _awoke_wait_ev),
-			bool (*stop_fn)(struct _awoke_wait_ev), void *data);
+			err_type (*run_once)(struct _awoke_wait_ev *),
+			bool (*stop_fn)(struct _awoke_wait_ev),
+			void *data);
 err_type awoke_waitev(awoke_wait_ev *ev);
 #endif /* __AWOKE_WAIT_H__ */

@@ -159,7 +159,7 @@ static void *worker_run(void *context)
 
 	if (!mask_exst(wk->features, WORKER_FEAT_PERIODICITY)) {
 		//log_debug("worker %s not periodicity", wk->name);
-		wk->handler();
+		wk->handler(wk);
 	}
 
 	do {
@@ -185,7 +185,7 @@ static void *worker_run(void *context)
 }
 
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
-		uint16_t features, err_type (*handler)(), void *data)
+		uint16_t features, err_type (*handler)(struct _awoke_worker *_wk), void *data)
 {
 	int r;
 	err_type ret;

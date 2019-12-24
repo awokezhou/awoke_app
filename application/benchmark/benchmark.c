@@ -20,18 +20,42 @@
 #include <getopt.h>
 
 #include "benchmark.h"
+#include "awoke_log.h"
 
 static void usage(int ex)
 {	
 	printf("usage : benchamrk [option]\n\n");
 
-    printf("    -waitev-test,    --file\t\tread data from file\n");
-    printf("    -condaction-test,    --input\t\tread data from input\n");
-
+    printf("\t--waitev-test\t\t\twaitev test\n");
+    printf("\t--condaction-test\t\tcondition&action test\n");
+	printf("\t--event-channel\t\t\tevent channel test\n");
+	printf("\t--worker\t\t\tworker test\n");
+	printf("\t--pthread\t\t\tpthread test\n");
+	printf("\t--bitflag-test\t\t\tbitflag test\n");
+	printf("\t--lock-test\t\t\tlock test\n");
+	printf("\t--timer-worker-test\t\ttimer worker test\n");
+	printf("\t--queue-zero-filter\t\tqueue zero filter\n");
+	printf("\t--vin-parse-test <vin>\t\tvinparser test, <vin>:input vin\n");
+	printf("\t--http-request-test\t\thttp request test\n");
 	EXIT(ex);
 }
 
-static err_type wait_test1_fn(awoke_wait_ev *ev)
+static void http_requset_usage(int ex) 
+{
+	printf("usage : benchmark --http-request-test\n\n");
+
+	printf("\t-m/--methd\t\thttp request method, GET/POST\n");
+	printf("\t-p/--protocol\t\thttp requset protocol, HTTP/1.1...\n");
+	printf("\t-u/--uri\t\thttp requset uri\n");
+	printf("\t-b/--body\t\thttp requset body\n");
+	printf("\t--Content-Type\t\theader Content-Type\n");
+	printf("\t--Authorization\t\theader Authorization\n");
+
+	printf("default:benchmark --http-request-test -u www.baidu.com -m POST -p HTTP/1.1 -b helloworld\n");
+	EXIT(ex);
+} 
+
+static err_type wait_test1_fn(struct _awoke_wait_ev *ev)
 {
 	waitev_test_t *p = ev->data;
 
@@ -47,12 +71,13 @@ static err_type wait_test1_fn(awoke_wait_ev *ev)
 	return et_ok;
 }
 
-err_type awoke_wait_test(void *data)
+err_type awoke_wait_test(int argc, char *argv[])
 {
 	log_debug("awoke_wait_test");
 	waitev_test_t t;
 	t.count = 0;
-	awoke_wait_ev *ev = awoke_waitev_create("wait-test", 5, WAIT_EV_F_SLEEP, wait_test1_fn, NULL, (void *)&t);
+	awoke_wait_ev *ev = awoke_waitev_create("wait-test", 5, 
+		WAIT_EV_F_SLEEP, wait_test1_fn, NULL, (void *)&t);
 	if (!ev) {
 		log_err("ev create error");
 		return et_waitev_create;
@@ -77,6 +102,7 @@ static void pipech_msg_header_dump(pipech_msg_header *hdr)
 
 err_type benchmark_event_chn_work(awoke_worker *wk)
 {
+	int rc;
 	pipech_msg_header w_header;
 	pipech_msg_header r_header;
 	awoke_event *event;
@@ -95,25 +121,26 @@ err_type benchmark_event_chn_work(awoke_worker *wk)
 	awoke_event_wait(wk->evl, 1000);
 	awoke_event_foreach(event, wk->evl) {
 		if (event->type == EVENT_NOTIFICATION) {
-			read(event->fd, &r_header, sizeof(r_header));
-			if (event->fd == wk->pipe_channel.ch_r) {
+			int rc = read(event->fd, &r_header, sizeof(r_header));
+			if ((event->fd == wk->pipe_channel.ch_r) && rc) {
 				pipech_msg_header_dump(&r_header);
 			}
 		}
 	}
 
-	write(t->pipe_channel.ch_w, &w_header, sizeof(w_header));
-	log_debug("worker %s send msg to main", wk->name);
+	rc = write(t->pipe_channel.ch_w, &w_header, sizeof(w_header));
+	log_debug("worker %s send msg(len:%d) to main", wk->name, rc);
+
+	return et_ok;
 }
 
-err_type benchmark_event_channel_test(void *data)
+static err_type benchmark_event_channel_test(int argc, char *argv[])
 {
 	int rc;
 	pipech_msg_header w_header;
 	pipech_msg_header r_header;
 	err_type ret;
 	awoke_event *event;
-	awoke_event_loop *evl;
 	event_channel_test_t *t;
 
 	t = mem_alloc_z(sizeof(event_channel_test_t));
@@ -159,29 +186,23 @@ err_type benchmark_event_channel_test(void *data)
 				}
 				if (event->fd == t->pipe_channel.ch_r) {
 					pipech_msg_header_dump(&r_header);
-					write(wk->pipe_channel.ch_w, &w_header, sizeof(w_header));
-					log_debug("main send msg to worker %s", wk->name);
+					rc = write(wk->pipe_channel.ch_w, (char *)&w_header, sizeof(w_header));
+					log_debug("main send msg(len:%d) to worker %s", wk->name, rc);
 				}
 			}
 		}
-	}
-}
-
-err_type *benchmark_test_work(void *data)
-{
-	log_debug("run");
-}
-
-err_type benchmark_test_worker_wait(struct _awoke_wait_ev *ev)
-{
-	if (ev->_reference >= 10) {
-		return et_waitev_finish;
 	}
 
 	return et_ok;
 }
 
-err_type benchmark_worker_test(void *data)
+static err_type benchmark_test_work(awoke_worker *wk)
+{
+	log_debug("run");
+	return et_ok;
+}
+
+err_type benchmark_worker_test(int argc, char *argv[])
 {
 	awoke_worker *wk = awoke_worker_create("worker-test", 2, WORKER_FEAT_PERIODICITY|WORKER_FEAT_SUSPEND,
 								  		   benchmark_test_work, NULL);
@@ -191,6 +212,8 @@ err_type benchmark_worker_test(void *data)
 
 	awoke_worker_stop(wk);
 	awoke_worker_destroy(wk);
+
+	return et_ok;
 }
 
 static void *pthread_test_handle(void *arg)
@@ -202,7 +225,7 @@ static void *pthread_test_handle(void *arg)
 	return NULL;
 } 
 
-err_type benchmark_pthread_test(void *data)
+err_type benchmark_pthread_test(int argc, char *argv[])
 {
 	pthread_t tidp;
 
@@ -223,7 +246,9 @@ err_type benchmark_pthread_test(void *data)
 	return et_ok;
 }
 
-err_type benchmark_bitflag_test(void *data)
+#define init_bitflag()	{0x0000}	
+
+static err_type benchmark_bitflag_test(int argc, char *argv[])
 {
 	typedef struct _bitflag {
 		uint16_t f_active,
@@ -232,7 +257,7 @@ err_type benchmark_bitflag_test(void *data)
 				 f_multi;
 	} bitflag;
 
-	bitflag flag;
+	bitflag flag = init_bitflag();
 
 	flag.f_active = TRUE;
 	flag.f_online = TRUE;
@@ -261,6 +286,7 @@ err_type benchmark_bitflag_test(void *data)
 		log_debug("multi");
 	}
 
+	return et_ok;
 }
 
 err_type worker_lock_test(awoke_worker *wk)
@@ -277,9 +303,11 @@ err_type worker_lock_test(awoke_worker *wk)
 		log_debug("acquire lock ok");
 		awoke_lock_release(x->sem_lock);
 	}
+
+	return et_ok;
 }
 
-err_type benchmark_lock_test(void *data)
+static err_type benchmark_lock_test(int argc, char *argv[])
 {
 	lock_test_t x;
 	x.mux_lock = awoke_lock_create(AWOKE_LOCK_T_MUX);
@@ -331,12 +359,6 @@ static err_type timer_worker_read_eng(awoke_tmtsk *tsk, awoke_tmwkr *twk)
 	return et_ok;
 }
 
-static err_type timer_worker_getvin(awoke_tmtsk *tsk, awoke_tmwkr *twk)
-{
-	log_debug("%s run", tsk->name);
-	return et_ok;
-}
-
 static err_type timer_worker_sched_end(awoke_tmwkr *twk)
 {
 	timer_worker_test_t *t = twk->data;
@@ -344,7 +366,7 @@ static err_type timer_worker_sched_end(awoke_tmwkr *twk)
 	return et_ok;
 }
 
-static err_type benchmark_timer_worker_test(void *data)
+static err_type benchmark_timer_worker_test(int argc, char *argv[])
 {
 	err_type ret;
 	timer_worker_test_t t;
@@ -377,7 +399,7 @@ static err_type benchmark_timer_worker_test(void *data)
 	awoke_tmwkr_stop(t.twk);
 
 	awoke_tmwkr_clean(&t.twk);
-	return et_ok;
+	return ret;
 }
 
 static uint32_t _queue_zero_filter_uint32(awoke_queue *q)
@@ -423,7 +445,7 @@ static uint32_t _queue_zero_filter_uint32(awoke_queue *q)
 	return average;
 }
 
-static err_type benchmark_queue_zero_filter_test(void *data)
+static err_type benchmark_queue_zero_filter_test(int argc, char *argv[])
 {
 	int i;
 	uint32_t *u;
@@ -458,24 +480,123 @@ static err_type benchmark_queue_zero_filter_test(void *data)
 	return et_ok;
 }
 
-static err_type benchmark_vin_parse_test(void *data)
+static err_type benchmark_vin_parse_test(int argc, char *argv[])
 {
-	char *vin = data;
+	int opt;
+	char *vin = "LSG231413213";
+	
+	static const struct option long_opts[] = {
+		{"vin",		required_argument,	NULL,	'v'},
+        {NULL, 0, NULL, 0}
+    };	
+
+	while ((opt = getopt_long(argc, argv, "v:", long_opts, NULL)) != -1)
+		{
+			switch (opt)
+			{
+				case 'v':
+					vin = optarg;
+					break;
+				
+				default:
+					break;
+			}
+		}
+
 	vininfo vinfo;
 	vin_parse(vin, &vinfo);
 	vininfo_dump(&vinfo);
 	return et_ok;
 }
 
+static err_type benchmark_http_request_test(int argc, char *argv[])
+{
+	int opt;
+	err_type ret;
+	char *method = "POST"; 
+	char *body = "hello world";
+	char *protocol = "HTTP/1.1"; 
+	char *uri = "www.baidu.com";
+	char *header_authorization = NULL;
+	char *header_content_type = "application/text";
+	char *header_accept = NULL;
+	char response[HTTP_REQPKT_SIZE];
+	http_header headers[HTTP_HEADER_SIZEOF];
+	
+	static const struct option long_opts[] = {
+		{"method",		required_argument,	NULL,	'm'},
+		{"protocol",	required_argument,	NULL,	'p'},
+        {"uri",			required_argument,	NULL,   'u'},
+        {"body",  		required_argument,  NULL,   'b'},
+        {"Content-Type",  	required_argument,  NULL,   arg_http_content_type},
+        {"Authorization",  	required_argument,  NULL,   arg_http_authorization},
+        {"Accept",  	required_argument,  NULL,   arg_http_accept},
+        {NULL, 0, NULL, 0}
+    };	
+
+	while ((opt = getopt_long(argc, argv, "u:m:p:b:?h", long_opts, NULL)) != -1)
+    {
+        switch (opt)
+        {
+        	case 'u':
+				uri = optarg;
+				break;
+
+			case 'm':
+				method = optarg;
+				break;
+
+			case 'p':
+				protocol = optarg;
+				break;				
+
+        	case 'b':
+				body = optarg;
+				break;
+
+			case arg_http_content_type:
+				header_content_type = optarg;
+				break;
+				
+			case arg_http_authorization:
+				header_authorization = optarg;
+				break;
+
+			case arg_http_accept:
+				header_accept = optarg;
+				break;
+				
+			case '?':
+			case 'h':
+				http_requset_usage(AWOKE_EXIT_SUCCESS);
+			default:
+				break;
+        }
+    }
+
+	http_header_init(headers);
+	http_header_set(headers, HTTP_HEADER_CONTENT_TYPE, header_content_type);
+	http_header_set(headers, HTTP_HEADER_AUTHORIZATION, header_authorization);
+	http_header_set(headers, HTTP_HEADER_ACCEPT, header_accept);
+	
+	ret = http_request(uri, method, protocol, body, headers, NULL, response);
+	if (ret != et_ok) {
+		log_err("http post request error, ret %d", ret);
+		return ret;
+	}
+
+	log_info(">>> HTTP Response:\n%s", response);
+
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
-	void *data;
+	char *app_id = "benchmark";
 	int loglevel = LOG_DBG;
 	int logmode = LOG_TEST;
 	bencmark_func bmfn = NULL;
-
-	log_id("benchmark");
 
 	static const struct option long_opts[] = {
 		{"loglevel",			required_argument,	NULL,	'l'},
@@ -490,6 +611,7 @@ int main(int argc, char *argv[])
 		{"timer-worker-test",	no_argument,		NULL,	arg_timer_worker},
 		{"queue-zero-filter",	no_argument, 		NULL, 	arg_queue_zero_filter},
 		{"vin-parse-test",		required_argument,	NULL,	arg_vin_parse_test},
+		{"http-request-test",	no_argument,		NULL,	arg_http_request_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -541,9 +663,12 @@ int main(int argc, char *argv[])
 				break;
 
 			case arg_vin_parse_test:
-				data = optarg;
 				bmfn = benchmark_vin_parse_test;
 				break;
+
+			case arg_http_request_test:
+				bmfn = benchmark_http_request_test;
+				goto run;
 				
             case '?':
             case 'h':
@@ -553,10 +678,10 @@ int main(int argc, char *argv[])
         }
     }
 
-	log_level(loglevel);
-	log_mode(logmode);
+	log_set(app_id, logmode, loglevel);
 
-	bmfn(data);
+run:
+	bmfn(argc, argv);
 
 	return 0;
 }

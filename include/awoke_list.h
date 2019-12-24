@@ -163,7 +163,6 @@ static inline int sl_list_size(struct _sl_list *existing)
 
 static inline void sl_list_reverse(struct _sl_list *existing)
 {
-	int size;
 	struct _sl_list *p1, *p2;
 	struct _sl_list *p = existing->next;
 	struct _sl_list *head = existing;

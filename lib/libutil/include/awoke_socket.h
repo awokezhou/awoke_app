@@ -42,6 +42,24 @@ typedef struct _sock_map{
 	int flag;
 }sock_map; 
 
+
+/* -- network io define --{ */
+typedef struct _awoke_network_io {
+	char *name;
+	int call_nr;
+	int	(*accept)(int, struct sockaddr *, int *);
+	int (*bind)(int, struct sockaddr *, int);
+	int (*connect)(int, struct sockaddr *, int);
+	int (*recv)(int, void *, int, unsigned int);
+	int (*send)(int, const void *, int, unsigned int);
+	int (*socket_create)(int, int, int);
+	int (*socket_close)(int);
+} awoke_network_io;
+/* }-- network io define -- */
+
+
+
+
 int awoke_socket_server(uint8_t, const char *, uint32_t, bool);
 int awoke_socket_accept_unix(int);
 int awoke_socket_accpet(int);
@@ -50,6 +68,7 @@ bool awoke_sock_fd_read_ready(int);
 int awoke_socket_create(int, int, int);
 err_type awoke_unix_message_send(char *, char *, int, int *, uint32_t);
 err_type awoke_socket_recv_wait(int fd, uint32_t tm);
+awoke_network_io *awoke_network_io_get();
 
 
 #endif /* __AWOKE_SOCKET_H__ */

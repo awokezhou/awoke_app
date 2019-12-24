@@ -4,6 +4,7 @@
 
 #include "awoke_type.h"
 
+/* -- request header define { -- */
 typedef enum {
     HEADER_ACCEPT             = 1,
 	HEADER_HOST                  ,
@@ -13,11 +14,14 @@ typedef enum {
     HEADER_CONNECTION            ,
     HEADER_CONTENT_LENGTH        ,
     HEADER_CONTENT_TYPE          ,
+    HEADER_USER_AGENT			 ,
+    HEADER_KEEP_ALIVE			 ,
     HEADER_SIZEOF                ,
 
     /* used by the core for custom headers */
     HEADER_OTHER
 } request_headers;
+/* -- } request header define -- */
 
 typedef struct _http_header {
     /* The header type/name, e.g: HEADER_CONTENT_LENGTH */
@@ -66,15 +70,21 @@ typedef struct _http_network_io {
 typedef struct _http_request {
 
 	/* -- start line -- */
-	mem_ptr_t method;
+	mem_ptr_t host;
 	mem_ptr_t path;
+	mem_ptr_t method;
 	mem_ptr_t protocol;
 
 	/* -- request headers -- */
+	http_header *extend_headers;
 	http_header headers[HEADER_SIZEOF]; 
 
 	/* -- POST data -- */
 	mem_ptr_t body;
+
+	int state_code;
+
+	http_connect conn;
 	
 #define HTTP_BUFF_MAX	8092	
 	char *pos;
@@ -82,10 +92,24 @@ typedef struct _http_request {
 	char original_buf[HTTP_BUFF_MAX];
 } http_request; 
 
-typedef struct _http_connection {
-	int sock;
+typedef struct _http_connect {
+	const char *uri;
+	char hostname[32];
+	mem_ptr_t host;
+	mem_ptr_t user;
+	mem_ptr_t path;
+	mem_ptr_t query;
+	mem_ptr_t scheme;
+	mem_ptr_t fragment;
+#define HQNB_HTTP_CONN_F_IPV4		0x0001
+#define HQNB_HTTP_CONN_F_HOSTNAME	0x0002
+#define HQNB_HTTP_CONN_F_IMPORT		0x0004
+#define HQNB_HTTP_CONN_F_EXPORT		0x0008
+	uint16_t flag;
+	awoke_tcp_connect _conn;
+	
 	uint32_t flags;
 	struct sockaddr_in addr;
-} http_conn;
+} http_connect;
 
 #endif /* __HTTP_CLIENT_H__ */

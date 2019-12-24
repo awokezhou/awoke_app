@@ -53,6 +53,13 @@ void log_id_set(char *id)
 	sg_log_id = id;
 }
 
+void _log_set(char *id, int mode, int level)
+{
+	log_id_set(id);
+	log_mode_set(mode);
+	log_level_set(level);
+}
+
 static char *log_id_get()
 {
 	return sg_log_id;

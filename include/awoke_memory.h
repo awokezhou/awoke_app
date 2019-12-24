@@ -49,11 +49,11 @@ static inline void mem_free(void *ptr)
 
 typedef struct
 {
-    char *p;
+    const char *p;
     unsigned long len;
 } mem_ptr_t;
 
-#define mem_ptr_none()	{0,0}
+#define mem_ptr_none()	{NULL,0}
 
 #define mem_ptr_dump(ptr) (ptr.len, ptr.p)
 
@@ -64,6 +64,13 @@ static inline mem_ptr_t mem_mk_ptr(const char *str)
 	if (str != NULL) ret.len = strlen(str);
 
 	return ret;
+}
+
+static inline mem_ptr_t mem_mkptr_num(int num)
+{
+	char num_str[16] = {0x0};
+	sprintf(num_str, "%d", num);
+	return mem_mk_ptr(num_str);
 }
 
 static inline void mem_ptr_copy(mem_ptr_t *dst, mem_ptr_t *src)

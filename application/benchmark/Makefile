@@ -1,6 +1,6 @@
 
 EXEC = bin/benchmark
-LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern -lvinparser
+LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern -lvinparser -lhttp
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
@@ -18,6 +18,7 @@ INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
                  -I$(LIB_PATH)/libpattern/include \
 				 -I$(LIB_PATH)/libsecurity/include \
 				 -I$(LIB_PATH)/libvinparser/include \
+				 -I$(LIB_PATH)/libhttp/include 
 
 all: prepare compile build
 

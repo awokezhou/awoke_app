@@ -53,7 +53,7 @@ static void parse_uri_component(const char **p, const char *end,
 	if (*p < end) (*p)++;
 }
 
-int http_parse_uri(const mem_ptr_t uri, mem_ptr_t *scheme,
+err_type http_parse_uri(const mem_ptr_t uri, mem_ptr_t *scheme,
 					     mem_ptr_t *user_info, mem_ptr_t *host,
 					     unsigned int *port, mem_ptr_t *path,
 					     mem_ptr_t *query, mem_ptr_t *fragment)
@@ -142,7 +142,7 @@ int http_parse_uri(const mem_ptr_t uri, mem_ptr_t *scheme,
 					for (; !found && p < end; p++) {
 						found = (*p == ']');
 					}
-					if (!found) return -1;
+					if (!found) return et_param;
 				} else {
 					for (; p < end; p++) {
 						if (*p == ':' || *p == '/') break;
@@ -189,7 +189,7 @@ int http_parse_uri(const mem_ptr_t uri, mem_ptr_t *scheme,
 	if (query != 0) *query = rquery;
 	if (fragment != 0) *fragment = rfragment;
 
-	return 0;
+	return et_ok;
 }
 
 #define mem_ptr_print(ptr) do {\
@@ -197,8 +197,26 @@ int http_parse_uri(const mem_ptr_t uri, mem_ptr_t *scheme,
 		printf("\n");\
 	}while(0);
 
-int http_connect_create(http_conn *c, mem_ptr_t addr, uint32_t port)
+err_type http_connect_create(http_connect *c, const char *uri)
 {
+	err_type ret;
+	char addr[16] = {0x0};
+	mem_ptr_t scheme, user, host, path, query, fragment;
+	unsigned int d1,d2,d3,d4, port = 0;
+	struct sockaddr_in sockaddr;
+
+	if (!c)
+		return et_param;
+
+	ret = http_parse_uri(mem_mk_ptr((char *)uri), &scheme, &user, &host, 
+						 &port, &path, &query, &fragment);
+	c->uri = uri;
+	c->host = host;
+	c->path = path;
+	c->user = user;
+	c->query = query;
+	c->scheme = scheme; 
+	/*
 	int fd;
 	int ret;
 	char _addr[16] = {0x0};
@@ -215,11 +233,11 @@ int http_connect_create(http_conn *c, mem_ptr_t addr, uint32_t port)
 	c->addr.sin_family = AF_INET;
 	c->addr.sin_addr.s_addr = inet_addr(_addr);
 	c->addr.sin_port = htons(port);
-
+	*/
 	return 0;
 }
 
-int http_connect(http_conn *c)
+int http_do_connect(http_conn *c)
 {
 	int ret;
 
@@ -283,8 +301,8 @@ int http_connect_send(http_conn *c, http_request *r)
 }
 
 typedef struct _header_entry {
-	char* key_p;
-	int key;
+	char* key;
+	int type;
 } header_entry;
 
 static header_entry my_headers_table[] = 
@@ -443,6 +461,24 @@ int http_request_build_body(http_request *req)
 	free(json_print);
 	return json_len;*/
 	return _request_ori_build(req, "%.*s", req->body.len, req->body.p);
+}
+
+static err_type http_post_request(const char *uri, cJSON *body, http_header *headers)
+{
+	err_type ret;
+	http_request *req;
+	cJSON *pbody = NULL;
+
+	if (!uri || !body || !*body)
+		return et_param;
+	
+	req = mem_alloc_z(sizeof(http_request));
+	if (!req) {
+		log_err("alloc request error");
+		return et_nomem;
+	}
+
+	ret = http_connect_create(&req->conn, uri);
 }
 
 int http_package_request(http_request *req)
@@ -788,9 +824,9 @@ int main(int argc, char **argv)
 	log_mode(LOG_TEST);
 	log_level(LOG_DBG);
 
-	mongoose_test(argc, argv);
+	//mongoose_test(argc, argv);
 
-	//http_request_test();
+	http_request_test();
 
 	//log_debug("will http_client_test");
 

@@ -1,9 +1,26 @@
 #include <sys/un.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "awoke_socket.h"
 #include "awoke_log.h"
 
 
+static err_type awoke_socket_bind(int fd, const struct sockaddr *addr,
+                   socklen_t addrlen, int backlog);
+
+
+
+static awoke_network_io g_sk_io = {
+	.accept = awoke_socket_accpet,
+	.bind = awoke_socket_bind,
+	.connect = connect,
+	.recv = recv,
+	.send = send,
+	.socket_create = awoke_socket_create,
+	.socket_close = close,
+};
+ 
 static sock_map sk_map[] = 
 {
 	sk_map_item(SOCK_LOCAL, 		AF_LOCAL, 	SOCK_STREAM, 	0),
@@ -12,6 +29,11 @@ static sock_map sk_map[] =
 	sk_map_item(SOCK_ETHERNET, 		AF_INET, 	SOCK_RAW,		0),
 };
 static const int sk_map_size = array_size(sk_map);
+
+awoke_network_io *awoke_network_io_get()
+{
+	return &g_sk_io;
+}
 
 static inline sock_map *get_sock_proto(uint8_t type)
 {

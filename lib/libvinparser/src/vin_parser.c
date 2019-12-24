@@ -100,10 +100,10 @@ static vininfo_section *section_find(vininfo_section *head, int size, char *pos)
 {
 	vininfo_section *p;
 
-	log_debug("table size %d", size);
+	//log_debug("table size %d", size);
 
 	array_foreach(head, size, p) {
-		log_debug("pos:%.*s code:%.*s", strlen(p->code), pos, strlen(p->code), p->code);
+		//log_debug("pos:%.*s code:%.*s", strlen(p->code), pos, strlen(p->code), p->code);
 		if (!strncmp(pos, p->code, strlen(p->code))) {
 			return p;
 		}
@@ -216,10 +216,10 @@ static vinmanu2vds *vp_maun2vds_map(vin_parser *vp, vininfo *vi)
 	head = vp->map_manu2vds;
 	size = vp->map_manu2vds_size;
 
-	log_debug("manuid %d", vi->manufac.id);
+	//log_debug("manuid %d", vi->manufac.id);
 
 	array_foreach(head, size, p) {
-		log_debug("map id %d", p->manuid);
+		//log_debug("map id %d", p->manuid);
 		if (p->manuid == vi->manufac.id) {
 			return p;
 		}
@@ -239,10 +239,10 @@ static err_type vp_mode(vin_parser *vp, vininfo *vi)
 	}
 
 	if (map->tb_vds != NULL) {
-		log_debug("table vds exist");
+		//log_debug("table vds exist");
 		s = section_find(map->tb_vds, map->tb_vds_size, vi->vds.p);
 		if (s) {
-			log_debug("find section %d %s %s", s->id, s->code, s->string);
+			//log_debug("find section %d %s %s", s->id, s->code, s->string);
 			section_set(&vi->modelin, s);
 		}
 	}

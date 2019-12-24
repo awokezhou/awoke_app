@@ -69,7 +69,6 @@
 #define buf_push_dwrd_safe(data, p, end) 		_buf_push_safe(data, p, 4, 	end)
 #define buf_push_stri_safe(data, p, end, ln)	_buf_push_safe(data, p, ln, end)
 
-#define array_size(array)	((sizeof(array))/(sizeof(array[0])))
 
 #define array_foreach(head, size, p)				\
 		int __i;									\

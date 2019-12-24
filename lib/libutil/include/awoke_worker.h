@@ -17,7 +17,6 @@
 #define worker_attr pthread_attr_t
 #define worker_mutex  pthread_mutex_t
 #define worker_cond  pthread_cond_t
-#define worker_create pthread_create
 #define _worker_mutex_init(mutex, val) pthread_mutex_init(mutex, val)
 #define worker_mutex_lock(mutex) pthread_mutex_lock(mutex)
 #define worker_mutex_unlock(mutex) pthread_mutex_unlock(mutex)
@@ -114,7 +113,7 @@ void awoke_worker_destroy(awoke_worker *wk);
 bool awoke_worker_should_stop(awoke_worker *wk);
 void awoke_worker_should_suspend(awoke_worker *wk);
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
-		uint16_t features, err_type (*handler)(), void *data);
+		uint16_t features, err_type (*handler)(struct _awoke_worker *), void *data);
 
 void awoke_tmwkr_stop(awoke_tmwkr *twk);
 void awoke_tmwkr_start(awoke_tmwkr *twk);
