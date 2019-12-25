@@ -37,6 +37,8 @@ typedef enum {
 	arg_http_content_type,
 	arg_http_authorization,
 	arg_http_accept,
+	arg_http_connection,
+	arg_http_user_agent,
 } http_args;
 
 typedef err_type (*bencmark_func)(int argc, char *argv[]);

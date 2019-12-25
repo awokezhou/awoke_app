@@ -4,17 +4,32 @@
 
 
 
+/*
+-- Module Description
+  This is a custom HTTP module.
+
+-- Commit Information --
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   ci       |  date       |  version |  description
+ -------------------------------------------------------------------------
+   610819fe |  2019-12-24 |  0.0.1   |  create libhttp
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+
+
+
+
 static http_header_entry g_header_keys_table[] = 
 {
-	http_header_entry_make(HTTP_HEADER_ACCEPT),
 	http_header_entry_make(HTTP_HEADER_HOST),
+	http_header_entry_make(HTTP_HEADER_USER_AGENT),
+	http_header_entry_make(HTTP_HEADER_ACCEPT),
 	http_header_entry_make(HTTP_HEADER_ACCEPT_CHARSET),
 	http_header_entry_make(HTTP_HEADER_ACCEPT_ENCODING),
 	http_header_entry_make(HTTP_HEADER_ACCEPT_LANGUAGE),
 	http_header_entry_make(HTTP_HEADER_CONNECTION),
 	http_header_entry_make(HTTP_HEADER_CONTENT_LENGTH),
 	http_header_entry_make(HTTP_HEADER_CONTENT_TYPE),
-	http_header_entry_make(HTTP_HEADER_USER_AGENT),
 	http_header_entry_make(HTTP_HEADER_KEEP_ALIVE),
 	http_header_entry_make(HTTP_HEADER_AUTHORIZATION),
 };
@@ -203,6 +218,11 @@ static err_type get_host_address(char *hostname, struct sockaddr_in *addr)
 	return et_ok;
 }
 
+bool http_buffchunk_dynamic(struct _http_buffchunk *chunk)
+{
+	return ((chunk->buff) && (chunk->buff != chunk->_fixed));
+}
+
 static void header_set(struct _http_header *headers, int type, mem_ptr_t val)
 {
 	struct _http_header *h;
@@ -210,11 +230,8 @@ static void header_set(struct _http_header *headers, int type, mem_ptr_t val)
 	mem_ptr_t key = find_key(type);
 	if (!key.p) 
 		return;
-
-	log_debug("find key %.*s", key.len, key.p);
 	
 	h = &headers[type];
-	log_debug("h type %d", h->type);
 	if (h->type != type)
 		h->type = type;
 	
@@ -224,22 +241,7 @@ static void header_set(struct _http_header *headers, int type, mem_ptr_t val)
 
 static void request_set_header(struct _http_request *req, int type, mem_ptr_t val)
 {
-	log_debug("header:type %d val %.*s", type, val.len, val.p);
 	return header_set(req->headers, type, val);
-}
-
-static void request_header_dump(struct _http_request *req)
-{
-	struct _http_header *h;
-
-	log_info(">>> headers:");
-
-	array_foreach(req->headers, HTTP_HEADER_SIZEOF, h) {
-		if (h->key.len) {
-			log_info("\t%.*s%.*s", h->key.len, h->key.p,
-				h->val.len, h->val.p);
-		}
-	}
 }
 
 static void request_set_extend_header(struct _http_request *req)
@@ -258,7 +260,7 @@ static void request_set_extend_header(struct _http_request *req)
 
 static int request_build_header(struct _http_request *req, struct _http_header *h)
 {
-  	return build_ptr_format(req->bp, "%.*s %.*s\r\n", 
+  	return build_ptr_format(req->bp, "%.*s %.*s"STR_CRLD, 
 							h->key.len, h->key.p,
 							h->val.len, h->val.p);
 }
@@ -275,7 +277,7 @@ static int request_build_body(struct _http_request *req)
 
 static int request_build_startline(struct _http_request *req)
 {	
-	return build_ptr_format(req->bp, "%.*s %.*s %.*s\r\n",
+	return build_ptr_format(req->bp, "%.*s %.*s %.*s"STR_CRLD,
 					 	    req->method.len, req->method.p,
 					 		req->path.len, req->path.p,
 					 		req->protocol.len, req->protocol.p);
@@ -295,19 +297,32 @@ static int request_build_headers(struct _http_request *req)
 	return len;
 }
 
-void http_request_clean(struct _http_request **req)
+void http_request_clean(struct _http_request *p)
 {
-	struct _http_request *p;
+	if (!http_connect_keep_alive(&p->conn))
+		http_connect_release(&p->conn);
 
-	if (!req || !*req)
-		return;
+	if (http_buffchunk_dynamic(&p->buffchunk))
+		mem_free(&p->buffchunk);
+}
 
-	p = *req;
-
-	http_connect_release(&p->conn);
-
-	mem_free(p);
-	p = NULL;
+void http_request_dump(struct _http_request *req)
+{
+	struct _http_header *h;
+	
+	log_info(">>> HTTP Request dump:");
+	log_info("--------------------------------");
+	log_info("uri : %s", req->uri);
+	log_info("method : %.*s", req->method.len, req->method.p);
+	log_info("protocol : %.*s", req->protocol.len, req->protocol.p);
+	array_foreach(req->headers, HTTP_HEADER_SIZEOF, h) {
+		if (h->key.len) {
+			log_info("%.*s %.*s", h->key.len, h->key.p,
+				h->val.len, h->val.p);
+		}
+	}
+	log_test("HTTP Text:\n%.*s", req->buffchunk.length, req->buffchunk.buff);
+	log_info("--------------------------------");
 }
 
 void http_request_init(struct _http_request *req)
@@ -320,8 +335,9 @@ void http_request_init(struct _http_request *req)
 	req->method = mem_mk_ptr(NULL);
 	req->protocol = mem_mk_ptr(NULL);
 
-	req->original_len = 0;
-	req->bp = build_ptr_make(req->original_buf, HTTP_REQPKT_SIZE);
+	http_buffchunk_init(req->buffchunk);
+	
+	req->bp = build_ptr_make(req->buffchunk.buff, req->buffchunk.size);
 }
 
 static err_type http_request_package(struct _http_request *req)
@@ -333,57 +349,122 @@ static err_type http_request_package(struct _http_request *req)
 
 	if (req->extend_headers)
 		request_set_extend_header(req);
-
-	log_info("method:%.*s", req->method.len, req->method.p);
-	log_info("body:%.*s", req->body.len, req->body.p);
-	log_info("protocol:%.*s", req->protocol.len, req->protocol.p);
-	request_header_dump(req);
 	
 	request_build_startline(req);
 	
 	request_build_headers(req);
 	
 	request_build_string(req, STR_CRLD);
-	
-	request_build_body(req);
 
-	req->original_len = req->bp.len;
-	
-	log_debug(">>> HTTP Packet:\n%.*s", req->bp.len, req->bp.head);
+	if (req->body.len)
+		request_build_body(req);
+
+	req->buffchunk.length = req->bp.len;
+
+	http_request_dump(req);
 
 	return et_ok;
 }
 
 err_type http_request_send(struct _http_request *req)
 {
-	return awoke_tcp_connect_send(&req->conn._conn, (void *)&req->original_buf, 
-							     req->original_len);
+	return awoke_tcp_connect_send(&req->conn._conn, req->buffchunk.buff, 
+							     req->buffchunk.length, NULL);
 }
 
-err_type http_request_recv(struct _http_request *req)
+err_type http_request_recv(struct _http_request *req, struct _http_response *rsp)
 {
-	memset(&req->original_buf, 0x0, HTTP_REQPKT_SIZE);
-	return awoke_tcp_connect_recv(&req->conn._conn, (void *)&req->original_buf, 
-								  HTTP_REQPKT_SIZE);
+	err_type ret;
+	int max_read;
+	int new_size;
+	int read_size;
+	char *realloc = NULL;
+	struct _http_buffchunk *chunk;
+	struct _awoke_tcp_connect *conn = &req->conn._conn;
+
+
+	http_buffchunk_init(rsp->buffchunk);
+	chunk = &rsp->buffchunk;
+	
+	do {
+
+		if (!chunk->length) {
+			log_test("first read");
+			/* first time receive */
+		
+		} else {
+
+			new_size = chunk->size + HTTP_BUFFER_CHUNK;
+			log_test("new size %d", new_size);
+			if (!http_buffchunk_dynamic(chunk)) {
+				log_test("buffchunk not dynamic, alloc memory");
+				chunk->buff = mem_alloc_z(new_size+1);
+				memcpy(chunk->buff, chunk->_fixed, chunk->size);
+			} else {
+				log_test("buffchunk dynamic, realloc memory");
+				realloc = mem_realloc(chunk->buff, new_size+1);
+				if (!realloc) {
+					log_err("realloc mem error");
+					goto recv_error;
+				} else {
+					chunk->buff = realloc;
+				}
+			}
+
+			chunk->size = new_size;
+			log_test("buffchunk size %d", chunk->size);
+		}
+
+		max_read = chunk->size - chunk->length;
+		log_test("max read %d", max_read);
+		ret = awoke_tcp_connect_recv(conn, chunk->buff, max_read, 
+									 &read_size, TRUE);
+		if (ret != et_ok) {
+			log_err("receive error, ret %d", ret);
+			goto recv_error;
+		}
+
+		log_test("tcp connect read %d", read_size);
+
+		chunk->length += read_size;
+		chunk->buff[chunk->length] = '\0';
+	} while (!awoke_tcp_recv_finish(conn));
+
+	http_response_parse(rsp);
+	return et_ok;
+	
+recv_error:
+	if (http_buffchunk_dynamic(chunk))
+		mem_free(chunk->buff);
+	mem_free(rsp);
+	return ret;
 }
 
-static void http_state_code(struct _http_request *r)
+static err_type response_parse_header(struct _http_response *rsp)
 {
-	char *search = NULL;
+	return et_ok;
+}
 
-	search = strstr(r->original_buf, HTTP_PROTOCOL_11_STR);
-	if (!search) {
-		search = strstr(r->original_buf, HTTP_PROTOCOL_10_STR);
-		if (!search) {
-			log_err("unknown version");
-			/* unknown version also use default format */
-		} 
-		search += strlen(HTTP_PROTOCOL_10_STR);
-		sscanf(search, " %d[^ ]", &r->state_code);
-	} else {
-		search += strlen(HTTP_PROTOCOL_11_STR);
-		sscanf(search, " %d[^ ]", &r->state_code);
-	}
+void http_response_clean(struct _http_response *rsp)
+{
+	if (http_buffchunk_dynamic(&rsp->buffchunk))
+		mem_free(rsp->buffchunk.buff);
+}
+
+void http_response_dump(struct _http_response *rsp)
+{
+	log_info(">> HTTP Response dump:");
+	log_info("--------------------------------");
+	log_info("status : %d", rsp->status);
+	log_info("connection : %d", rsp->connection);
+	log_info("content length : %d", rsp->content_length);
+	log_test("HTTP Text:\n%.*s", rsp->buffchunk.length, rsp->buffchunk.buff);
+	log_info("--------------------------------");
+}
+
+err_type http_response_parse(struct _http_response *rsp)
+{
+	return response_parse_header(rsp);
 }
 
 static err_type http_connect_create(struct _http_connect *c, const char *uri)
@@ -404,14 +485,7 @@ static err_type http_connect_create(struct _http_connect *c, const char *uri)
 
 	if (!path.len)
 		path = mem_mk_ptr("/");
-
-	log_info("uri:%s", uri);
-	log_info("host:%.*s", host.len, host.p);
-	log_info("path:%.*s", path.len, path.p);
-	log_info("user:%.*s", user.len, user.p);
-	log_info("query:%.*s", query.len, query.p);
-	log_info("scheme:%.*s", scheme.len, scheme.p);
-
+	
 	c->uri = uri;
 	c->host = host;
 	c->path = path;
@@ -430,7 +504,7 @@ static err_type http_connect_create(struct _http_connect *c, const char *uri)
 			return ret;
 		}
 		sprintf(addr, "%s", inet_ntoa(sockaddr.sin_addr));
-		log_info("host address %s", addr);
+		log_test("host address %s", addr);
 		c->flag = HTTP_CONN_F_HOSTNAME;
 	} else {
 		memcpy(addr, host.p, host.len);
@@ -453,6 +527,16 @@ void http_connect_release(struct _http_connect *c)
 err_type http_do_connect(struct _http_connect *c)
 {
 	return awoke_tcp_do_connect(&c->_conn);
+}
+
+bool http_connect_keep_alive(struct _http_connect *c)
+{
+	return mask_exst(c->flag, HTTP_CONN_F_KEEP_ALIVE);
+}
+
+void http_connect_set_keep_alive(struct _http_connect *c)
+{
+	mask_push(c->flag, HTTP_CONN_F_KEEP_ALIVE);
 }
 
 void http_header_set(struct _http_header *headers, int type, char *value)
@@ -478,75 +562,106 @@ void http_header_init(struct _http_header *headers)
 	}
 }
 
+/*
+ * Build a Http request, send to server and receive data.
+ * @uri: request url
+ * @method: GET/POST
+ * @protocol: HTTP/1.0 HTTP/1.1
+ * @body: HTTP body
+ * @headers: extend HTTP header array
+ * @alive: use for keep-alive connect. If not set, connect will be released when request over.
+ *		   If set, connect will copy to this param
+ * @rsp: the response from server
+ */
 err_type http_request(const char *uri, const char *method, const char *protocol, 
 	const char *body, struct _http_header *headers, struct _http_connect *alive, 
-	char *rsp)
+	struct _http_response *rsp)
 {
 	err_type ret;
-	struct _http_request *req;
+	struct _http_request request;
+	struct _http_response response;
 
-	if (!uri || !body)
+	if (!uri || !method || !protocol)
 		return et_param;
 
-	req = mem_alloc_z(sizeof(struct _http_request));
-	if (!req) {
-		log_err("alloc request error");
-		return et_nomem;
+	http_request_init(&request);
+
+	/* 
+	 * Alive is support for connect import or keep-alive. If alive connect
+	 * exist and is connected, this is a import connect, and we should copy
+	 * to req's conn.
+	 */
+	if (alive && alive->_conn.status == tcp_connected) {
+		log_test("import connect active, don't need to create one");
+		memcpy(&request.conn, alive, sizeof(struct _http_connect));
+		goto connected;		
+	} 
+
+	if (alive) {
+		log_test("connect need keep alive");
+		http_connect_set_keep_alive(alive);
 	}
 
-	http_request_init(req);
-
-	ret = http_connect_create(&req->conn, uri);
+	ret = http_connect_create(&request.conn, uri);
 	if (ret != et_ok) {
 		log_err("connect create error, ret %d", ret);
 		goto release;
 	}
 
-	req->host = req->conn.host;
-	req->method = mem_mk_ptr(method);
-	if (!strncmp(HTTP_METHOD_POST_STR, req->method.p, req->method.len)) {
-		req->body = mem_mk_ptr(body);
+	log_test("connect create ok");
+
+
+connected:
+	request.uri = request.conn.uri;
+	request.host = request.conn.host;
+	request.method = mem_mk_ptr(method);
+	if (!strncmp(HTTP_METHOD_POST_STR, request.method.p, request.method.len)) {
+		request.body = mem_mk_ptr(body);
 	}
-	req->protocol = mem_mk_ptr(protocol);
-	req->extend_headers = headers;
-	mem_ptr_copy(&req->path, &req->conn.path);
+	request.protocol = mem_mk_ptr(protocol);
+	request.extend_headers = headers;
+	mem_ptr_copy(&request.path, &request.conn.path);
 	
-	ret = http_request_package(req);
+	ret = http_request_package(&request);
 	if (ret != et_ok) {
 		log_err("package post request error");
 		goto release;
 	}
 
-	ret = http_do_connect(&req->conn);
+	ret = http_do_connect(&request.conn);
 	if (ret != et_ok) {
 		log_err("do connect error, ret %d", ret);
 		goto release;
 	}
 
-	ret = http_request_send(req);
+	ret = http_request_send(&request);
 	if (ret != et_ok) {
 		log_err("do connect error, ret %d", ret);
 		goto release;
 	}
 
-	ret = http_request_recv(req);
+	log_test("request send ok");
+
+	ret = http_request_recv(&request, &response);
 	if (ret != et_ok) {
-		log_err("do connect error, ret %d", ret);
+		log_err("receive error, ret %d", ret);
 		goto release;
 	}
 
-	http_state_code(req);
+	log_test("response receive ok");
 
-	if ((req->original_len > 0) && (rsp != NULL)) {
-		memcpy(rsp, &req->original_buf, req->original_len);
+	http_response_dump(&response);
+	
+	if (rsp) {
+		memcpy(rsp, &request, sizeof(struct _http_response));
 	}
 
-	if (req->state_code != 	HTTP_CODE_SUCCESS) {
-		log_debug("state code error, code:%d", req->state_code);
+	if (alive) {
+		memcpy(alive, &request.conn, sizeof(struct _http_connect));
 	}
 	
 release:
-	if (req)
-		http_request_clean(&req);
+	http_request_clean(&request);
+	if (!rsp) http_response_clean(&response);
 	return ret;
 }

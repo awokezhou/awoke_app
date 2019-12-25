@@ -513,15 +513,19 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 {
 	int opt;
 	err_type ret;
-	char *method = "POST"; 
-	char *body = "hello world";
+	char *method = "GET"; 
+	char *body = "xxx";
 	char *protocol = "HTTP/1.1"; 
 	char *uri = "www.baidu.com";
 	char *header_authorization = NULL;
-	char *header_content_type = "application/text";
+	char *header_content_type = NULL;
 	char *header_accept = NULL;
-	char response[HTTP_REQPKT_SIZE];
+	char *header_accept_encoding = NULL;
+	char *header_connection = NULL;
+	char *header_user_agent = NULL;
 	http_header headers[HTTP_HEADER_SIZEOF];
+	struct _http_connect connect_keep;
+	struct _http_response response;
 	
 	static const struct option long_opts[] = {
 		{"method",		required_argument,	NULL,	'm'},
@@ -531,6 +535,8 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
         {"Content-Type",  	required_argument,  NULL,   arg_http_content_type},
         {"Authorization",  	required_argument,  NULL,   arg_http_authorization},
         {"Accept",  	required_argument,  NULL,   arg_http_accept},
+        {"Connection",  required_argument,  NULL,   arg_http_connection},
+        {"User-Agent",  required_argument,  NULL,   arg_http_user_agent},
         {NULL, 0, NULL, 0}
     };	
 
@@ -565,6 +571,14 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 			case arg_http_accept:
 				header_accept = optarg;
 				break;
+
+			case arg_http_connection:
+				header_connection = optarg;
+				break;
+
+			case arg_http_user_agent:
+				header_user_agent = optarg;
+				break;
 				
 			case '?':
 			case 'h':
@@ -578,14 +592,17 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	http_header_set(headers, HTTP_HEADER_CONTENT_TYPE, header_content_type);
 	http_header_set(headers, HTTP_HEADER_AUTHORIZATION, header_authorization);
 	http_header_set(headers, HTTP_HEADER_ACCEPT, header_accept);
+	http_header_set(headers, HTTP_HEADER_ACCEPT_ENCODING, header_accept_encoding);
+	http_header_set(headers, HTTP_HEADER_CONNECTION, header_connection);
+	http_header_set(headers, HTTP_HEADER_USER_AGENT, header_user_agent);
 	
-	ret = http_request(uri, method, protocol, body, headers, NULL, response);
+	ret = http_request(uri, method, protocol, body, headers, NULL, &response);
 	if (ret != et_ok) {
 		log_err("http post request error, ret %d", ret);
 		return ret;
 	}
 
-	log_info(">>> HTTP Response:\n%s", response);
+	http_response_clean(&response);
 
 	return et_ok;
 }
@@ -678,9 +695,8 @@ int main(int argc, char *argv[])
         }
     }
 
-	log_set(app_id, logmode, loglevel);
-
 run:
+	log_set(app_id, logmode, loglevel);
 	bmfn(argc, argv);
 
 	return 0;

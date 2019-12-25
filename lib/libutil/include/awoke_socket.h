@@ -52,6 +52,7 @@ typedef struct _awoke_network_io {
 	int (*connect)(int, struct sockaddr *, int);
 	int (*recv)(int, void *, int, unsigned int);
 	int (*send)(int, const void *, int, unsigned int);
+	int (*read)(int, void *, int);
 	int (*socket_create)(int, int, int);
 	int (*socket_close)(int);
 } awoke_network_io;

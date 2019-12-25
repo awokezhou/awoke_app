@@ -14,7 +14,7 @@ static char *sg_log_id  = NULL;
 	
 void log_level_set(int level)
 {
-	if (level > LOG_BUG || level < LOG_DBG)
+	if (level > LOG_BUG || level < LOG_TEST)
 		return;
 	sg_log_level = level;
 }
@@ -22,6 +22,23 @@ void log_level_set(int level)
 static int log_level_get()
 {
 	return sg_log_level;
+}
+
+static char *log_id_get()
+{
+	return sg_log_id;
+}
+
+void log_id_set(char *id)
+{
+	if (!id)
+		return;
+	sg_log_id = id;
+}
+
+static bool log_id_invalid()
+{
+	return (!log_id_get());
 }
 
 static bool log_level_invalid(int level)
@@ -46,23 +63,11 @@ static bool log_mode_test()
 	return (log_mode_get()==LOG_TEST);
 }
 
-void log_id_set(char *id)
-{
-	if (!id)
-		return;
-	sg_log_id = id;
-}
-
 void _log_set(char *id, int mode, int level)
 {
 	log_id_set(id);
 	log_mode_set(mode);
 	log_level_set(level);
-}
-
-static char *log_id_get()
-{
-	return sg_log_id;
 }
 
 static void _log_file_write(char *file, char *str, int len)
@@ -113,7 +118,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
     switch (level)
     {
         case LOG_BUG:
-            header_title = "BUG";
+            header_title = "BUG  ";
             header_color = ANSI_YELLOW;
             break;
             
@@ -121,24 +126,29 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
             header_title = "DEBUG";
             header_color = ANSI_GREEN;            
             break;
-            
+
+		case LOG_TEST:
+			header_title = "TEST ";
+			header_color = ANSI_CYAN;
+			break;
+			
         case LOG_ERR:
             header_title = "ERROR";
             header_color = ANSI_RED;               
             break;
             
         case LOG_INFO:
-            header_title = "INFO";
+            header_title = "INFO ";
             header_color = ANSI_BLUE;  
             break;
             
         case LOG_WARN:
-            header_title = "WARN";
+            header_title = "WARN ";
             header_color = ANSI_MAGENTA;
             break;
 
         default:
-            header_title = "BUG";
+            header_title = "BUG  ";
             header_color = ANSI_RED;
             break;
     }
@@ -173,6 +183,9 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
 	    printf("%s\n", reset_color);
 	    fflush(stdout);
 	} else {
+
+		if (log_id_invalid())
+			return;
 		
 		build_ptr bp = build_ptr_init(buff, 1024);
 

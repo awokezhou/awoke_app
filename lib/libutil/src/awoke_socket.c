@@ -17,6 +17,7 @@ static awoke_network_io g_sk_io = {
 	.connect = connect,
 	.recv = recv,
 	.send = send,
+	.read = read,
 	.socket_create = awoke_socket_create,
 	.socket_close = close,
 };

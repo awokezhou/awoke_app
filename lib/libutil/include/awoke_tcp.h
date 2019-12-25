@@ -14,7 +14,7 @@
 #include "awoke_error.h"
 #include "awoke_macros.h"
 #include "awoke_socket.h"
-
+#include "awoke_package.h"
 
 
 typedef enum {
@@ -36,8 +36,12 @@ typedef struct _awoke_tcp_connect {
 /* }-- tcp connect define -- */
 
 err_type awoke_tcp_do_connect(awoke_tcp_connect *c);
-err_type awoke_tcp_connect_send(awoke_tcp_connect *c, void *buf, int len);
-err_type awoke_tcp_connect_recv(awoke_tcp_connect *c, void *buf, int max_size);
+err_type awoke_tcp_connect_send(awoke_tcp_connect *c, char *buf, int buf_size, 
+	int *send_size);
+err_type awoke_tcp_connect_recv(awoke_tcp_connect *c, char *buf, int max_size, 
+	int *read_size, bool block);
 err_type awoke_tcp_connect_create(awoke_tcp_connect *c, const char *addr, uint16_t port);
 err_type awoke_tcp_connect_release(awoke_tcp_connect *c);
+err_type awoke_tcp_recv_finish(awoke_tcp_connect *c);
+
 #endif /* __AWOKE_TCP_H__ */

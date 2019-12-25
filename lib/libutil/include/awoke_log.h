@@ -31,6 +31,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...);
 #define LOG_FILE_PATH		"/home/share/project/awoke_app/log/"
 #define LOG_FILE_POSTFIX	".log"
 
+#define log_test(...)		awoke_log(LOG_TEST,   __func__, __LINE__, __VA_ARGS__)
 #define log_debug(...)      awoke_log(LOG_DBG,    __func__, __LINE__, __VA_ARGS__)
 #define log_info(...)       awoke_log(LOG_INFO,   __func__, __LINE__, __VA_ARGS__)
 #define log_err(...)        awoke_log(LOG_ERR,    __func__, __LINE__, __VA_ARGS__)
