@@ -524,7 +524,7 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	char *header_connection = NULL;
 	char *header_user_agent = NULL;
 	http_header headers[HTTP_HEADER_SIZEOF];
-	struct _http_connect connect_keep;
+	struct _http_connect connect_keep, *conn = NULL;
 	struct _http_response response;
 	
 	static const struct option long_opts[] = {
@@ -578,6 +578,8 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 
 			case arg_http_user_agent:
 				header_user_agent = optarg;
+				if (!strcmp(header_connection, "keep-alive"))
+					conn = &connect_keep;
 				break;
 				
 			case '?':
@@ -596,7 +598,7 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	http_header_set(headers, HTTP_HEADER_CONNECTION, header_connection);
 	http_header_set(headers, HTTP_HEADER_USER_AGENT, header_user_agent);
 	
-	ret = http_request(uri, method, protocol, body, headers, NULL, &response);
+	ret = http_request(uri, method, protocol, body, headers, conn, &response);
 	if (ret != et_ok) {
 		log_err("http post request error, ret %d", ret);
 		return ret;
@@ -604,6 +606,16 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 
 	http_response_clean(&response);
 
+	return et_ok;
+}
+
+static err_type benchmark_sscanf_test(int argc, char *argv[])
+{
+	int length;
+	char *str = "Content-Length: 14615\r\ndsadsadsadasdsadasd";
+
+	sscanf(str, "Content-Length: %d%*s", &length);
+	log_debug("length:%d", length);
 	return et_ok;
 }
 
@@ -629,6 +641,7 @@ int main(int argc, char *argv[])
 		{"queue-zero-filter",	no_argument, 		NULL, 	arg_queue_zero_filter},
 		{"vin-parse-test",		required_argument,	NULL,	arg_vin_parse_test},
 		{"http-request-test",	no_argument,		NULL,	arg_http_request_test},
+		{"sscanf-test",			no_argument,		NULL,	arg_sscanf_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -686,6 +699,10 @@ int main(int argc, char *argv[])
 			case arg_http_request_test:
 				bmfn = benchmark_http_request_test;
 				goto run;
+
+			case arg_sscanf_test:
+				bmfn = benchmark_sscanf_test;
+				break;
 				
             case '?':
             case 'h':

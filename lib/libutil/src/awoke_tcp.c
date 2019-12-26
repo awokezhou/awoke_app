@@ -61,7 +61,7 @@ err_type awoke_tcp_connect_send(awoke_tcp_connect *c, char *buf, int buf_size,
 	return et_ok;
 }
 
-err_type awoke_tcp_recv_finish(awoke_tcp_connect *c)
+bool awoke_tcp_recv_finish(awoke_tcp_connect *c)
 {
 	bool data_ready = awoke_sock_fd_read_ready(c->sock);
 	return (!data_ready);

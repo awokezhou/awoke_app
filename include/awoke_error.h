@@ -8,6 +8,7 @@ typedef enum
     et_fail,
     et_param,
     et_nomem,
+    et_mem_limit,
     et_exist,
     et_full,
     et_empty,

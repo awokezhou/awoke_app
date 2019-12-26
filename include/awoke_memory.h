@@ -79,5 +79,8 @@ static inline void mem_ptr_copy(mem_ptr_t *dst, mem_ptr_t *src)
 	dst->len = src->len;
 }
 
+#define mem_ptr_prfmt		"%.*s"
+#define mem_ptr_print(ptr)	(ptr.len, ptr.p)
+
 #endif /* __AWOKE_MEMORY_H__ */
 

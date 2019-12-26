@@ -56,6 +56,8 @@ bool awoke_sock_fd_read_ready(int fd)
     
     ioctl(fd, FIONREAD, &read);   
 
+	log_test("fd %d FIONRAED %d", fd, read);
+
     if (read)
         return TRUE;
     else

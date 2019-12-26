@@ -42,6 +42,6 @@ err_type awoke_tcp_connect_recv(awoke_tcp_connect *c, char *buf, int max_size,
 	int *read_size, bool block);
 err_type awoke_tcp_connect_create(awoke_tcp_connect *c, const char *addr, uint16_t port);
 err_type awoke_tcp_connect_release(awoke_tcp_connect *c);
-err_type awoke_tcp_recv_finish(awoke_tcp_connect *c);
+bool awoke_tcp_recv_finish(awoke_tcp_connect *c);
 
 #endif /* __AWOKE_TCP_H__ */

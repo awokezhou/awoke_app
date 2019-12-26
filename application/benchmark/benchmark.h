@@ -30,6 +30,7 @@ typedef enum {
 	arg_queue_zero_filter,
 	arg_vin_parse_test,
 	arg_http_request_test,
+	arg_sscanf_test,
 } benchmark_args;
 
 typedef enum {

@@ -35,7 +35,7 @@ typedef enum {
 /* }-- protocol define -- */
 
 
-/* -- statecode define --{ */
+/* -- status code define --{ */
 /* succesful */
 #define HTTP_CODE_SUCCESS			200
 #define HTTP_CODE_CREATED			201
@@ -53,10 +53,10 @@ typedef enum {
 #define HTTP_CODE_NOT_MODIFIED		304
 #define HTTP_CODE_REDIR_USE_PROXY	305
 
-/* client Errors */
+/* client errors */
 #define HTTP_CODE_CLIENT_BAD_REQUEST				400
 #define HTTP_CODE_CLIENT_UNAUTH						401
-#define HTTP_CODE_CLIENT_PAYMENT_REQ   				402     /* Wtf?! :-) */
+#define HTTP_CODE_CLIENT_PAYMENT_REQ   				402     
 #define HTTP_CODE_CLIENT_FORBIDDEN					403
 #define HTTP_CODE_CLIENT_NOT_FOUND					404
 #define HTTP_CODE_CLIENT_METHOD_NOT_ALLOWED			405
@@ -72,7 +72,7 @@ typedef enum {
 #define HTTP_CODE_CLIENT_UNSUPPORTED_MEDIA			415
 #define HTTP_CODE_CLIENT_REQUESTED_RANGE_NOT_SATISF 416
 
-/* server Errors */
+/* server errors */
 #define HTTP_CODE_SERVER_INTERNAL_ERROR			500
 #define HTTP_CODE_SERVER_NOT_IMPLEMENTED		501
 #define HTTP_CODE_SERVER_BAD_GATEWAY			502
@@ -80,16 +80,16 @@ typedef enum {
 #define HTTP_CODE_SERVER_GATEWAY_TIMEOUT		504
 #define HTTP_CODE_SERVER_HTTP_VERSION_UNSUP		505
 
-/* }-- statecode define -- */
+/* }-- status code define -- */
 
 
 /* -- method define --{ */
-#define HTTP_METHOD_GET_STR		"GET"
-#define HTTP_METHOD_POST_STR    "POST"
-#define HTTP_METHOD_HEAD_STR    "HEAD"
-#define HTTP_METHOD_PUT_STR     "PUT"
-#define HTTP_METHOD_DELETE_STR  "DELETE"
-#define HTTP_METHOD_OPTIONS_STR "OPTIONS"
+#define HTTP_METHOD_GET_STR			"GET"
+#define HTTP_METHOD_POST_STR    	"POST"
+#define HTTP_METHOD_HEAD_STR    	"HEAD"
+#define HTTP_METHOD_PUT_STR     	"PUT"
+#define HTTP_METHOD_DELETE_STR  	"DELETE"
+#define HTTP_METHOD_OPTIONS_STR 	"OPTIONS"
 
 typedef enum {
 	HTTP_METHOD_GET = 1,
@@ -103,24 +103,25 @@ typedef enum {
 
 
 /* -- headers define --{ */
-#define HTTP_HEADER_ACCEPT_STR 				"Accept:"
-#define HTTP_HEADER_ACCEPT_CHARSET_STR 		"Accept-Charset:"
-#define HTTP_HEADER_ACCEPT_ENCODING_STR 	"Accept-Encoding:"
-#define HTTP_HEADER_ACCEPT_LANGUAGE_STR 	"Accept-Language:"
-#define HTTP_HEADER_CONNECTION_STR 			"Connection:"
-#define HTTP_HEADER_COOKIE_STR 				"Cookie:"
-#define HTTP_HEADER_CONTENT_LENGTH_STR 		"Content-Length:"
-#define HTTP_HEADER_CONTENT_RANGE_STR 		"Content-Range:"
-#define HTTP_HEADER_CONTENT_TYPE_STR		"Content-Type:"
-#define HTTP_HEADER_IF_MODIFIED_SINCE_STR 	"If-Modified-Since:"
-#define HTTP_HEADER_HOST_STR				"Host:"
-#define HTTP_HEADER_LAST_MODIFIED_STR		"Last-Modified:"
-#define HTTP_HEADER_LAST_MODIFIED_SINCE_STR "Last-Modified-Since:"
-#define HTTP_HEADER_REFERER_STR 			"Referer:"
-#define HTTP_HEADER_RANGE_STR 				"Range:"
-#define HTTP_HEADER_USER_AGENT_STR 			"User-Agent:"
-#define HTTP_HEADER_KEEP_ALIVE_STR			"Keep-Alive:"
-#define HTTP_HEADER_AUTHORIZATION_STR		"Authorization:"
+#define HTTP_HEADER_UNKNOWN_STR 			NULL
+#define HTTP_HEADER_ACCEPT_STR 				"Accept"
+#define HTTP_HEADER_ACCEPT_CHARSET_STR 		"Accept-Charset"
+#define HTTP_HEADER_ACCEPT_ENCODING_STR 	"Accept-Encoding"
+#define HTTP_HEADER_ACCEPT_LANGUAGE_STR 	"Accept-Language"
+#define HTTP_HEADER_CONNECTION_STR 			"Connection"
+#define HTTP_HEADER_COOKIE_STR 				"Cookie"
+#define HTTP_HEADER_CONTENT_LENGTH_STR 		"Content-Length"
+#define HTTP_HEADER_CONTENT_RANGE_STR 		"Content-Range"
+#define HTTP_HEADER_CONTENT_TYPE_STR		"Content-Type"
+#define HTTP_HEADER_IF_MODIFIED_SINCE_STR 	"If-Modified-Since"
+#define HTTP_HEADER_HOST_STR				"Host"
+#define HTTP_HEADER_LAST_MODIFIED_STR		"Last-Modified"
+#define HTTP_HEADER_LAST_MODIFIED_SINCE_STR "Last-Modified-Since"
+#define HTTP_HEADER_REFERER_STR 			"Referer"
+#define HTTP_HEADER_RANGE_STR 				"Range"
+#define HTTP_HEADER_USER_AGENT_STR 			"User-Agent"
+#define HTTP_HEADER_KEEP_ALIVE_STR			"Keep-Alive"
+#define HTTP_HEADER_AUTHORIZATION_STR		"Authorization"
 
 typedef enum {
 	HTTP_HEADER_UNKNOWN = 0,
@@ -182,7 +183,8 @@ typedef struct _http_connect {
 
 
 /* -- http buffer chunk -- {*/
-#define HTTP_BUFFER_CHUNK		4096		/* HTTP buffer chunks 4KB */
+#define HTTP_BUFFER_CHUNK		8092		/* HTTP buffer chunks 4KB */
+#define HTTP_BUFFER_LIMIT		8*HTTP_BUFFER_CHUNK
 
 typedef struct _http_buffchunk {
 	char *buff;
@@ -203,7 +205,7 @@ typedef struct _http_buffchunk {
 /* -- request define --{ */
 typedef struct _http_request {
 
-	char *uri; 
+	const char *uri; 
 	
 	mem_ptr_t host;
 	mem_ptr_t path;
@@ -228,14 +230,16 @@ typedef struct _http_request {
 typedef struct _http_response {
 
 	int status;
-
-	int method;
-
 	int protocol;
-	
 	int connection;
-
 	long content_length;
+
+	mem_ptr_t firstline;
+	mem_ptr_t protocol_p;
+	mem_ptr_t statuscode_p;
+	mem_ptr_t body;
+
+	http_header headers[HTTP_HEADER_SIZEOF];
 	
 	http_buffchunk buffchunk;
 	
@@ -251,13 +255,13 @@ err_type http_do_connect(struct _http_connect *c);
 bool http_connect_keep_alive(struct _http_connect *c);
 void http_connect_set_keep_alive(struct _http_connect *c);
 err_type http_request_send(struct _http_request *req);
-err_type http_request_recv(struct _http_request *req, struct _http_response *rsp);
+err_type http_response_recv(struct _http_request *req, struct _http_response *rsp);
 err_type http_request(const char *uri, const char *method, const char *protocol, 
 	const char *body, struct _http_header *headers, struct _http_connect *alive, 
 	struct _http_response *rsp);
 err_type http_response_parse(struct _http_response *rsp);
 void http_response_clean(struct _http_response *rsp);
-
+bool http_response_recv_finish(struct _http_response *rsp);
 /* }-- public interface define */
 
 
