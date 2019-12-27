@@ -40,6 +40,7 @@ typedef enum {
 	arg_http_accept,
 	arg_http_connection,
 	arg_http_user_agent,
+	arg_http_connect_keep,
 } http_args;
 
 typedef err_type (*bencmark_func)(int argc, char *argv[]);

@@ -260,6 +260,7 @@ err_type http_request(const char *uri, const char *method, const char *protocol,
 	const char *body, struct _http_header *headers, struct _http_connect *alive, 
 	struct _http_response *rsp);
 err_type http_response_parse(struct _http_response *rsp);
+void http_response_init(struct _http_response *rsp);
 void http_response_clean(struct _http_response *rsp);
 bool http_response_recv_finish(struct _http_response *rsp);
 /* }-- public interface define */

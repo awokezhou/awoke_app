@@ -521,7 +521,7 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	char *header_content_type = NULL;
 	char *header_accept = NULL;
 	char *header_accept_encoding = NULL;
-	char *header_connection = NULL;
+	char *header_connection = "close";
 	char *header_user_agent = NULL;
 	http_header headers[HTTP_HEADER_SIZEOF];
 	struct _http_connect connect_keep, *conn = NULL;
@@ -537,8 +537,9 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
         {"Accept",  	required_argument,  NULL,   arg_http_accept},
         {"Connection",  required_argument,  NULL,   arg_http_connection},
         {"User-Agent",  required_argument,  NULL,   arg_http_user_agent},
+        {"connect-export",  required_argument,  NULL,   arg_http_connect_keep},
         {NULL, 0, NULL, 0}
-    };	
+    };
 
 	while ((opt = getopt_long(argc, argv, "u:m:p:b:?h", long_opts, NULL)) != -1)
     {
@@ -573,15 +574,17 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 				break;
 
 			case arg_http_connection:
-				header_connection = optarg;
+				header_connection = optarg;				
 				break;
 
 			case arg_http_user_agent:
 				header_user_agent = optarg;
-				if (!strcmp(header_connection, "keep-alive"))
-					conn = &connect_keep;
 				break;
-				
+
+			case arg_http_connect_keep:
+				conn = &connect_keep;
+				break;
+			
 			case '?':
 			case 'h':
 				http_requset_usage(AWOKE_EXIT_SUCCESS);
@@ -597,6 +600,27 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	http_header_set(headers, HTTP_HEADER_ACCEPT_ENCODING, header_accept_encoding);
 	http_header_set(headers, HTTP_HEADER_CONNECTION, header_connection);
 	http_header_set(headers, HTTP_HEADER_USER_AGENT, header_user_agent);
+
+	/*
+	 * <(debug): memory test, check if there are some mem not free>
+	 *
+	int loop = 1000;
+	
+	while (--loop) {
+		if (!(loop%10)) log_warn("%d", loop);
+		http_response_init(&response);
+		ret = http_request(uri, method, protocol, body, headers, conn, &response);
+		if (ret != et_ok) {
+			log_err("http post request error, ret %d", ret);
+			http_response_clean(&response);
+			return ret;
+		}
+
+		http_response_clean(&response);
+		usleep(100000);
+		//sleep(1);
+	}*/
+
 	
 	ret = http_request(uri, method, protocol, body, headers, conn, &response);
 	if (ret != et_ok) {

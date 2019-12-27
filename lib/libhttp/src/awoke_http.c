@@ -438,8 +438,10 @@ static int request_build_headers(struct _http_request *req)
 
 void http_request_clean(struct _http_request *p)
 {
-	if (!http_connect_keep_alive(&p->conn))
+	if (!http_connect_keep_alive(&p->conn)) {
+		log_test("connect not keep alive, will release");
 		http_connect_release(&p->conn);
+	}
 
 	if (http_buffchunk_dynamic(&p->buffchunk))
 		mem_free(&p->buffchunk);
@@ -524,7 +526,7 @@ err_type http_request_send(struct _http_request *req)
 
 		max_send = chunk->length - send_total;
 		max_send = max_send > HTTP_BUFFER_CHUNK ? HTTP_BUFFER_CHUNK : max_send;
-		log_debug("max_send %d", max_send);
+		log_test("max_send %d", max_send);
 		
 		ret = awoke_tcp_connect_send(conn, chunk->buff+send_size, max_send, 
 									 &send_size);
@@ -534,7 +536,7 @@ err_type http_request_send(struct _http_request *req)
 		}
 
 		send_total += send_size;
-		log_debug("send_size %d send_total %d", send_size, send_total);
+		log_test("send_size %d send_total %d", send_size, send_total);
 		
 	} while (!http_reqeust_send_finish(req, send_total));
 	
@@ -548,7 +550,6 @@ err_type http_response_recv(struct _http_request *req, struct _http_response *rs
 	int max_read;
 	int new_size;
 	int read_size;
-	char *realloc = NULL;
 	struct _http_buffchunk *chunk;
 	struct _awoke_tcp_connect *conn = &req->conn._conn;
 
@@ -713,7 +714,7 @@ bool http_response_recv_finish(struct _http_response *rsp)
 {
 	http_response_preparse(rsp);
 
-	log_debug("bodylen:%d", rsp->body.len);
+	log_test("bodylen:%d", rsp->body.len);
 
 	if (rsp->body.len == rsp->content_length) 
 		return TRUE;
@@ -803,7 +804,7 @@ static err_type http_connect_create(struct _http_connect *c, const char *uri)
 			return ret;
 		}
 		sprintf(addr, "%s", inet_ntoa(sockaddr.sin_addr));
-		c->flag = HTTP_CONN_F_HOSTNAME;
+		mask_push(c->flag, HTTP_CONN_F_HOSTNAME);
 	} else {
 		memcpy(addr, host.p, host.len);
 	}
@@ -817,6 +818,19 @@ static err_type http_connect_create(struct _http_connect *c, const char *uri)
 	}
 
 	return et_ok;
+}
+
+void http_connect_dump(struct _http_connect *c)
+{
+	struct _awoke_tcp_connect *tcp_conn = &c->_conn;
+	
+	log_test(">>> connect dump:");
+	log_test("------------------------");
+	log_test("address:%s", inet_ntoa(tcp_conn->addr.sin_addr));
+	log_test("port:%d", htons(tcp_conn->addr.sin_port));
+	log_test("socket:%d", tcp_conn->sock);
+	log_test("status:0x%x", tcp_conn->status);
+	log_test("------------------------");
 }
 
 void http_connect_release(struct _http_connect *c)
@@ -871,12 +885,13 @@ err_type http_request(const char *uri, const char *method, const char *protocol,
 	if (alive && alive->_conn.status == tcp_connected) {
 		log_debug("import connect active, don't need to create one");
 		memcpy(&request.conn, alive, sizeof(struct _http_connect));
+		http_connect_dump(&request.conn);
 		goto connected;		
 	} 
 
 	if (alive) {
 		log_debug("connect need keep alive");
-		http_connect_set_keep_alive(alive);
+		http_connect_set_keep_alive(&request.conn);
 	}
 
 	ret = http_connect_create(&request.conn, uri);
@@ -884,15 +899,23 @@ err_type http_request(const char *uri, const char *method, const char *protocol,
 		log_err("connect create error, ret %d", ret);
 		goto release;
 	}
-
-	log_test("connect create ok");
 	
+	ret = http_do_connect(&request.conn);
+	if (ret != et_ok) {
+		log_err("do connect error, ret %d", ret);
+		goto release;
+	}
 
 connected:
+	log_test("connected");
 	request.uri = request.conn.uri;
 	request.extend_headers = headers;
 	request.method = mem_mk_ptr(method);
 	request.protocol = mem_mk_ptr(protocol);
+	if (!strncmp(HTTP_PROTOCOL_11_STR, request.protocol.p, request.protocol.len)) {
+		request_set_header(&request, HTTP_HEADER_CONNECTION, mem_mk_ptr("keep-alive"));
+	}
+	
 	mem_ptr_copy(&request.host, &request.conn.host);
 	mem_ptr_copy(&request.path, &request.conn.path);
 	if (!strncmp(HTTP_METHOD_POST_STR, request.method.p, request.method.len)) {
@@ -906,15 +929,9 @@ connected:
 		goto release;
 	}
 
-	ret = http_do_connect(&request.conn);
-	if (ret != et_ok) {
-		log_err("do connect error, ret %d", ret);
-		goto release;
-	}
-
 	ret = http_request_send(&request);
 	if (ret != et_ok) {
-		log_err("do connect error, ret %d", ret);
+		log_err("request send error, ret %d", ret);
 		goto release;
 	}
 
@@ -932,9 +949,8 @@ connected:
 	http_response_dump(&response);
 	
 	if (rsp) {
+		log_test("response need copy");
 		response_copy(rsp, &response);
-		http_buffchunk_dump(&rsp->buffchunk);
-		http_buffchunk_dump(&response.buffchunk);
 	}
 
 	if (alive) {

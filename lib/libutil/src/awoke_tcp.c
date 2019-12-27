@@ -13,7 +13,6 @@ err_type awoke_tcp_connect_release(awoke_tcp_connect *c)
 	
 	if (c->status == tcp_unavailable)
 		return et_ok;
-
 	io->socket_close(c->sock);
 
 	tcp_connect_status_set(c, tcp_unavailable);
