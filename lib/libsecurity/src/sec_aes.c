@@ -594,7 +594,7 @@ uint8_t *awoke_string_padding(uint8_t *s, char c, int align, int *rlen)
 	if ((!s) || (align <= 0))
         return NULL;
 	
-	len = strlen(s);
+	len = strlen((char *)s);
 	if (len==align)
 		align_len = align;
 	else
@@ -643,18 +643,18 @@ err_type aes_cbc_enc_string(uint8_t *key, uint8_t *inv, int key_len,
 	int safe_inv_len;
 	int safe_str_len;
 	uint8_t *safe_key;
-	uint8_t *safe_inv;
+	uint8_t *safe_inv = NULL;
 	uint8_t *safe_str;
-	uint8_t *safe_enc;
+	uint8_t *safe_enc = NULL;
 	mbedtls_aes_context ctx;
 	
 	if (!key || !inv || !str || key_len<=0)
 		return et_aes_enc;
 
-	len = strlen(key);
+	len = strlen((char *)key);
 	if (len > key_len)
 		return et_aes_enc;
-	len = strlen(inv);
+	len = strlen((char *)inv);
 	if (len > key_len)
 		return et_aes_enc;
 
@@ -675,24 +675,24 @@ err_type aes_cbc_enc_string(uint8_t *key, uint8_t *inv, int key_len,
 	mbedtls_aes_init(&ctx);
 	safe_enc = mem_alloc_z(safe_str_len);
 
-	printf("key:%s, len:%d\n", key, strlen(key));
-	buf_dump(key, strlen(key));
+	printf("key:%s, len:%d\n", key, (int)strlen((char *)key));
+	buf_dump(key, strlen((char *)key));
 	printf("\n");
-	printf("safe_key:%s, len:%d\n", safe_key, strlen(safe_key));
+	printf("safe_key:%s, len:%d\n", safe_key, (int)strlen((char *)safe_key));
 	buf_dump(safe_key, safe_key_len);
 	printf("\n");
 
-	printf("inv:%s, len:%d\n", inv, strlen(inv));
-	buf_dump(inv, strlen(inv));
+	printf("inv:%s, len:%d\n", inv, (int)strlen((char *)inv));
+	buf_dump(inv, strlen((char *)inv));
 	printf("\n");
-	printf("safe_inv:%s, len:%d\n", safe_inv, strlen(safe_inv));
+	printf("safe_inv:%s, len:%d\n", safe_inv, (int)strlen((char *)safe_inv));
 	buf_dump(safe_inv, safe_inv_len);
 	printf("\n");
 
-	printf("plain:%s, len:%d\n", str, strlen(str));
-	buf_dump(str, strlen(str));
+	printf("plain:%s, len:%d\n", str, (int)strlen((char *)str));
+	buf_dump(str, strlen((char *)str));
 	printf("\n");
-	printf("safe plain:%s, len:%d\n", safe_str, strlen(safe_str));
+	printf("safe plain:%s, len:%d\n", safe_str, (int)strlen((char *)safe_str));
 	buf_dump(safe_str, safe_str_len);
 	printf("\n");
 
@@ -700,7 +700,7 @@ err_type aes_cbc_enc_string(uint8_t *key, uint8_t *inv, int key_len,
 	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, safe_str_len, 
 		safe_inv, safe_str, safe_enc);
 	
-	printf("cipher:%s, len:%d\n", safe_enc, strlen(safe_enc));
+	printf("cipher:%s, len:%d\n", safe_enc, (int)strlen((char *)safe_enc));
 	printf("0x%2x, cipher len %d\n", safe_enc[15], safe_str_len);
 	buf_dump(safe_enc, safe_str_len);
 	printf("\n");
@@ -727,19 +727,18 @@ err_type aes_cbc_dec_string(uint8_t *key, uint8_t *inv, int key_len,
 	int len;
 	int safe_key_len;
 	int safe_inv_len;
-	int safe_str_len;
 	uint8_t *safe_key;
 	uint8_t *safe_inv;
-	uint8_t *safe_dec;
+	uint8_t *safe_dec = NULL;
 	mbedtls_aes_context ctx;
 
 	if (!key || !inv || !str || key_len<=0)
 		return et_aes_enc;
 
-	len = strlen(key);
+	len = strlen((char *)key);
 	if (len > key_len)
 		return et_aes_enc;
-	len = strlen(inv);
+	len = strlen((char *)inv);
 	if (len > key_len)
 		return et_aes_enc;
 
@@ -755,18 +754,18 @@ err_type aes_cbc_dec_string(uint8_t *key, uint8_t *inv, int key_len,
 		goto err;	
 
 	mbedtls_aes_init(&ctx);
-	safe_dec = mem_alloc_z(strlen(str));
+	safe_dec = mem_alloc_z(strlen((char *)str));
 
-	printf("cipher:%s, len:%d\n", str, strlen(str));
-	buf_dump(str, strlen(str));
+	printf("cipher:%s, len:%d\n", str, (int)strlen((char *)str));
+	buf_dump(str, strlen((char *)str));
 	printf("\n");
 
 	mbedtls_aes_setkey_enc(&ctx, safe_key, 128);
-	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, strlen(str), 
+	mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, strlen((char *)str), 
 		safe_inv, str, safe_dec);
 
-	printf("plain:%s, len:%d\n", safe_dec, strlen(safe_dec));
-	buf_dump(safe_dec, strlen(safe_dec));
+	printf("plain:%s, len:%d\n", safe_dec, (int)strlen((char *)safe_dec));
+	buf_dump(safe_dec, strlen((char *)safe_dec));
 	printf("\n");		
 		
 	if (safe_key) mem_free(safe_key);
@@ -789,14 +788,13 @@ err_type aes_cbc_enc_byte(uint8_t *key, int key_len,
 	log_debug("g_aes_128_vec");
 	buf_dump(inv, inv_len);
 
-   	int len;
    	int safe_key_len;
    	int safe_inv_len;
    	int safe_buf_len;
    	uint8_t *safe_key;
    	uint8_t *safe_inv;
-	uint8_t *safe_buf;
-	uint8_t *safe_out;
+	uint8_t *safe_buf = NULL;
+	//uint8_t *safe_out;
 	mbedtls_aes_context ctx;
 
 	if (!key || !inv || !buf || key_len<=0)
@@ -876,12 +874,11 @@ err_type aes_cbc_dec_byte(uint8_t *key, int key_len,
 								uint8_t *buf, int buf_len, uint8_t *out,
 								int *out_len)
 {
-   	int len;
    	int safe_key_len;
    	int safe_inv_len;
    	uint8_t *safe_key;
    	uint8_t *safe_inv;
-	uint8_t *safe_out;
+	uint8_t *safe_out = NULL;
 	mbedtls_aes_context ctx;
 
 	if (!key || !inv || !buf || key_len<=0)

@@ -136,8 +136,9 @@ int awoke_string_to_hex(char *string, uint8_t *hex, uint16_t hex_len)
     int len;
     char *str = string;
 	
-    if (!hex || !string || hex_len<=0)
+    if (!hex || !string || hex_len<=0) {
         return -1;
+    }
 
 	if(0 != (hex_len%2))
         return -1;
@@ -182,7 +183,6 @@ int awoke_string_bcd2str(char *out, const uint8_t *in, uint16_t b_len)
 
 int awoke_string_str2bcd(uint8_t *bin_data, const char *str_data, uint16_t bin_len)
 {
-	int i;
     int out_len;
 
     uint8_t digit1;

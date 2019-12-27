@@ -50,7 +50,6 @@ static bool in_chars(char x, int f, int e, char *chars)
 
 static bool chars_between(char x, char f, char e)
 {
-	int i;
 	char *table = g_chars;
 	char *find_x, *find_f, *find_e;
 	
@@ -76,7 +75,7 @@ static void vp_init(vin_parser *vp, const char *vin)
 {
 	memset(vp, 0x0, sizeof(vin_parser));
 	vp->vin = vin;
-	vp->pos = vp->vin;
+	vp->pos = (char *)vp->vin;
 	vp->tb_country = vin_country_table();
 	vp->tb_country_size = vincoun_offset;
 	vp->tb_manufac = vin_manufac_table();
@@ -96,7 +95,7 @@ static void section_set(vininfo_section *dst, vininfo_section *src)
 	memcpy(dst, src, sizeof(vininfo_section));
 }
 
-static vininfo_section *section_find(vininfo_section *head, int size, char *pos)
+static vininfo_section *section_find(vininfo_section *head, int size, const char *pos)
 {
 	vininfo_section *p;
 
@@ -260,7 +259,7 @@ static err_type vp_mode(vin_parser *vp, vininfo *vi)
 static err_type vp_vds(vin_parser *vp, vininfo *vi)
 {
 	_ptr_set(&vp->pos, &vi->vds, 6);
-	vp_mode(vp, vi);
+	return vp_mode(vp, vi);
 }
 
 static void year_range_set(vin_year_range *range, int min, int max)
@@ -309,7 +308,7 @@ static err_type vp_year(vin_parser *vp, vininfo *vi)
 static err_type vp_vis(vin_parser *vp, vininfo *vi)
 {
 	_ptr_set(&vp->pos, &vi->vis, 8);
-	vp_year(vp, vi);
+	return vp_year(vp, vi);
 }
 
 err_type vin_parse(const char *vin, vininfo *vi)
@@ -325,4 +324,5 @@ err_type vin_parse(const char *vin, vininfo *vi)
 
 	vp_vds(&vp, vi);
 	vp_vis(&vp, vi);
+	return et_ok;
 }

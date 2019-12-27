@@ -12,7 +12,7 @@ static err_type awoke_socket_bind(int fd, const struct sockaddr *addr,
 
 
 static awoke_network_io g_sk_io = {
-	.accept = awoke_socket_accpet,
+	.accept = accept,
 	.bind = awoke_socket_bind,
 	.connect = connect,
 	.recv = recv,

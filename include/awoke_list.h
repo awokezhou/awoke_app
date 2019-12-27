@@ -180,7 +180,6 @@ static inline void sl_list_reverse(struct _sl_list *existing)
 	p1->next = NULL;
 	
 	while(p2->next != NULL) {
-		printf("x\n");
 		p->next = p1;
 		p1 = p;
 		p = p2;
@@ -194,31 +193,20 @@ static inline void sl_list_reverse(struct _sl_list *existing)
 
 static inline void sl2_list_reverse(struct _sl_list *existing)
 {
-	printf("sl_list_reverse\n");
 	int i = 0;
 	struct _sl_list *map[5];
-	printf("0.1\n");
 	int size = sl_list_size(existing);
-	printf("0.2, size %d\n", size);
 	struct _sl_list *p = existing->next;
 
-	printf("1\n");
-
 	while (p != NULL) {
-		printf("1.1 %d\n", i);
 		map[i] = p;
 		p = p->next;
 		i++;
 	}
 
-	printf("2\n");
-
 	for (i=0; i<size-1; i++) {
-		printf("2.1 %d\n", i);
 		map[i+1]->next = map[i];
 	}
-
-	printf("3\n");
 	
 	map[0]->next = NULL;
 	existing->next = map[size-1];

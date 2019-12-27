@@ -1,18 +1,6 @@
 
-#include <errno.h>
-#include <sys/socket.h>
-#include <fcntl.h>
-#include <sys/un.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-
 #include "awoke_rtmsg.h"
 #include "awoke_log.h"
-#include "awoke_error.h"
-#include "awoke_string.h"
-#include "awoke_memory.h"
-#include "awoke_macros.h"
 
 rtmsg_app_info app_info_array[] = 
 {
@@ -250,14 +238,14 @@ err_type awoke_rtmsg_send(rtmsg_handle *handle,
 err_type awoke_rtmsg_recv(rtmsg_handle *handle,
 							    rtmsg_header *header)
 {
-	return rt_message_recv(handle->fd, header, NULL);
+	return rt_message_recv(handle->fd, &header, NULL);
 }
 
 err_type awoke_rtmsg_recv_timeout(rtmsg_handle *handle,
 									        rtmsg_header *header,
 							    			uint32_t timeout)
 {
-	return rt_message_recv(handle->fd, header, &timeout);
+	return rt_message_recv(handle->fd, &header, &timeout);
 }
 
 err_type awoke_rtmsg_init(rt_app_id rid, rtmsg_handle **msg_handle)

@@ -151,7 +151,7 @@ static err_type run_once(awoke_worker *wk)
 	return wk->handler(wk);
 }
 
-static void *worker_run(void *context)
+static void worker_run(void *context)
 {
 	err_type ret;
 	awoke_worker_context *ctx = context;
@@ -168,6 +168,9 @@ static void *worker_run(void *context)
 			worker_should_suspend(wk);
 		
 		ret = run_once(wk);
+		if (ret != et_ok) {
+			log_test("worker run once error, ret %d", ret);
+		}
 		
 		worker_reference(wk);
 		
@@ -243,9 +246,9 @@ awoke_worker *awoke_worker_create(char *name, uint32_t tick,
 	worker_attr_setdetachstate(&wk->attr, WORKER_CREATE_JOINABLE);
 
 	if (mask_exst(wk->features, WORKER_FEAT_CUSTOM_DEFINE)) {
-		r = worker_create(&wk->wid, &wk->attr, handler, (void *)context);
+		r = worker_create(&wk->wid, &wk->attr, (void *)handler, (void *)context);
 	} else {
-		r = worker_create(&wk->wid, &wk->attr, worker_run, (void *)context);
+		r = worker_create(&wk->wid, &wk->attr, (void *)worker_run, (void *)context);
 	}
 	if (r < 0) {
 		log_err("worker %s create error, ret %d", wk->name, r);
@@ -387,16 +390,18 @@ static err_type timer_scheduler(awoke_worker *wk)
 	if (twk->sched_end != NULL) {
 		twk->sched_end(twk);
 	}
+
+	return et_ok;
 }
 
 void awoke_tmwkr_start(awoke_tmwkr *twk)
 {
-	return awoke_worker_start(twk->scheduler);
+	awoke_worker_start(twk->scheduler);
 }
 
 void awoke_tmwkr_stop(awoke_tmwkr *twk)
 {
-	return awoke_worker_stop(twk->scheduler);
+	awoke_worker_stop(twk->scheduler);
 }
 
 awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features, 
@@ -404,7 +409,6 @@ awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features,
 									   err_type (*sched_end)(struct _awoke_tmwkr *), 
 									   void *data)
 {
-	err_type ret;
 	awoke_tmwkr *twk;
 
 	twk = mem_alloc_z(sizeof(awoke_tmwkr));
@@ -425,10 +429,10 @@ awoke_tmwkr *awoke_tmwkr_create(char *name, uint32_t clock, uint16_t features,
 	/* scheduler create */
 	if (mask_exst(features, WORKER_FEAT_CUSTOM_DEFINE)) {
 		twk->scheduler = awoke_worker_create(name, clock, features, 
-										     handler, (void *)twk);
+										     (void *)handler, (void *)twk);
 	} else {
 		twk->scheduler = awoke_worker_create(name, clock, features, 
-											 timer_scheduler, (void *)twk);
+											 (void *)timer_scheduler, (void *)twk);
 	}
 
 	if (!twk->scheduler) 

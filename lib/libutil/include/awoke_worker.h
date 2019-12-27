@@ -1,6 +1,7 @@
 #ifndef __AWOKE_WORKER_H__
 #define __AWOKE_WORKER_H__
 
+#include<unistd.h>
 #include <pthread.h> 
 
 #include "awoke_type.h"
@@ -21,7 +22,7 @@
 #define worker_mutex_lock(mutex) pthread_mutex_lock(mutex)
 #define worker_mutex_unlock(mutex) pthread_mutex_unlock(mutex)
 #define worker_mutex_destroy(mutex) pthread_mutex_destroy(mutex)
-#define _worker_cond_init(cond, val) pthread_mutex_init(cond, val)
+#define _worker_cond_init(cond, val) pthread_cond_init(cond, val)
 #define worker_condition_wait(cond, mutex) pthread_cond_wait(cond, mutex)
 #define worker_condition_notify(cond) pthread_cond_signal(cond)
 #define worker_condition_destroy(cond) pthread_cond_destroy(cond)

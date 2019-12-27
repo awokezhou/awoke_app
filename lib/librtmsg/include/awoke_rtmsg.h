@@ -1,8 +1,19 @@
 #ifndef __AWOKE_RTMSG_H__
 #define __AWOKE_RTMSG_H__
 
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 
 #include "awoke_type.h"
+#include "awoke_error.h"
+#include "awoke_string.h"
+#include "awoke_memory.h"
+#include "awoke_macros.h"
 
 
 #define RT_TM_ASSOCIATE_MSG_RECV			2000

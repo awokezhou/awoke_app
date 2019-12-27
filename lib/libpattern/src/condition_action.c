@@ -48,7 +48,7 @@ err_type condition_action_add(condition_action *ca, uint8_t ctype, uint16_t atyp
 {
 	bool find_action = FALSE;
 	bool find_condtion = FALSE;
-	action *actn, *add;
+	action *actn, *add = NULL;
 	condition *cond;
 	awoke_list *cond_list = &ca->_ca[0];
 	awoke_list *actn_list = &ca->_ca[1];

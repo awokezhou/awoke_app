@@ -28,7 +28,7 @@ typedef struct _vinmanu2vds {
 	vininfo_section *tb_vds;
 	int tb_vds_size;
 	vininfo_section *tb_bt;
-	int *tb_bt_size;
+	int tb_bt_size;
 } vinmanu2vds;
 
 typedef struct _vininfo {
@@ -49,7 +49,7 @@ typedef struct _vin_year_range {
 } vin_year_range;
 
 typedef struct _vin_parser {
-	char *vin;
+	const char *vin;
 	char *pos;
 	int tb_manufac_size;
 	int tb_country_size;

@@ -2,10 +2,12 @@
 #ifndef __AWOKE_LOCK_H__
 #define __AWOKE_LOCK_H__
 
+
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include<sys/time.h>
 
 #include "awoke_log.h"
 #include "awoke_type.h"

@@ -1,9 +1,6 @@
-#include "awoke_event.h"
-#include "awoke_type.h"
-#include "awoke_log.h"
-#include "awoke_socket.h"
 
-#include <sys/select.h>
+#include "awoke_event.h"
+#include "awoke_log.h"
 
 
 void awoke_event_clean(awoke_event **event)

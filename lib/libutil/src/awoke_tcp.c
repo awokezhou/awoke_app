@@ -92,8 +92,6 @@ err_type awoke_tcp_connect_recv(awoke_tcp_connect *c, char *buf, int max_size,
 err_type awoke_tcp_connect_create(awoke_tcp_connect *c, const char *addr, uint16_t port)
 {
 	int fd;
-	int ret;
-	struct sockaddr_in local;
 	awoke_network_io *io = awoke_network_io_get();
 	
 	if (!c || !addr) 

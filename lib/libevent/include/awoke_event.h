@@ -1,10 +1,15 @@
 #ifndef __AWOKE_EVENT_H__
 #define __AWOKE_EVENT_H__
 
-#include "awoke_log.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
+
 #include "awoke_type.h"
 #include "awoke_list.h"
 #include "awoke_error.h"
+#include "awoke_socket.h"
+
 
 #define EVENT_QUEUE_SIZE        128
 
@@ -107,6 +112,7 @@ err_type awoke_event_channel_create(awoke_event_loop *loop,
 									 int *r_fd, int *w_fd, void *data);
 err_type awoke_event_pipech_create(awoke_event_loop *loop, awoke_event_pipech *ch);
 void awoke_event_loop_clean(awoke_event_loop **loop);
+void awoke_event_pipech_clean(awoke_event_loop *loop, awoke_event_pipech *ch);
 
 
 #endif /* __WEB_EVENT_H__ */

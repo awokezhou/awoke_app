@@ -21,7 +21,7 @@ uint8_t *sec_string_padding(uint8_t *s, char c, int align, int *rlen)
 	if ((!s) || (align <= 0))
         return NULL;
 	
-	len = strlen(s);
+	len = strlen((char *)s);
 	if (len==align)
 		align_len = align;
 	else

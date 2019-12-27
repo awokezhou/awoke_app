@@ -13,8 +13,12 @@
    ci       |  date       |  version |  description
  -------------------------------------------------------------------------
    610819fe |  2019-12-24 |  0.0.1   |  create libhttp
+            |             |			 |
    9de45551 |  2019-12-25 |  0.0.2   |  support buffchunk, response, add
    			|			  |  		 |  loop receive and send
+   			|			  |			 |	
+   4294bcf0 |  2019-12-27 |  0.0.3	 |  memory test for buffchunk; tcp 
+   										connect test for conn-keep
  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 */
 

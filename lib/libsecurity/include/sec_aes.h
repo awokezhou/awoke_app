@@ -29,7 +29,7 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
-#include <stddef.h>
+//#include <stddef.h>
 #include <stdint.h>
 
 #include "awoke_type.h"
