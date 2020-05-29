@@ -82,6 +82,14 @@
 #define print_ip_format "%d.%d.%d.%d"
 #define print_ip(addr)	\
 				addr[0], addr[1], addr[2], addr[3]
+	
+#ifndef min
+#define min(a, b) ((a) <= (b) ? (a) : (b))
+#endif
+
+#ifndef max
+#define max(a, b) ((a) < (b) ? (b) : (a))
+#endif
 
 
 #endif /* __AWOKE_MACROS_H__ */

@@ -269,9 +269,33 @@ static err_type get_host_address(char *hostname, struct sockaddr_in *addr)
 	return et_ok;
 }
 
+err_type http_buffchunk_init(struct _http_buffchunk *chunk)
+{
+	chunk->size = HTTP_BUFFER_CHUNK;
+	chunk->length = 0;
+
+#ifdef HTTP_BUFFCHUNK_FIXED
+	chunk->buff = chunk->_fixed;
+	memset(chunk->_fixed, 0x0, HTTP_BUFFER_CHUNK);
+	return et_ok;
+#endif
+
+	chunk->buff = mem_alloc_z(HTTP_BUFFER_CHUNK);
+	if (!chunk->buff) {
+		log_err("chunk alloc error");
+		return et_nomem;
+	}
+	log_test("buffchunk alloc ok");
+
+	return et_ok;
+}
+
 bool http_buffchunk_dynamic(struct _http_buffchunk *chunk)
 {
+#ifdef HTTP_BUFFCHUNK_FIXED
 	return ((chunk->buff) && (chunk->buff != chunk->_fixed));
+#endif
+	return TRUE;
 }
 
 void http_buffchunk_dump(struct _http_buffchunk *chunk)
@@ -281,7 +305,9 @@ void http_buffchunk_dump(struct _http_buffchunk *chunk)
 	log_test("size:%d", chunk->size);
 	log_test("length:%d", chunk->length);
 	log_test("buff address:0x%x", chunk->buff);
+#ifdef HTTP_BUFFCHUNK_FIXED
 	log_test("fixed address:0x%x", chunk->_fixed);
+#endif
 	log_test("------------------------");
 }
 
@@ -297,20 +323,22 @@ void http_buffchunk_copy(struct _http_buffchunk *dst, struct _http_buffchunk *sr
 	 * "_fixed" field to dst buffchunk, and point the dst buffchunk's
 	 * "buff" field to it self's "_fixed" field.
 	 */
-
+	 
 	if (http_buffchunk_dynamic(src)) {
 		dst->buff = src->buff;
 		return;
 	}
 
+#ifdef HTTP_BUFFCHUNK_FIXED
 	memcpy(dst->_fixed, src->_fixed, src->length);
 	dst->buff = dst->_fixed;
+#endif
 }
 
 err_type http_buffchunk_resize(struct _http_buffchunk *chunk, int new_size)
 {
 	char *realloc = NULL;
-	
+
 	if (chunk->size >= new_size) 
 		return et_ok;
 
@@ -324,8 +352,10 @@ err_type http_buffchunk_resize(struct _http_buffchunk *chunk, int new_size)
 			log_err("alloc chunk error");
 			return et_nomem;
 		}
-		
+
+#ifdef HTTP_BUFFCHUNK_FIXED
 		memcpy(chunk->buff, chunk->_fixed, chunk->length);
+#endif
 	
 	} else {
 		log_test("buffchunk dynamic, realloc memory");
@@ -343,9 +373,9 @@ err_type http_buffchunk_resize(struct _http_buffchunk *chunk, int new_size)
 	return et_ok;
 }
 
-static void header_set(struct _http_header *headers, int type, mem_ptr_t val)
+static void header_set(http_header *headers, int type, mem_ptr_t val)
 {
-	struct _http_header *h;
+	http_header *h;
 
 	mem_ptr_t key = find_key(type);
 	if (!key.p) 
@@ -366,8 +396,8 @@ static void request_set_header(struct _http_request *req, int type, mem_ptr_t va
 
 static void request_set_extend_header(struct _http_request *req)
 {
-	struct _http_header *h;
-	struct _http_header *extend = req->extend_headers;
+	http_header *h;
+	http_header *extend = req->extend_headers;
 
 	array_foreach(extend, HTTP_HEADER_SIZEOF, h) {
 		if (h->type != HTTP_HEADER_UNKNOWN) {
@@ -378,7 +408,7 @@ static void request_set_extend_header(struct _http_request *req)
 	return;
 }
 
-void http_header_set(struct _http_header *headers, int type, char *value)
+void http_header_set(http_header *headers, int type, char *value)
 {
 	mem_ptr_t val;
 
@@ -390,9 +420,9 @@ void http_header_set(struct _http_header *headers, int type, char *value)
 	return header_set(headers, type, val);
 }
 
-void http_header_init(struct _http_header *headers)
+void http_header_init(http_header *headers)
 {
-	struct _http_header *h;
+	http_header *h;
 
 	array_foreach(headers, HTTP_HEADER_SIZEOF, h) {
 		h->key = mem_mk_ptr(NULL);
@@ -401,9 +431,9 @@ void http_header_init(struct _http_header *headers)
 	}
 }
 
-static int request_build_header(struct _http_request *req, struct _http_header *h)
+static int request_build_header(struct _http_request *req, http_header *h)
 {
-  	return build_ptr_format(req->bp, "%.*s: %.*s"STR_CRLD, 
+  	return build_ptr_format(req->bp, "%.*s: %.*s"STR_CRLD,
 							h->key.len, h->key.p,
 							h->val.len, h->val.p);
 }
@@ -429,9 +459,12 @@ static int request_build_startline(struct _http_request *req)
 static int request_build_headers(struct _http_request *req)
 {
 	int len;
-	struct _http_header *h;
+	http_header *h;
+
+	log_test("request_build_headers");
 
 	array_foreach(req->headers, HTTP_HEADER_SIZEOF, h) {
+		log_test("header key:%.*s val:%.*s", h->key.len, h->key.p, h->val.len, h->val.p);
 		if (h->key.p) {
 			len += request_build_header(req, h);
 		}
@@ -451,21 +484,28 @@ void http_request_clean(struct _http_request *p)
 		mem_free(&p->buffchunk);
 }
 
+void http_header_dump(http_header *headers)
+{
+	http_header *h;
+
+	array_foreach(headers, HTTP_HEADER_SIZEOF, h) {
+		if (h->key.len) {
+			log_info("%.*s %.*s", h->key.len, h->key.p,
+				h->val.len, h->val.p);
+		}
+	}
+}
+
 void http_request_dump(struct _http_request *req)
 {
-	struct _http_header *h;
+	
 	
 	log_info(">>> HTTP Request dump:");
 	log_info("--------------------------------");
 	log_info("uri : %s", req->uri);
 	log_info("method : %.*s", req->method.len, req->method.p);
 	log_info("protocol : %.*s", req->protocol.len, req->protocol.p);
-	array_foreach(req->headers, HTTP_HEADER_SIZEOF, h) {
-		if (h->key.len) {
-			log_info("%.*s %.*s", h->key.len, h->key.p,
-				h->val.len, h->val.p);
-		}
-	}
+	http_header_dump(req->headers);
 	log_test("HTTP Text:\n%.*s", req->buffchunk.length, req->buffchunk.buff);
 	log_info("--------------------------------");
 }
@@ -480,9 +520,11 @@ void http_request_init(struct _http_request *req)
 	req->method = mem_mk_ptr(NULL);
 	req->protocol = mem_mk_ptr(NULL);
 
-	http_buffchunk_init(req->buffchunk);
-	
-	req->bp = build_ptr_make(req->buffchunk.buff, req->buffchunk.size);
+	http_header_init(req->headers);
+
+	http_buffchunk_init(&req->buffchunk);
+
+ 	req->bp = build_ptr_make(req->buffchunk.buff, req->buffchunk.size);
 }
 
 static err_type http_request_package(struct _http_request *req)
@@ -494,15 +536,24 @@ static err_type http_request_package(struct _http_request *req)
 
 	if (req->extend_headers)
 		request_set_extend_header(req);
+
+	log_debug("bp head:0x%x, p:0x%x, len %d, max %d", req->bp.head, 
+		req->bp.p, req->bp.len, req->bp.max);
 	
 	request_build_startline(req);
+
+	log_debug("bp head:0x%x, p:0x%x, len %d, max %d", req->bp.head, 
+		req->bp.p, req->bp.len, req->bp.max);
 	
 	request_build_headers(req);
 	
 	request_build_string(req, STR_CRLD);
 
+	log_test("STR_CRLD ok");
+
 	if (req->body.len) {
 		request_build_body(req);
+		log_test("body ok");
 	}
 
 	req->buffchunk.length = req->bp.len;
@@ -656,6 +707,8 @@ static err_type response_parse_header(struct _http_response *rsp)
 		log_err("parse headers error");
 		return et_parser;
 	}
+
+	log_debug("tail 0x%x", tail);
 	
 	while ((end = strstr(head, "\r\n")) && (end <= tail)) {
 
@@ -670,6 +723,13 @@ static err_type response_parse_header(struct _http_response *rsp)
 			
 		head = end + 2;
 	}
+
+	tail += 4;
+	head = tail;
+	rsp->body.p = head;
+	rsp->body.len = rsp->content_length;
+
+	log_debug("body 0x%x", rsp->body.p);
 
 	return et_ok;
 }
@@ -703,7 +763,7 @@ void http_response_init(struct _http_response *rsp)
 
 	http_header_init(rsp->headers);
 		
-	http_buffchunk_init(rsp->buffchunk);
+	http_buffchunk_init(&rsp->buffchunk);
 }
 
 void http_response_clean(struct _http_response *rsp)
@@ -919,7 +979,6 @@ connected:
 	if (!strncmp(HTTP_PROTOCOL_11_STR, request.protocol.p, request.protocol.len)) {
 		request_set_header(&request, HTTP_HEADER_CONNECTION, mem_mk_ptr("keep-alive"));
 	}
-	
 	mem_ptr_copy(&request.host, &request.conn.host);
 	mem_ptr_copy(&request.path, &request.conn.path);
 	if (!strncmp(HTTP_METHOD_POST_STR, request.method.p, request.method.len)) {
@@ -932,6 +991,8 @@ connected:
 		log_err("package post request error");
 		goto release;
 	}
+
+	log_test("http_request_package ok");
 
 	ret = http_request_send(&request);
 	if (ret != et_ok) {

@@ -635,13 +635,55 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 
 static err_type benchmark_sscanf_test(int argc, char *argv[])
 {
+	/*
 	int length;
 	char *str = "Content-Length: 14615\r\ndsadsadsadasdsadasd";
 
 	sscanf(str, "Content-Length: %d%*s", &length);
-	log_debug("length:%d", length);
+	log_debug("length:%d", length);*/
+
+	uint8_t magic = 0x1353;
+	int addr = &magic;
+	log_debug("magic addr:%d", addr>>32);
+	
 	return et_ok;
 }
+
+static err_type benchmark_buffchunk_test(int argc, char *argv[])
+{
+	int i;
+	awoke_buffchunk *chunk;
+	awoke_buffchunk_pool *pool;
+
+	for (i=0; i<1000000; i++) {
+		if (!(i%10)) log_warn("%d", i);
+		chunk = awoke_buffchunk_create(1024);
+		chunk->length = sprintf(chunk->p, "Hello world");
+	
+		pool = awoke_buffchunk_pool_create(8092);
+		awoke_buffchunk_pool_dump(pool);
+
+		awoke_buffchunk_pool_chunkadd(pool, chunk);
+		//awoke_buffchunk_pool_dump(&pool);
+
+		usleep(100);
+
+		awoke_buffchunk_pool_chunkadd(pool, chunk);
+		//awoke_buffchunk_pool_dump(&pool);
+
+		awoke_buffchunk_pool_free(&pool);
+		usleep(200);
+	}
+	
+	return et_ok;
+}
+
+static err_type benchmark_valist_test(int argc, char *argv[])
+{
+	xlog("hello world");
+	return et_ok;
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -666,6 +708,8 @@ int main(int argc, char *argv[])
 		{"vin-parse-test",		required_argument,	NULL,	arg_vin_parse_test},
 		{"http-request-test",	no_argument,		NULL,	arg_http_request_test},
 		{"sscanf-test",			no_argument,		NULL,	arg_sscanf_test},
+		{"buffchunk-test",      no_argument, 		NULL,	arg_buffchunk_test},
+		{"valist-test",			no_argument,		NULL,	arg_valist_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -727,7 +771,15 @@ int main(int argc, char *argv[])
 			case arg_sscanf_test:
 				bmfn = benchmark_sscanf_test;
 				break;
-				
+
+			case arg_buffchunk_test:
+				bmfn = benchmark_buffchunk_test;
+				break;
+
+			case arg_valist_test:
+				bmfn = benchmark_valist_test;
+				break;
+			
             case '?':
             case 'h':
 			case '-':

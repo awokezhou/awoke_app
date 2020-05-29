@@ -13,6 +13,7 @@
 #include "awoke_worker.h"
 #include "awoke_string.h"
 #include "awoke_http.h"
+#include "awoke_buffer.h"
 
 #include "vin_parser.h"
 #include "condition_action.h"
@@ -31,6 +32,8 @@ typedef enum {
 	arg_vin_parse_test,
 	arg_http_request_test,
 	arg_sscanf_test,
+	arg_buffchunk_test,
+	arg_valist_test,
 } benchmark_args;
 
 typedef enum {

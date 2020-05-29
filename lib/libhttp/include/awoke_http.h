@@ -18,6 +18,10 @@
 
 
 
+//#define HTTP_BUFFCHUNK_FIXED
+
+
+
 #define STR_CRLD	"\r\n"
 
 
@@ -142,16 +146,16 @@ typedef enum {
     HTTP_HEADER_OTHER
 } request_headers;
 
-typedef struct _http_header_entry {
-	char* key;
-	int type;
-} http_header_entry;
-
 typedef struct _http_header {
     int type;		/* header type/name, e.g: HEADER_CONTENT_LENGTH */
     mem_ptr_t key;	/* reference the header Key name, e.g: 'Content-Length' */
     mem_ptr_t val;	/* reference the header Value, e.g: '123456' */
 } http_header;
+
+typedef struct _http_header_entry {
+	char* key;
+	int type;
+} http_header_entry;
 
 #define http_header_entry_make(entry)	{entry##_STR, entry}
 /* }-- headers define -- */
@@ -188,17 +192,12 @@ typedef struct _http_connect {
 
 typedef struct _http_buffchunk {
 	char *buff;
+#ifdef HTTP_BUFFCHUNK_FIXED
 	char _fixed[HTTP_BUFFER_CHUNK];
+#endif
 	int size;
 	int length;
 } http_buffchunk;
-
-#define http_buffchunk_init(chunk)	do {\
-		chunk.size = HTTP_BUFFER_CHUNK;\
-		chunk.length = 0;\
-		chunk.buff = chunk._fixed;\
-		memset(chunk._fixed, 0x0, HTTP_BUFFER_CHUNK);\
-	} while(0)
 /* }-- http buffer chunk */
 
 
@@ -250,6 +249,7 @@ typedef struct _http_response {
 /* public interface define --{ */
 void http_header_init(struct _http_header *headers);
 void http_header_set(struct _http_header *headers, int type, char *val);
+void http_header_dump(http_header *headers);
 void http_connect_release(struct _http_connect *c);
 err_type http_do_connect(struct _http_connect *c);
 bool http_connect_keep_alive(struct _http_connect *c);
