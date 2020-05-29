@@ -11,8 +11,10 @@
 #include "awoke_waitev.h"
 #include "awoke_memory.h"
 #include "awoke_worker.h"
+#include "awoke_macros.h"
 #include "awoke_string.h"
 #include "awoke_http.h"
+#include "fastlz.h"
 
 #include "vin_parser.h"
 #include "condition_action.h"
@@ -31,6 +33,8 @@ typedef enum {
 	arg_vin_parse_test,
 	arg_http_request_test,
 	arg_sscanf_test,
+    arg_time_zero,
+    arg_fastlz_test,
 } benchmark_args;
 
 typedef enum {

@@ -23,7 +23,8 @@
 #include "awoke_log.h"
 
 static void usage(int ex)
-{	
+{
+	
 	printf("usage : benchamrk [option]\n\n");
 
     printf("\t--waitev-test\t\t\twaitev test\n");
@@ -643,6 +644,132 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	return et_ok;
 }
 
+static err_type benchmark_time_zero_test(int argc, char *argv[])
+{
+    time_t now, zero;
+    struct tm *tm;
+    
+    time(&now);
+    tm = gmtime(&now);
+    tm->tm_sec = 0;
+    tm->tm_min = 0;
+    tm->tm_hour = 0;
+    zero = mktime(tm);
+    log_debug("now:%d zero:%d", now, zero);
+    return et_ok;
+}
+
+static err_type fastlz_test(int length, int cmplevle, bool dump)
+{
+    #define get_random(a,b) ((rand()%(b-a+1))+a)
+
+    bool check_ok = TRUE;
+    int i;
+    int cmpsize = length+(length/20);
+    int cmplens, dpmlens;
+
+    uint8_t *src = mem_alloc_z(length);
+    uint8_t *cmp = mem_alloc_z(cmpsize);
+    uint8_t *dmp = mem_alloc_z(length);
+
+    /* int source data */
+    for (i=0; i<(length-1); i++) {
+        src[i] = get_random(0, 255);
+    }
+
+    if (dump) {
+        pkg_dump(src, length);
+    }
+
+    /* compress */
+    cmplens = fastlz_compress_level(cmplevle, src, length, cmp);
+    if (dump) {
+        pkg_dump(cmp, cmplens);
+    }
+
+    /* decompress */
+    dpmlens = fastlz_decompress(cmp, cmplens, dmp, length);
+    if (dump) {
+        pkg_dump(dmp, dpmlens);
+    }
+
+    /* check */
+    for (i=0; i<(length-1); i++) {
+        if (src[i] != dmp[i]) {
+            check_ok = FALSE;
+            break;
+        }
+    }
+
+    log_debug("length:%d level:%d compress:%d decompress:%d check:%d", 
+        length, cmplevle, cmplens, dpmlens, check_ok);
+
+    mem_free(src);
+    mem_free(cmp);
+    mem_free(dmp);
+    return et_ok;
+}
+
+static err_type fastlz_pkg(uint8_t *src, int num)
+{
+    typedef struct _fastlz_test_gpsinfo {
+        uint32_t time;
+        uint32_t lat;
+        uint32_t lon;
+        uint8_t speed;
+        uint16_t alt;
+        uint8_t angle;
+    }
+
+    uint16_t cmd = 0x0a02;
+    uint8_t devmode = 0x01;
+    uint8_t hoststate = 0x02;
+    uint8_t motionstate = 0x02;
+    uint16_t devvolt = 0x1a2;
+    uint8_t voltper = 100;
+    uint8_t devtemp = 0x87;
+    uint8_t hostpos = 1;
+    uint32_t celltime = 0x00034157;
+    uint16_t mcc = 0x0460;
+    uint8_t mnc = 0x11;
+    uint8_t act = 0x0;
+    uint16_t tac = 0x4b00;
+    uint32_t cellid = 0x9356a12;
+    uint16_t earfcn = 0xe68;
+    uint16_t pci = 0x1dd;
+    uint8_t rsrp = 0x56;
+    uint8_t rsrq = 0xf4;
+    uint8_t rssi = 0xfe;
+    uint16_t snr = 0x3f2;
+    uint8_t cellnum = 5;
+    uint16_t neighbor1_earfcn = 0xe68;
+    uint16_t neighbor1_pci = 0xa1;
+    uint8_t neighbor1_rsrp = 0x62;
+    uint8_t neighbor1_rsrq = 0xf3;
+    uint8_t neighbor1_rssi = 0xf2;
+    uint16_t neighbor1_snr = 0x416;
+    uint8_t gpsnum = gpsnum;
+
+}
+
+static err_type benchmark_fastlz_test(int argc, char *argv[])
+{
+    int i = 0;
+
+    int length_table[8] = {128, 256, 512, 1024, 1566, 2048, 4096, 8092};
+    int length_table_size = array_size(length_table);
+
+    for (i=0; i<(length_table_size-1); i++) {
+        fastlz_test(length_table[i], 1, FALSE);
+    }
+
+    for (i=0; i<(length_table_size-1); i++) {
+        fastlz_test(length_table[i], 2, FALSE);
+    }
+
+    return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -666,6 +793,8 @@ int main(int argc, char *argv[])
 		{"vin-parse-test",		required_argument,	NULL,	arg_vin_parse_test},
 		{"http-request-test",	no_argument,		NULL,	arg_http_request_test},
 		{"sscanf-test",			no_argument,		NULL,	arg_sscanf_test},
+        {"timezero-test",		no_argument,		NULL,	arg_time_zero},
+        {"fastlz-test",         no_argument,        NULL,   arg_fastlz_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -727,7 +856,15 @@ int main(int argc, char *argv[])
 			case arg_sscanf_test:
 				bmfn = benchmark_sscanf_test;
 				break;
-				
+			
+            case arg_time_zero:
+                bmfn = benchmark_time_zero_test;
+                break;
+
+            case arg_fastlz_test:
+                bmfn = benchmark_fastlz_test;
+                break;
+
             case '?':
             case 'h':
 			case '-':
