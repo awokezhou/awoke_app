@@ -429,7 +429,7 @@ int main(int argc, char **argv)
 	log_debug("dns init ok");
 
 	struct sockaddr_in addr;
-	err_type ret = dns_resolve("www.szhqiot.top", &addr, 5);
+	err_type ret = dns_resolve("unicore-api1.rx-networks.cn", &addr, 5);
 	log_debug("address %s", inet_ntoa(addr.sin_addr));
 
 	dns_entry *e;

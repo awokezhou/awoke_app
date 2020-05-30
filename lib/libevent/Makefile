@@ -29,26 +29,26 @@ all: prepare compile build install
 
 .PHONY: prepare
 prepare:
-	echo "-------------prepare--------------"
+	@echo "-------------prepare--------------"
 	if [ ! -d ${LIB_OBJ_PATH} ];then mkdir obj;fi;
 	if [ ! -d ${LIB_LIB_PATH} ];then mkdir lib;fi;
 
 .PHONY: compile
 compile: $(OBJ_FILES)
 $(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : $(LIB_SRC_PATH)/%.c
-	echo "-------------compile--------------"
+	@echo "-------------compile--------------"
 	$(CC) $(CFLAGS) $(INCLUDE_PATHS) $(INC_PATH) -fPIC -c $< -o $@
 
 .PHONY: build
 build:$(LIB)
 $(LIB): $(OBJ_FILES)
-	echo "-------------build--------------"
+	@echo "-------------build--------------"
 	$(CC) -shared -fPIC -Wl,--whole-archive,-soname,$@ $(CFLAGS) -o $@ $(OBJ_FILES) -Wl,--no-whole-archive $(LIBS)
 	
 
 .PHONY: install
 install:
-	echo "-------------install--------------"
+	@echo "-------------install--------------"
 	cp $(LIB) $(LIB_PATH)
 
 .PHONY: clean

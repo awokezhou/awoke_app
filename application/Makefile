@@ -1,5 +1,5 @@
 
-MAKE_PART := message_router rtmsg_test_client rtmsg_test_server
+MAKE_PART := message_router
 .PHONY: $(MAKE_PART)
 all: $(MAKE_PART)
 

@@ -163,7 +163,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
 	        header_color = "";
 	    }
 
-		printf(" [%i/%02i/%02i %02i:%02i:%02i] ",
+		printf("[%i/%02i/%02i %02i:%02i:%02i] ",
 			current->tm_year + 1900,
 			current->tm_mon + 1,
 			current->tm_mday,
