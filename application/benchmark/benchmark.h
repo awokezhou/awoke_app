@@ -39,6 +39,8 @@ typedef enum {
 	arg_valist_test,
     arg_time_zero,
     arg_fastlz_test,
+    arg_gpsdata_test,
+    arg_queue_test,
 } benchmark_args;
 
 typedef enum {

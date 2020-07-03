@@ -1042,6 +1042,102 @@ static err_type benchmark_fastlz_test(int argc, char *argv[])
     return et_ok;
 }
 
+static double gpsdata_test_abs(double x)
+{
+    if (x < 0) {
+        x = x*(-1);
+    }
+
+    return x;
+}
+
+static err_type benchmark_gpsdata_test(int argc, char *argv[])
+{
+    uint16_t redius;
+    double lat, lon;
+    double new_lat, new_lon;
+    double lat_diff, lon_diff;
+
+#define GPSDATA_TEST_LAT_DISTANCE   111000
+#define GPSDATA_TEST_LON_DISTANCE   92000
+
+    lat = 30;
+    lon = 40;
+    new_lat = 32;
+    new_lon = 42;
+    redius = 100;
+
+    lat_diff = gpsdata_test_abs(new_lat-lat);
+    lon_diff = gpsdata_test_abs(new_lon-lon);
+
+    log_debug("lat:%d lon:%d", lat, lon);
+    log_debug("new_lat:%d new_lon:%d", new_lat, new_lon);
+    log_debug("lat_diff:%d lon_diff:%d", lat_diff, lon_diff);
+
+    log_debug("lat:%d lon:%d", (uint32_t)lat, (uint32_t)lon);
+    log_debug("new_lat:%d new_lon:%d", (uint32_t)new_lat, (uint32_t)new_lon);
+    log_debug("lat_diff:%d lon_diff:%d", (uint32_t)lat_diff, (uint32_t)lon_diff);   
+
+    if ((lat_diff*GPSDATA_TEST_LAT_DISTANCE > redius)) {
+        log_debug("lat redius");
+    }
+
+    if ((lon_diff*GPSDATA_TEST_LON_DISTANCE > redius)) {
+        log_debug("lon redius");
+    }
+
+    return et_ok;
+}
+
+static void queue_dump(awoke_queue *q)
+{
+    int *p;
+    awoke_queue_foreach(q, p, int) {
+        log_debug("%d", *p);
+    }
+}
+
+static err_type benchmark_queue_test(int argc, char *argv[])
+{
+    int x, a, b, c, d, e, f, g, h, i, j, *p, u;
+    awoke_queue *q = awoke_queue_create(sizeof(int), 10, 
+        AWOKE_QUEUE_F_IN|AWOKE_QUEUE_F_RB);
+
+    a = 1;
+    b = 2;
+    c = 3;
+    d = 4;
+    e = 5;
+    f = 6;
+    g = 7;
+    h = 8;
+    i = 9;
+    j = 10;
+    x = 100;
+
+    awoke_queue_enq(q, &a);
+    awoke_queue_enq(q, &b);
+    awoke_queue_enq(q, &c);
+    awoke_queue_enq(q, &d);
+    awoke_queue_enq(q, &e);
+    awoke_queue_enq(q, &f);
+    awoke_queue_enq(q, &g);
+    awoke_queue_enq(q, &h);
+    awoke_queue_enq(q, &i);
+    //awoke_queue_enq(q, &j);
+    Queue.enqueue(q, &j);
+    //awoke_queue_insert_after(q, 9, &x);
+
+    log_debug("queue size:%d curr:%d", awoke_queue_size(q), q->curr);
+
+    queue_dump(q);
+
+    Queue.delete(q, 9);
+
+    log_debug("\r\n");
+    queue_dump(q);
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -1069,6 +1165,8 @@ int main(int argc, char *argv[])
 		{"valist-test",			no_argument,		NULL,	arg_valist_test},
         {"timezero-test",		no_argument,		NULL,	arg_time_zero},
         {"fastlz-test",         no_argument,        NULL,   arg_fastlz_test},
+        {"gpsdata-test",        no_argument,        NULL,   arg_gpsdata_test},
+        {"queue-test",          no_argument,        NULL,   arg_queue_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1145,6 +1243,14 @@ int main(int argc, char *argv[])
 
             case arg_fastlz_test:
                 bmfn = benchmark_fastlz_test;
+                break;
+
+            case arg_gpsdata_test:
+                bmfn = benchmark_gpsdata_test;
+                break;
+
+            case arg_queue_test:
+                bmfn = benchmark_queue_test;
                 break;
 
             case '?':
