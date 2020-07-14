@@ -1,0 +1,55 @@
+<QuickDatabase version="1.0">
+
+    <object name="Root." category="Static" description="Root Object.">
+    </object>
+
+    <object name="Root.DevInfo" category="Static" description="Device Information.">
+        <member name="Manufactory" dtype="String" power="ReadOnly" default="" maxlength="64" 
+                description="The manufacturer of the device." />
+        <member name="ModelNumber" dtype="String" power="ReadOnly" default="" maxlength="64"
+                description="The model number of the device." />
+        <member name="SerialNumber" dtype="String" power="ReadOnly" default="" maxlength="64"
+                description="The serial number of the device." />
+        <member name="SoftwareVersion" dtype="String" power="ReadOnly" deafault="" maxlength="64"
+                description="The software version of the device." />
+        <member name="HardwareVersion" dtype="String" power="ReadOnly" deafault="" maxlength="64"
+                description="The hardware version of the device." />
+        <member name="BackupSwVersion" dtype="String" power="ReadOnly" default="" maxlength="64"
+                description="The backup software version of the device." />
+    </object>
+
+    <object name="Root.DevStatus" category="Static" description="Device Status.">
+        <member name="Temperature" dtype="Int" power="ReadOnly" default="0"
+                description="The temperature of the device." />
+        <member name="Voltage" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="The voltage of the device." />
+        <member name="DateTime" dtype="DateTime" power="ReadWrite" default=""
+                description="The datetime of the device." />
+        <member name="UpTime" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="The uptime of the device. Represents the number of seconds the system has been running since booting." />
+    </object>
+
+    <object name="Root.Statistic" category="Static" description="Statistical summary.">
+        <member name="TXpackets" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Number of packets sent successfully." />
+        <member name="TXErrpackets" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Total packages failed to send." />
+        <member name="RXpackets" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Number of packets receive successfully." />
+        <member name="TXBytes" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Total size of bytes sent successfully." />
+        <member name="RXBytes" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Total size of bytes receive successfully." />
+    </object>
+
+    <object name="Root.Modem" category="Static" description="Modem information.">
+        <member name="TXpower" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="RF transmitting power." />
+        <member name="PhysicalCellID" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Physical cell ID." />
+    </object>
+
+
+
+</QuickDatabase>
+
