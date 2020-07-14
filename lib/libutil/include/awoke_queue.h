@@ -29,36 +29,45 @@ typedef struct _awoke_queue {		/* FIFO standard queue */
 		__k--,													\
 		u = (type *)((q)->_queue + (__k)*((q)->node_size))) 	\
 
-bool awoke_queue_empty(awoke_queue *q);
-bool awoke_queue_full(awoke_queue *q);
+
 int awoke_queue_size(awoke_queue *q);
+
+bool awoke_queue_full(awoke_queue *q);
+bool awoke_queue_empty(awoke_queue *q);
+void awoke_queue_free(awoke_queue **q);
+void awoke_queue_clean(awoke_queue *q);
+
 err_type awoke_queue_deq(awoke_queue *q, void *u);
 err_type awoke_queue_enq(awoke_queue *q, void *u);
-awoke_queue *awoke_queue_create(size_t node_size, int node_nr, uint16_t flag);
-void awoke_queue_clean(awoke_queue **q);
 err_type awoke_queue_get(awoke_queue *q, int index, void *u);
 err_type awoke_queue_last(awoke_queue *q, void *u);
+err_type awoke_queue_first(awoke_queue *q, void *u);
+err_type awoke_queue_remove(awoke_queue *q, int index);
 err_type awoke_queue_insert_after(awoke_queue *q, int index, void *u);
-err_type awoke_queue_delete(awoke_queue *q, int index);
 
-#define NAMESPACE(name) namespace_#name
+awoke_queue *awoke_queue_create(size_t node_size, int node_nr, uint16_t flag);
 
+
+
+/* -- Namespace --{*/
 #ifdef namespace_awoke
 #ifdef namespace_queue
-typedef struct _namespace {
-
-    awoke_queue *(*create)(size_t node_size, int node_nr, uint16_t flag);
-    bool (*empty)(awoke_queue *q);
-    bool (*full)(awoke_queue *q);
-    int (*length)(awoke_queue *q);
-    err_type (*get)(awoke_queue *q, int index, void *u);
-    err_type (*last)(awoke_queue *q, void *u);
-    err_type (*dequeue)(awoke_queue *q, void *u);
-    err_type (*enqueue)(awoke_queue *q, void *u);
-    err_type (*delete)(awoke_queue *q, int index);
-    err_type (*insert_after)(awoke_queue *q, int index, void *u);
-} namespace;
-extern namespace const Queue;
+typedef struct _queue_namespace {
+	int (*size)(awoke_queue *q);
+	bool (*full)(awoke_queue *q);
+	bool (*empty)(awoke_queue *q);
+	void (*free)(awoke_queue **q);
+	void (*clean)(awoke_queue *q);
+	err_type (*get)(awoke_queue *q, int index, void *u);
+	err_type (*last)(awoke_queue *q, void *u);
+	err_type (*first)(awoke_queue *q, void *u);
+	err_type (*remove)(awoke_queue *q, int index);
+	err_type (*dequeue)(awoke_queue *q, void *u);
+	err_type (*enqueue)(awoke_queue *q, void *u);
+	err_type (*insert_after)(awoke_queue *q, int index, void *u);
+    awoke_queue *(*create)(size_t node_size, int node_nr, uint16_t flag);    
+} queue_namespace;
+extern queue_namespace const Queue;
 #endif
 #endif
 
