@@ -29,6 +29,7 @@ class QDBObject(object):
         self.childs = []
         self.parent = None
         self.parent_name = ''
+        self.fullname = name
         self.name = ''
         self.parse_name(name)
         self.oidname = self.getoidname(self.name)
@@ -333,6 +334,7 @@ class QDBParser(object):
         fobj = open(filename, 'w+')
         string = '#ifndef __QDB_OBJECT_H__\n'
         string += '#define __QDB_OBJECT_H__\n\n\n'
+        string += '#include \"QDB.h\"\n\n\n'
         string += '#define __QDB_VERSION__\t\t"{}"\n\n'.format(self.handler.version)
         fobj.write(string)
         for obj in self.objects:
@@ -363,6 +365,7 @@ class QDBParser(object):
         fobj = open(filename, 'w+')
         string = '#ifndef __QDB_OBJECTID_H__\n'
         string += '#define __QDB_OBJECTID_H__\n\n\n'
+        string += '#include \"QDB.h\"\n\n\n'
         string += '#define QDB_OID_MAXSIZE\t\t{}\n\n'.format(self.object_nr)
         fobj.write(string)
         for obj in self.objects:
@@ -395,11 +398,11 @@ class QDBParser(object):
         string += '\t\"{}\", /* object name */\n'.format(obj.name)
         string += '\t0,0, /* flags and instance depth */\n'
         string += '\tNULL, /* parent */\n'
-        string += '\t{0, DEFAULT_ACCESS_BIT_MASK, 0, DEFAULT_NOTIFICATION_VALUE, 0, 0}, /* nodeattr value of this objNode */\n'
-        string += '\tNULL, /* pointer to instances of nodeattr values for parameter nodes */\n'
+        #string += '\t{0, QDB_ACCESS_BITMASK, 0, QDB_NOTIFICATION_VALUE, 0, 0}, /* nodeattr value of this objNode */\n'
+        #string += '\tNULL, /* pointer to instances of nodeattr values for parameter nodes */\n'
         if (obj.category == 'Static') and (len(obj.members) > 0):
-            string += '\tsizeof({}Members)/sizeof(QDBObjectMember), /* members number */\n'.format(obj.name)
-            string += '\t{}Members, /* point to members */\n'
+            string += '\tsizeof({}ObjectMembers)/sizeof(QDBObjectMember), /* members number */\n'.format(obj.name)
+            string += '\t{}ObjectMembers, /* point to members */\n'.format(obj.name)
         else:
             string += '\t0, /* members number */\n'
             string += '\tNULL, /* point to members */\n'
@@ -417,11 +420,11 @@ class QDBParser(object):
         for child in obj.childs:
             string += '\t{\n'
             string += '\t\t{},\n'.format(child.oid)
-            string += '\t\t\"{}\",\n'.format(child.name)
+            string += '\t\t\"{}\", /* name:{} */\n'.format(child.name, child.fullname)
             string += '\t\t0,0, /* flags and instance depth */\n'
             string += '\t\tNULL, /* parent */\n'
-            string += '\t\t{0, DEFAULT_ACCESS_BIT_MASK, 0, DEFAULT_NOTIFICATION_VALUE, 0, 0}, /* nodeattr value of this objNode */\n'
-            string += '\t\tNULL, /* pointer to instances of nodeattr values for parameter nodes */\n'
+            #string += '\t\t{0, DEFAULT_ACCESS_BIT_MASK, 0, DEFAULT_NOTIFICATION_VALUE, 0, 0}, /* nodeattr value of this objNode */\n'
+            #string += '\t\tNULL, /* pointer to instances of nodeattr values for parameter nodes */\n'
             if (child.category == 'Static') and (len(child.members) > 0):
                 string += '\t\tsizeof({}ObjectMembers)/sizeof(QDBObjectMember), /* members number */\n'.format(child.name)
                 string += '\t\t{}ObjectMembers, /* point to members */\n'.format(child.name)
@@ -471,7 +474,7 @@ class QDBParser(object):
         print('generate {}'.format(oidfname))
 
         # generate source file
-        srcfname = '{}._object.c'.format(prefix)
+        srcfname = '{}_object.c'.format(prefix)
         self.generate_source(srcfname)
         print('generate {}'.format(srcfname))
 

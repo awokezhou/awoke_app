@@ -8,6 +8,7 @@
 #include "awoke_error.h"
 #include "awoke_event.h"
 #include "awoke_queue.h"
+#include "awoke_stack.h"
 #include "awoke_waitev.h"
 #include "awoke_memory.h"
 #include "awoke_worker.h"
@@ -41,6 +42,8 @@ typedef enum {
     arg_fastlz_test,
     arg_gpsdata_test,
     arg_queue_test,
+    arg_minpq_test,
+    arg_stack_test,
 } benchmark_args;
 
 typedef enum {

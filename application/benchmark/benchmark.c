@@ -1,3 +1,6 @@
+#define namespace_awoke
+#define namespace_stack
+#define namespace_queue
 
 #include <stdio.h>
 #include <time.h> 
@@ -21,6 +24,7 @@
 
 #include "benchmark.h"
 #include "awoke_log.h"
+
 
 static void usage(int ex)
 {
@@ -641,11 +645,22 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 
 static err_type benchmark_sscanf_test(int argc, char *argv[])
 {
+    /*
 	int length;
 	char *str = "Content-Length: 14615\r\ndsadsadsadasdsadasd";
 
 	sscanf(str, "Content-Length: %d%*s", &length);
 	log_debug("length:%d", length);
+    */
+
+    int raw = 66534;
+    uint16_t volt;
+    uint16_t data;
+
+    volt = raw;
+    log_debug("volt:%d", volt);
+    data = htons(volt/10);
+    log_debug("data:%d", data);
 
 	return et_ok;
 }
@@ -1124,18 +1139,265 @@ static err_type benchmark_queue_test(int argc, char *argv[])
     awoke_queue_enq(q, &g);
     awoke_queue_enq(q, &h);
     awoke_queue_enq(q, &i);
-    //awoke_queue_enq(q, &j);
-    Queue.enqueue(q, &j);
-    //awoke_queue_insert_after(q, 9, &x);
+    awoke_queue_enq(q, &j);
 
-    log_debug("queue size:%d curr:%d", awoke_queue_size(q), q->curr);
+    awoke_queue_foreach(q, p, int) {
+        log_debug("%d", *p);
+    }
 
-    queue_dump(q);
+    log_debug("---");
 
-    Queue.delete(q, 9);
+    int size = awoke_queue_size(q);
 
-    log_debug("\r\n");
-    queue_dump(q);
+    for (i=0; i<size; i++) {
+        awoke_queue_get(q, i, &u);
+        log_debug("%d", u);
+    }
+
+    log_debug("i:%d ---", i);
+
+    for (i=0; i<size; i++) {
+        awoke_queue_deq(q, &u);
+        log_debug("%d", u);
+    }
+
+    log_debug("%d---", i);
+}
+
+void private_info(int linenr, char *buff, int len, awoke_minpq *q)
+{
+    int i;
+    int x, p;
+    build_ptr bp = build_ptr_init(buff, len);
+
+    build_ptr_string(bp, "value:   ");
+    for (i=1; i<=MinPQ.size(q); i++) {
+        MinPQ.get(q, &x, &p, i);
+        build_ptr_format(bp, "%3d", x);
+    }
+}
+
+
+/*
+ * general mode test
+ * custom define comparator
+ * resize
+ */
+
+typedef struct _benchmark_minpq_struct {
+    int p;
+    int data;
+} bmms;
+
+void bmms_info_prior_handle(awoke_minpq *q, int width, char *buff, int len)
+{
+    int i;
+    int p;
+    bmms s;
+    
+    build_ptr bp = build_ptr_init(buff, len);
+
+    build_ptr_string(bp, "prior:");
+    for (i=1; i<=MinPQ.size(q); i++) {
+        MinPQ.get(q, &s, &p, i);
+        build_ptr_format(bp, "%*d", width, s.p);
+    }
+}
+
+void bmms_info_value_handle(awoke_minpq *q, int width, char *buff, int len)
+{
+    int i;
+    int p;
+    bmms s;
+    
+    build_ptr bp = build_ptr_init(buff, len);
+
+    build_ptr_string(bp, "value:");
+    for (i=1; i<=MinPQ.size(q); i++) {
+        MinPQ.get(q, &s, &p, i);
+        build_ptr_format(bp, "%*d", width, s.data);
+    }
+}
+
+static void bmms_init(bmms *s, int p, int data)
+{
+    s->p = p;
+    s->data = data;
+}
+
+static bool bmms_comparator(void *s1, void *s2)
+{
+    bmms *b1 = (bmms *)s1;
+    bmms *b2 = (bmms *)s2;
+
+    return (b1->p > b2->p);
+}
+
+static err_type benchmark_minpq_custom_test(int argc, char *argv[])
+{
+    int p;
+    bmms a, b, c, d, e, f, g, h, i, j, k, x;
+
+    awoke_minpq *q = MinPQ.create(sizeof(bmms), 0, bmms_comparator, 0x0);
+    MinPQ.set_info_handle(q, 5, bmms_info_prior_handle, bmms_info_value_handle);
+
+    bmms_init(&a, 3, 1);
+    bmms_init(&b, 3, 2);
+    bmms_init(&c, 8, 3);
+    bmms_init(&d, 2, 4);
+    bmms_init(&e, 6, 5);
+    bmms_init(&f, 13, 6);
+    bmms_init(&g, 7, 7);
+    bmms_init(&h, 9, 8);
+    bmms_init(&i, 19, 9);
+    bmms_init(&j, 5, 10);
+    bmms_init(&k, 7, 11);
+
+    MinPQ.insert(q, &a, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &b, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &c, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &d, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &e, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &f, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &g, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &h, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &i, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &j, 0);
+    MinPQ.info(q);
+    MinPQ.insert(q, &k, 0);
+    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+
+    MinPQ.info(q);
+
+    return et_ok;
+}
+
+static err_type benchmark_minpq_test(int argc, char *argv[])
+{
+    int a, b, c, d, e, f, g, h, i, j, k, x, p;
+
+    awoke_minpq *q = MinPQ.create(sizeof(int), 20, NULL, 0x0);
+    MinPQ.info(q);
+
+    a = 1;
+    b = 2;
+    c = 3;
+    d = 4;
+    e = 5;
+    f = 6;
+    g = 7;
+    h = 8;
+
+    MinPQ.insert(q, &a, 2);
+    MinPQ.info(q);
+
+    MinPQ.insert(q, &b, 3);
+    MinPQ.insert(q, &b, 13);
+    MinPQ.insert(q, &d, 11);
+    MinPQ.insert(q, &h, 9);
+    MinPQ.insert(q, &d, 17);
+    MinPQ.insert(q, &c, 8);
+    MinPQ.insert(q, &f, 5);
+    MinPQ.insert(q, &f, 3);
+    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", p, x);
+    MinPQ.info(q);
+
+    return et_ok;
+}
+
+static err_type benchmark_stack_test(int argc, char *argv[])
+{
+    int x, a, b, c, d, e, f, g, h, i, j, *p, u;
+
+    awoke_stack *s = Stack.create(sizeof(int), 10);
+
+    log_debug("stack size:%d", Stack.size(s));
+
+    a = 1;
+    b = 2;
+    c = 3;
+    d = 4;
+    e = 5;
+    f = 6;
+    g = 7;
+    h = 8;
+    i = 9;
+    j = 10;
+    x = 100;
+
+    Stack.push(s, &a);
+    Stack.push(s, &b);
+    Stack.push(s, &c);
+    Stack.push(s, &d);
+    Stack.push(s, &e);
+    Stack.push(s, &f);
+    Stack.push(s, &g);
+    Stack.push(s, &h);
+    Stack.push(s, &i);
+    Stack.push(s, &j);
+    Stack.push(s, &x);
+
+    for (i=0; i<Stack.size(s); i++) {
+        Stack.get(s, i, &u);
+        log_debug("item:%d", u);
+    }
+
+    Stack.pop(s, &u);
+    log_debug("pop item:%d", u);
+
+    for (i=0; i<Stack.size(s); i++) {
+        Stack.get(s, i, &u);
+        log_debug("item:%d", u);
+    }
+
+    return et_ok;
 }
 
 int main(int argc, char *argv[])
@@ -1167,6 +1429,8 @@ int main(int argc, char *argv[])
         {"fastlz-test",         no_argument,        NULL,   arg_fastlz_test},
         {"gpsdata-test",        no_argument,        NULL,   arg_gpsdata_test},
         {"queue-test",          no_argument,        NULL,   arg_queue_test},
+        {"minpq-test",          no_argument,        NULL,   arg_minpq_test},
+        {"stack-test",          no_argument,        NULL,   arg_stack_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1251,6 +1515,14 @@ int main(int argc, char *argv[])
 
             case arg_queue_test:
                 bmfn = benchmark_queue_test;
+                break;
+
+            case arg_minpq_test:
+                bmfn = benchmark_minpq_custom_test;
+                break;
+
+            case arg_stack_test:
+                bmfn = benchmark_stack_test;
                 break;
 
             case '?':
