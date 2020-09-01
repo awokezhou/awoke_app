@@ -11,6 +11,15 @@
 
 
 
+/* -- dump struct --{*/
+typedef struct _awoke_queue_dumpinfo {
+	uint8_t width;
+	void (*value_dump)(void *s, int width, char *buff, int len);
+	void (*priro_dump)(void *s, int width, char *buff, int len);
+} awoke_queue_dumpinfo;
+/*}-- dump struct -- */
+
+
 /* -- Queue -- {*/
 typedef struct _awoke_queue {		/* FIFO standard queue */
 	int curr;
@@ -61,18 +70,15 @@ typedef struct _awoke_minpq {
 #define AWOKE_MINPQ_F_RES   0x0002  /* Resize */
     uint16_t flags;
     bool (*comparator)(void *, void *);
-
-    int info_width;
-    void (*info_prior_handle)(struct _awoke_minpq *, int, char *, int);
-    void (*info_value_handle)(struct _awoke_minpq *, int, char *, int);
+	awoke_queue_dumpinfo dumpinfo;
 } awoke_minpq;
 
 int awoke_minpq_size(awoke_minpq *q);
 bool awoke_minpq_full(struct _awoke_minpq *q);
 bool awoke_minpq_empty(struct _awoke_minpq *q);
-void awoke_minpq_info_set_handle(struct _awoke_minpq *q, int,
-    void (*info_prior_handle)(struct _awoke_minpq *, int, char *, int),
-    void (*info_value_handle)(struct _awoke_minpq *, int, char *, int));
+void awoke_minpq_dumpinfo_set(struct _awoke_minpq *q, int width,
+    void (*value_dump)(void *, int, char *, int),
+    void (*prior_dump)(void *, int, char *, int));
 err_type minpq_min(struct _awoke_minpq *q, int *p);
 err_type awoke_minpq_insert(struct _awoke_minpq *q, void *u, int p);
 err_type awoke_minpq_delmin(struct _awoke_minpq *q, void *u, int *p);
@@ -80,6 +86,35 @@ awoke_minpq *awoke_minpq_create(size_t node_size, int capacity,
     bool(*comparator)(void *, void *), uint16_t flags);
 err_type awoke_minpq_get(struct _awoke_minpq *q, void *u, int *p, int index);
 /*}-- MinPQ -- */
+
+
+/* -- FIFO --{*/
+typedef struct _awoke_fifo {
+	char *q;
+#define AWOKE_FIFO_F_CDF   0x0001  /* custom define free */
+#define AWOKE_FIFO_F_RES   0x0002  /* Resize */
+#define AWOKE_FIFO_F_RBK   0x0004  /* Rollback */
+	uint16_t flags;
+	size_t nodesize;
+	unsigned int head;
+	unsigned int tail;
+	unsigned int node_nr;
+	unsigned int capacity;
+	awoke_queue_dumpinfo dumpinfo;
+} awoke_fifo;
+
+err_type awoke_fifo_get(struct _awoke_fifo *f, void *u, int index);
+bool awoke_fifo_empty(struct _awoke_fifo *f);
+bool awoke_fifo_full(struct _awoke_fifo *f);
+err_type awoke_fifo_resize(struct _awoke_fifo *f, unsigned int capacity);
+err_type awoke_fifo_size(struct _awoke_fifo *f);
+err_type *awoke_fifo_dequeue(struct _awoke_fifo *f, void *u);
+err_type *awoke_fifo_enqueue(struct _awoke_fifo *f, void *u);
+awoke_fifo *awoke_fifo_create(size_t nodesize, int capacity, uint16_t flags);
+void awoke_fifo_dumpinfo_set(struct _awoke_fifo *f, int width,
+    void (*value_dump)(void *, int, char *, int),
+    void (*prior_dump)(void *, int, char *, int));
+/*}-- FIFO -- */
 
 
 /* -- Namespace --{*/

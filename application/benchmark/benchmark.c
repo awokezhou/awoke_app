@@ -1,5 +1,4 @@
 #define namespace_awoke
-#define namespace_stack
 #define namespace_queue
 
 #include <stdio.h>
@@ -746,317 +745,6 @@ static err_type benchmark_time_zero_test(int argc, char *argv[])
     return et_ok;
 }
 
-static int fastlz_pkg(uint8_t *src, int num)
-{
-    typedef struct _fastlz_test_gpsinfo {
-        uint32_t time;
-        uint32_t lat;
-        uint32_t lon;
-        uint8_t speed;
-        uint16_t alt;
-        uint8_t angle;
-    } fastlz_test_gpsinfo;
-
-	fastlz_test_gpsinfo gpstable[] = {
-		{1590719644, 3305864961, 4052158478, 0, 453, 0},
-		{1590719646, 3305864963, 4052158463, 0, 454, 0},
-		{1590719647, 3305864927, 4052158475, 0, 455, 0},
-		{1590719649, 3305864935, 4052158466, 0, 455, 0},
-		{1590719651, 3305864914, 4052158412, 0, 453, 0},
-		{1590719652, 3305864982, 4052158432, 0, 453, 0},
-		{1590719654, 3305864931, 4052158456, 0, 453, 0},
-		{1590719656, 3305864949, 4052158413, 0, 453, 0},
-		{1590719658, 3305864998, 4052158434, 0, 453, 0},
-		{1590719661, 3305864927, 4052158432, 0, 453, 0},
-		{1590719663, 3305864989, 4052158433, 0, 453, 0},
-		{1590719665, 3305864972, 4052158466, 0, 453, 0},
-		{1590719666, 3305864909, 4052158457, 0, 453, 0},
-		{1590719667, 3305864906, 4052158456, 0, 453, 0},
-		{1590719669, 3305864918, 4052158463, 0, 453, 0},
-		{1590719671, 3305864908, 4052158445, 0, 453, 0},
-		{1590719673, 3305864917, 4052158467, 0, 453, 0},
-		{1590719674, 3305864958, 4052158475, 0, 453, 0},
-		{1590719676, 3305864909, 4052158465, 0, 453, 0},
-		{1590719678, 3305864933, 4052158454, 0, 453, 0},
-		{1590719680, 3305864967, 4052158446, 0, 453, 0},
-		{1590719682, 3305864985, 4052158486, 0, 453, 0},
-		{1590719684, 3305864901, 4052158445, 0, 453, 0},
-		{1590719686, 3305864923, 4052158447, 0, 453, 0},
-		{1590719688, 3305864921, 4052158456, 0, 453, 0},
-		{1590719690, 3305864935, 4052158456, 0, 453, 0},
-		{1590719692, 3305864956, 4052158423, 0, 453, 0},
-		{1590719694, 3305864977, 4052158456, 0, 453, 0},
-		{1590719696, 3305864908, 4052158455, 0, 453, 0},
-		{1590719697, 3305864976, 4052158498, 0, 453, 0},
-		{1590719698, 3305864923, 4052158475, 0, 453, 0},
-		{1590719701, 3305864987, 4052158457, 0, 453, 0},
-		{1590719703, 3305864985, 4052158443, 0, 453, 0},
-		{1590719705, 3305864976, 4052158457, 0, 453, 0},
-		{1590719707, 3305864909, 4052158446, 0, 453, 0},
-		{1590719709, 3305864968, 4052158454, 0, 453, 0},
-		{1590719711, 3305864932, 4052158446, 0, 453, 0},
-		{1590719713, 3305864933, 4052158454, 0, 453, 0},
-		{1590719715, 3305864944, 4052158498, 0, 453, 0},
-		{1590719718, 3305864955, 4052158425, 0, 453, 0},
-                                                     
-		{1590719719, 3305864955, 4052158425, 0, 453, 0},
-		{1590719721, 3305864931, 4052158425, 0, 453, 0},
-		{1590719723, 3305864956, 4052158425, 0, 453, 0},
-		{1590719724, 3305864954, 4052158425, 0, 453, 0},
-		{1590719725, 3305864965, 4052158425, 0, 453, 0},
-		{1590719727, 3305864973, 4052158425, 0, 453, 0},
-		{1590719719, 3305864957, 4052158425, 0, 453, 0},
-		{1590719721, 3305864948, 4052158422, 0, 453, 0},
-		{1590719723, 3305864975, 4052158441, 0, 453, 0},
-		{1590719725, 3305864919, 4052158435, 0, 453, 0},
-		{1590719727, 3305864986, 4052158466, 0, 453, 0},
-		{1590719729, 3305864965, 4052158479, 0, 453, 0},
-		{1590719731, 3305864985, 4052158465, 0, 453, 0},
-		{1590719733, 3305864983, 4052158458, 0, 453, 0},
-		{1590719735, 3305864981, 4052158495, 0, 453, 0},
-		{1590719738, 3305864902, 4052158475, 0, 453, 0},
-		{1590719740, 3305864992, 4052158448, 0, 453, 0},
-		{1590719742, 3305864958, 4052158405, 0, 453, 0},
-		{1590719744, 3305864987, 4052158496, 0, 453, 0},
-		{1590719746, 3305864931, 4052158448, 0, 453, 0},
-		{1590719748, 3305864966, 4052158447, 0, 453, 0},
-		{1590719752, 3305864967, 4052158449, 0, 453, 0},
-		{1590719754, 3305864989, 4052158445, 0, 453, 0},
-		{1590719758, 3305864908, 4052158431, 0, 453, 0},
-		{1590719763, 3305864932, 4052158435, 0, 453, 0},
-		{1590719766, 3305864967, 4052158452, 0, 453, 0},
-		{1590719768, 3305864984, 4052158456, 0, 453, 0},
-		{1590719771, 3305864990, 4052158498, 0, 453, 0},
-		{1590719774, 3305864945, 4052158445, 0, 453, 0},
-		{1590719777, 3305864987, 4052158479, 0, 453, 0},
-		{1590719779, 3305864956, 4052158402, 0, 453, 0},
-		{1590719782, 3305864987, 4052158441, 0, 453, 0},
-		{1590719784, 3305864945, 4052158473, 0, 453, 0},
-		{1590719788, 3305864967, 4052158461, 0, 453, 0},
-		{1590719791, 3305864996, 4052158461, 0, 453, 0},
-		{1590719794, 3305864945, 4052158467, 0, 453, 0},
-		{1590719795, 3305864967, 4052158484, 0, 453, 0},
-		{1590719799, 3305864954, 4052158462, 0, 453, 0},
-		{1590719811, 3305864956, 4052158494, 0, 453, 0},
-		{1590719815, 3305864945, 4052158472, 0, 453, 0},		
-	};
-
-	int i;
-
-	uint8_t *pos = src;
-	#if 0
-    uint16_t cmd = 0x0a02;
-    uint8_t devmode = 0x01;
-    uint8_t hoststate = 0x02;
-    uint8_t motionstate = 0x02;
-    uint16_t devvolt = 0x1a2;
-    uint8_t voltper = 100;
-    uint8_t devtemp = 0x87;
-    uint8_t hostpos = 1;
-	uint8_t reserve = 0x0;
-    uint32_t celltime = 0x00034157;
-    uint16_t mcc = 0x0460;
-    uint8_t mnc = 0x11;
-    uint8_t act = 0x0;
-    uint16_t tac = 0x4b00;
-    uint32_t cellid = 0x9356a12;
-    uint16_t earfcn = 0xe68;
-    uint16_t pci = 0x1dd;
-    uint8_t rsrp = 0x56;
-    uint8_t rsrq = 0xf4;
-    uint8_t rssi = 0xfe;
-    uint16_t snr = 0x3f2;
-    uint8_t cellnum = 5;
-    uint16_t neighbor1_earfcn = 0xe68;
-    uint16_t neighbor1_pci = 0xa1;
-    uint8_t neighbor1_rsrp = 0x62;
-    uint8_t neighbor1_rsrq = 0xf3;
-    uint8_t neighbor1_rssi = 0xf2;
-    uint16_t neighbor1_snr = 0x416;
-   
-	/* pkg cmd */
-	cmd = htons(cmd);
-	pkg_push_word(cmd, pos);
-
-	/* device mode */
-	pkg_push_byte(devmode, pos);
-
-	/* host state */
-	pkg_push_byte(hoststate, pos);
-
-	/* motion state */
-	pkg_push_byte(motionstate, pos);
-
-	/* device volt */
-	devvolt = htons(devvolt);
-	pkg_push_word(devvolt, pos);
-
-	/* volt percent */
-	pkg_push_byte(voltper, pos);
-
-	/* tempurate */
-	pkg_push_byte(devtemp, pos);
-
-	/* hostpos */
-	pkg_push_byte(hostpos, pos);
-
-	/* reserve */
-	pkg_push_bytes(reserve, pos, 3);
-
-	/* celltime */
-	celltime = htonl(celltime);
-	pkg_push_dwrd(celltime, pos);
-
-	/* MCC */
-	mcc = htons(mcc);
-	pkg_push_word(mcc, pos);
-
-	/* MNC */
-	pkg_push_byte(mnc, pos);
-
-	/* ACT */
-	pkg_push_byte(act, pos);
-
-	/* TAC */
-	pkg_push_byte(tac, pos);
-
-	/* cellid */
-	cellid = htonl(cellid);
-	pkg_push_dwrd(cellid, pos);
-
-	/* earfcn */
-	earfcn = htons(earfcn);
-	pkg_push_word(earfcn, pos);
-
-	/* PCI */
-	pci = htons(pci);
-	pkg_push_word(pci, pos);
-
-	/* RSRP */
-	pkg_push_byte(rsrp, pos);
-
-	/* RSRQ */
-	pkg_push_byte(rsrq, pos);
-
-	/* RSSI */
-	pkg_push_byte(rssi, pos);
-
-	/* SNR */
-	pkg_push_byte(snr, pos);
-
-	/* NCellnum */
-	pkg_push_byte(cellnum, pos);
-	#endif
-
-	uint8_t gpsnum = num;
-	if (gpsnum == 1)
-		gpsnum = 2;
-	
-	/* gpsnum */
-	pkg_push_byte(gpsnum, pos);
-
-	for (i=0; i<(gpsnum-1); i++) {
-
-		fastlz_test_gpsinfo *gpsinfo = &gpstable[i];
-
-		/* time */
-		uint32_t time = htonl(gpsinfo->time);
-		pkg_push_dwrd(time, pos);
-
-		/* lat */
-		uint32_t lat = htonl(gpsinfo->lat);
-		pkg_push_dwrd(lat, pos);
-
-		/* lon */
-		uint32_t lon = htonl(gpsinfo->lon);
-		pkg_push_dwrd(lon, pos);
-
-		/* speed */
-		uint8_t speed = gpsinfo->speed;
-		pkg_push_byte(speed, pos);
-
-		/* alt */
-		uint8_t alt = gpsinfo->alt;
-		pkg_push_byte(alt, pos);
-
-		/* angle */
-		uint16_t angle = htons(gpsinfo->angle);
-		pkg_push_word(angle, pos);
-	}
-
-	return (pos-src);
-}
-
-static err_type fastlz_test(int number, int cmplevle, bool dump)
-{
-    bool check_ok = TRUE;
-    int i, length;    
-	int cmplens, dpmlens;
-
-	int rate;
-    uint8_t *src = mem_alloc_z(4096);
-    uint8_t *cmp = mem_alloc_z(4096);
-    uint8_t *dmp = mem_alloc_z(4096);
-
-    /* int source data */
-	length = fastlz_pkg(src, number);
-
-    if (dump) {
-        pkg_dump(src, length);
-    }
-
-    /* compress */
-	cmplens = LZ4_compress_default(src, cmp, length, 4096);
-	//cmplens = lzjb_compress(src, cmp, length, 4096);
-    //cmplens = fastlz_compress_level(cmplevle, src, length, cmp);
-    if (dump) {
-        pkg_dump(cmp, cmplens);
-    }
-
-    /* decompress */
-	dpmlens = LZ4_decompress_safe(cmp, dmp, cmplens, 4096);
-	//dpmlens = lzjb_compress(cmp, dmp, cmplens, 4096);
-    //dpmlens = fastlz_decompress(cmp, cmplens, dmp, length);
-    if (dump) {
-        pkg_dump(dmp, dpmlens);
-    }
-
-    /* check */
-    for (i=0; i<(length-1); i++) {
-        if (src[i] != dmp[i]) {
-            check_ok = FALSE;
-            break;
-        }
-    }
-
-	rate = 100 - cmplens*100/length;
-
-    mem_free(src);
-    mem_free(cmp);
-    mem_free(dmp);
-
-	printf("%d\t%d\t%d\t  %d\t\t%d\t%d\r\n", 
-		number, length, cmplens, dpmlens, check_ok, rate);
-	
-    return et_ok;
-}
-
-static err_type benchmark_fastlz_test(int argc, char *argv[])
-{
-    int i = 0;
-
-    int length_table[] = {5, 10, 15, 20, 25, 30, 40, 60, 80};
-    int length_table_size = array_size(length_table);
-
-	printf("gpsnum\tsource\tcompress  decompress\tcheck\trate(\%)\r\n");
-
-    for (i=0; i<(length_table_size-1); i++) {
-        fastlz_test(length_table[i], 1, FALSE);
-    }
-
-    return et_ok;
-}
-
 static double gpsdata_test_abs(double x)
 {
     if (x < 0) {
@@ -1352,15 +1040,29 @@ static err_type benchmark_minpq_test(int argc, char *argv[])
     return et_ok;
 }
 
-static err_type benchmark_stack_test(int argc, char *argv[])
+void fifo_test_value_handle(awoke_fifo *f, int width, char *buff, int len)
 {
-    int x, a, b, c, d, e, f, g, h, i, j, *p, u;
+    int i;
+    int p;
+    int d;
+    
+    build_ptr bp = build_ptr_init(buff, len);
 
-    awoke_stack *s = Stack.create(sizeof(int), 10);
+    build_ptr_string(bp, "value:");
+    for (i=0; i<awoke_fifo_size(f); i++) {
+        awoke_fifo_get(f, &d, i);
+        build_ptr_format(bp, "%*d", width, d);
+    }
+}
 
-    log_debug("stack size:%d", Stack.size(s));
+static err_type benchmark_fifo_test(int argc, char *argv[])
+{
+	int x, a, b, c, d, e, f, g, h, i, j, k;
 
-    a = 1;
+	awoke_fifo *fifo = awoke_fifo_create(sizeof(int), 8, AWOKE_FIFO_F_RBK);
+	awoke_fifo_dumpinfo_set(fifo, 4, fifo_test_value_handle, NULL);
+
+	a = 1;
     b = 2;
     c = 3;
     d = 4;
@@ -1372,40 +1074,45 @@ static err_type benchmark_stack_test(int argc, char *argv[])
     j = 10;
     x = 100;
 
-    Stack.push(s, &a);
-    Stack.push(s, &b);
-    Stack.push(s, &c);
-    Stack.push(s, &d);
-    Stack.push(s, &e);
-    Stack.push(s, &f);
-    Stack.push(s, &g);
-    Stack.push(s, &h);
-    Stack.push(s, &i);
-    Stack.push(s, &j);
-    Stack.push(s, &x);
+	awoke_fifo_dump(fifo);
 
-    for (i=0; i<Stack.size(s); i++) {
-        Stack.get(s, i, &u);
-        log_debug("item:%d", u);
-    }
+	awoke_fifo_enqueue(fifo, &a);
+	awoke_fifo_enqueue(fifo, &b);
+	awoke_fifo_enqueue(fifo, &c);
+	awoke_fifo_enqueue(fifo, &d);
+	awoke_fifo_enqueue(fifo, &e);
+	awoke_fifo_enqueue(fifo, &f);
+	awoke_fifo_enqueue(fifo, &g);
+	awoke_fifo_enqueue(fifo, &h);
+	awoke_fifo_enqueue(fifo, &i);
+	awoke_fifo_enqueue(fifo, &j);
 
-    Stack.pop(s, &u);
-    log_debug("pop item:%d", u);
+	awoke_fifo_dump(fifo);
 
-    for (i=0; i<Stack.size(s); i++) {
-        Stack.get(s, i, &u);
-        log_debug("item:%d", u);
-    }
+	awoke_fifo_dequeue(fifo, &x);
+	awoke_fifo_dequeue(fifo, &x);
+	awoke_fifo_dequeue(fifo, &x);
+	
+	awoke_fifo_dump(fifo);
+	
+	awoke_fifo_dequeue(fifo, &x);
+	awoke_fifo_dequeue(fifo, &x);
+	awoke_fifo_dequeue(fifo, &x);
 
-    return et_ok;
+	awoke_fifo_dump(fifo);
+	
+	awoke_fifo_dequeue(fifo, &x);
+	awoke_fifo_dequeue(fifo, &x);
+
+	awoke_fifo_dump(fifo);
 }
 
 int main(int argc, char *argv[])
 {
 	int opt;
 	char *app_id = "benchmark";
-	int loglevel = LOG_DBG;
-	int logmode = LOG_TEST;
+	int loglevel = LOG_TRACE;
+	int logmode = LOG_TRACE;
 	bencmark_func bmfn = NULL;
 
 	static const struct option long_opts[] = {
@@ -1426,11 +1133,10 @@ int main(int argc, char *argv[])
 		{"buffchunk-test",      no_argument, 		NULL,	arg_buffchunk_test},
 		{"valist-test",			no_argument,		NULL,	arg_valist_test},
         {"timezero-test",		no_argument,		NULL,	arg_time_zero},
-        {"fastlz-test",         no_argument,        NULL,   arg_fastlz_test},
         {"gpsdata-test",        no_argument,        NULL,   arg_gpsdata_test},
         {"queue-test",          no_argument,        NULL,   arg_queue_test},
         {"minpq-test",          no_argument,        NULL,   arg_minpq_test},
-        {"stack-test",          no_argument,        NULL,   arg_stack_test},
+		{"fifo-test",  			no_argument, 		NULL,   arg_fifo_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1505,10 +1211,6 @@ int main(int argc, char *argv[])
                 bmfn = benchmark_time_zero_test;
                 break;
 
-            case arg_fastlz_test:
-                bmfn = benchmark_fastlz_test;
-                break;
-
             case arg_gpsdata_test:
                 bmfn = benchmark_gpsdata_test;
                 break;
@@ -1521,9 +1223,9 @@ int main(int argc, char *argv[])
                 bmfn = benchmark_minpq_custom_test;
                 break;
 
-            case arg_stack_test:
-                bmfn = benchmark_stack_test;
-                break;
+			case arg_fifo_test:
+				bmfn = benchmark_fifo_test;
+				break;
 
             case '?':
             case 'h':
@@ -1534,7 +1236,7 @@ int main(int argc, char *argv[])
     }
 
 run:
-	log_set(app_id, logmode, loglevel);
+	awoke_log_init(loglevel, 0);
 	bmfn(argc, argv);
 
 	return 0;

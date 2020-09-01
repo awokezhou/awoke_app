@@ -68,7 +68,7 @@ void awoke_worker_stop(awoke_worker *wk)
 {
 	worker_mutex_lock(&wk->mutex);
 	wk->_force_stop = TRUE;
-	log_debug("worker %s stop", wk->name);
+	log_trace("worker %s stop", wk->name);
 	worker_mutex_unlock(&wk->mutex);
 }
 
@@ -78,7 +78,7 @@ void awoke_worker_suspend(awoke_worker *wk)
         worker_mutex_lock(&wk->mutex);
         wk->_running = FALSE;
 		worker_condition_notify(&wk->cond);
-		log_debug("worker %s suspend", wk->name);
+		log_trace("worker %s suspend", wk->name);
         worker_mutex_unlock(&wk->mutex);
     }
 }
@@ -89,7 +89,7 @@ void awoke_worker_resume(awoke_worker *wk)
         worker_mutex_lock(&wk->mutex);
         wk->_running = TRUE;
         worker_condition_notify(&wk->cond);
-		log_debug("worker %s resume", wk->name);
+		log_trace("worker %s resume", wk->name);
         worker_mutex_unlock(&wk->mutex);
     }
 }
@@ -134,7 +134,7 @@ static void worker_should_suspend(awoke_worker *wk)
 	worker_mutex_lock(&wk->mutex);
 	
 	while (!wk->_running) {
-		log_debug("worker %s condition wait", wk->name);
+		log_trace("worker %s condition wait", wk->name);
 		worker_condition_wait(&wk->cond, &wk->mutex);
 	}
 	
@@ -146,9 +146,9 @@ void awoke_worker_should_suspend(awoke_worker *wk)
 	return worker_should_suspend(wk);
 }
 
-static err_type run_once(awoke_worker *wk)
+static err_type run_once(awoke_worker *wk, void *ctx)
 {
-	return wk->handler(wk);
+	return wk->handler(ctx);
 }
 
 static void worker_run(void *context)
@@ -158,7 +158,7 @@ static void worker_run(void *context)
 	awoke_worker *wk = ctx->worker;
 
 	if (!mask_exst(wk->features, WORKER_FEAT_PERIODICITY)) {
-		//log_debug("worker %s not periodicity", wk->name);
+		log_burst("worker %s not periodicity", wk->name);
 		wk->handler(wk);
 	}
 
@@ -167,14 +167,14 @@ static void worker_run(void *context)
 		if (mask_exst(wk->features, WORKER_FEAT_SUSPEND))
 			worker_should_suspend(wk);
 		
-		ret = run_once(wk);
+		ret = run_once(wk, context);
 		if (ret != et_ok) {
-			log_test("worker run once error, ret %d", ret);
+			log_trace("worker run once error, ret %d", ret);
 		}
 		
 		worker_reference(wk);
 		
-		//log_debug("worker %s run once", wk->name);
+		log_burst("worker %s run once", wk->name);
 		
 		if (mask_exst(wk->features, WORKER_FEAT_TICK_USEC)) {
 			usleep(wk->tick);
@@ -188,7 +188,7 @@ static void worker_run(void *context)
 }
 
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
-		uint16_t features, err_type (*handler)(struct _awoke_worker *_wk), void *data)
+		uint16_t features, err_type (*handler)(void *ctx), void *data)
 {
 	int r;
 	err_type ret;
@@ -255,7 +255,7 @@ awoke_worker *awoke_worker_create(char *name, uint32_t tick,
 		goto err;
 	}
 
-	log_debug("worker %s create ok, tick %d", wk->name, wk->tick);
+	log_trace("worker %s create ok, tick %d", wk->name, wk->tick);
 	
 	return wk;
 	

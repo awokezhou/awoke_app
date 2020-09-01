@@ -4,8 +4,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/sysinfo.h>
 
 #include "awoke_macros.h"
+#include "awoke_log.h"
+
 
 
 static inline void *mem_alloc(const size_t size)
@@ -17,6 +20,41 @@ static inline void *mem_alloc(const size_t size)
     }
 
     return aux;
+}
+
+static uint32_t free_heap(void)
+{
+	int ret;
+	struct sysinfo info;
+
+	ret = sysinfo(&info);
+	if (ret < 0) {
+		log_err("get sysinfo error:%d", ret);
+		return ret;
+	}
+
+	return info.freeram;
+}
+
+static inline void *mem_alloc_trace(const size_t size, const char *reason)
+{
+	void *aux;
+
+	if (size) {
+
+		log_trace("%s size:%lu free:%lu", reason, size, free_heap());
+	
+		aux = malloc(size);
+
+		if (awoke_unlikely(!aux && size)) {
+			log_trace("%s alloc error", reason);
+        	return NULL;
+   		}
+
+		return aux;
+	}
+
+	return NULL;
 }
 
 static inline void *mem_alloc_z(const size_t size)

@@ -285,7 +285,7 @@ err_type http_buffchunk_init(struct _http_buffchunk *chunk)
 		log_err("chunk alloc error");
 		return et_nomem;
 	}
-	log_test("buffchunk alloc ok");
+	log_trace("buffchunk alloc ok");
 
 	return et_ok;
 }
@@ -300,15 +300,15 @@ bool http_buffchunk_dynamic(struct _http_buffchunk *chunk)
 
 void http_buffchunk_dump(struct _http_buffchunk *chunk)
 {
-	log_test(">>> buffchunk dump:");
-	log_test("------------------------");
-	log_test("size:%d", chunk->size);
-	log_test("length:%d", chunk->length);
-	log_test("buff address:0x%x", chunk->buff);
+	log_trace(">>> buffchunk dump:");
+	log_trace("------------------------");
+	log_trace("size:%d", chunk->size);
+	log_trace("length:%d", chunk->length);
+	log_trace("buff address:0x%x", chunk->buff);
 #ifdef HTTP_BUFFCHUNK_FIXED
-	log_test("fixed address:0x%x", chunk->_fixed);
+	log_trace("fixed address:0x%x", chunk->_fixed);
 #endif
-	log_test("------------------------");
+	log_trace("------------------------");
 }
 
 void http_buffchunk_copy(struct _http_buffchunk *dst, struct _http_buffchunk *src)
@@ -346,7 +346,7 @@ err_type http_buffchunk_resize(struct _http_buffchunk *chunk, int new_size)
 		return et_mem_limit;
 	
 	if (!http_buffchunk_dynamic(chunk)) {
-		log_test("buffchunk not dynamic, alloc memory");
+		log_trace("buffchunk not dynamic, alloc memory");
 		chunk->buff = mem_alloc_z(new_size+1);
 		if (!chunk->buff) {
 			log_err("alloc chunk error");
@@ -358,7 +358,7 @@ err_type http_buffchunk_resize(struct _http_buffchunk *chunk, int new_size)
 #endif
 	
 	} else {
-		log_test("buffchunk dynamic, realloc memory");
+		log_trace("buffchunk dynamic, realloc memory");
 		realloc = mem_realloc(chunk->buff, new_size+1);
 		if (!chunk->buff) {
 			log_err("realloc chunk error");
@@ -461,10 +461,10 @@ static int request_build_headers(struct _http_request *req)
 	int len;
 	http_header *h;
 
-	log_test("request_build_headers");
+	log_trace("request_build_headers");
 
 	array_foreach(req->headers, HTTP_HEADER_SIZEOF, h) {
-		log_test("header key:%.*s val:%.*s", h->key.len, h->key.p, h->val.len, h->val.p);
+		log_trace("header key:%.*s val:%.*s", h->key.len, h->key.p, h->val.len, h->val.p);
 		if (h->key.p) {
 			len += request_build_header(req, h);
 		}
@@ -476,7 +476,7 @@ static int request_build_headers(struct _http_request *req)
 void http_request_clean(struct _http_request *p)
 {
 	if (!http_connect_keep_alive(&p->conn)) {
-		log_test("connect not keep alive, will release");
+		log_trace("connect not keep alive, will release");
 		http_connect_release(&p->conn);
 	}
 
@@ -506,7 +506,7 @@ void http_request_dump(struct _http_request *req)
 	log_info("method : %.*s", req->method.len, req->method.p);
 	log_info("protocol : %.*s", req->protocol.len, req->protocol.p);
 	http_header_dump(req->headers);
-	log_test("HTTP Text:\n%.*s", req->buffchunk.length, req->buffchunk.buff);
+	log_trace("HTTP Text:\n%.*s", req->buffchunk.length, req->buffchunk.buff);
 	log_info("--------------------------------");
 }
 
@@ -549,11 +549,11 @@ static err_type http_request_package(struct _http_request *req)
 	
 	request_build_string(req, STR_CRLD);
 
-	log_test("STR_CRLD ok");
+	log_trace("STR_CRLD ok");
 
 	if (req->body.len) {
 		request_build_body(req);
-		log_test("body ok");
+		log_trace("body ok");
 	}
 
 	req->buffchunk.length = req->bp.len;
@@ -581,7 +581,7 @@ err_type http_request_send(struct _http_request *req)
 
 		max_send = chunk->length - send_total;
 		max_send = max_send > HTTP_BUFFER_CHUNK ? HTTP_BUFFER_CHUNK : max_send;
-		log_test("max_send %d", max_send);
+		log_trace("max_send %d", max_send);
 		
 		ret = awoke_tcp_connect_send(conn, chunk->buff+send_size, max_send, 
 									 &send_size);
@@ -591,7 +591,7 @@ err_type http_request_send(struct _http_request *req)
 		}
 
 		send_total += send_size;
-		log_test("send_size %d send_total %d", send_size, send_total);
+		log_trace("send_size %d send_total %d", send_size, send_total);
 		
 	} while (!http_reqeust_send_finish(req, send_total));
 	
@@ -613,13 +613,13 @@ err_type http_response_recv(struct _http_request *req, struct _http_response *rs
 	do {
 
 		if (!chunk->length) {
-			log_test("first read");
+			log_trace("first read");
 			/* first time receive */
 		
 		} else {
 
 			new_size = chunk->size + HTTP_BUFFER_CHUNK;
-			log_test("new size %d", new_size);
+			log_trace("new size %d", new_size);
 			ret = http_buffchunk_resize(chunk, new_size);
 			if (ret != et_ok) {
 				log_err("buffchunk resize error, ret %d", ret);
@@ -627,11 +627,11 @@ err_type http_response_recv(struct _http_request *req, struct _http_response *rs
 			}
 
 			//chunk->size = new_size;
-			log_test("buffchunk size %d", chunk->size);
+			log_trace("buffchunk size %d", chunk->size);
 		}
 
 		max_read = chunk->size - chunk->length;
-		log_test("max read %d", max_read);
+		log_trace("max read %d", max_read);
 		ret = awoke_tcp_connect_recv(conn, chunk->buff+chunk->length, max_read, 
 									 &read_size, FALSE);
 		if (ret != et_ok) {
@@ -639,7 +639,7 @@ err_type http_response_recv(struct _http_request *req, struct _http_response *rs
 			goto recv_error;
 		}
 
-		log_test("tcp connect read %d", read_size);
+		log_trace("tcp connect read %d", read_size);
 
 		chunk->length += read_size;
 		chunk->buff[chunk->length] = '\0';
@@ -675,7 +675,7 @@ static err_type response_parse_header(struct _http_response *rsp)
 	rsp->firstline.p = head;
 	rsp->firstline.len = tail-head;
 
-	log_test("find startline, head(%d):%.*s", rsp->firstline.len, 
+	log_trace("find startline, head(%d):%.*s", rsp->firstline.len, 
 		rsp->firstline.len, rsp->firstline.p);
 
 	pos = strstr(head, " ");
@@ -685,9 +685,9 @@ static err_type response_parse_header(struct _http_response *rsp)
 	}
 	rsp->protocol_p.p = head;
 	rsp->protocol_p.len = pos-head;
-	log_test("protocol:%.*s", rsp->protocol_p.len, rsp->protocol_p.p);
+	log_trace("protocol:%.*s", rsp->protocol_p.len, rsp->protocol_p.p);
 	rsp->protocol = get_protocol(rsp->protocol_p);
-	log_test("protocol:%d", rsp->protocol);
+	log_trace("protocol:%d", rsp->protocol);
 		
 	head = pos + 1;
 	pos = strstr(head, " ");
@@ -697,9 +697,9 @@ static err_type response_parse_header(struct _http_response *rsp)
 	}
 	rsp->statuscode_p.p = head;
 	rsp->statuscode_p.len = tail-head;
-	log_test("statuscode:%.*s", rsp->statuscode_p.len, rsp->statuscode_p.p);
+	log_trace("statuscode:%.*s", rsp->statuscode_p.len, rsp->statuscode_p.p);
 	sscanf(head, "%d %*s", &rsp->status);
-	log_test("status:%d", rsp->status);
+	log_trace("status:%d", rsp->status);
 
 	head = tail + 2;
 	tail = strstr(head, "\r\n\r\n");
@@ -769,7 +769,7 @@ void http_response_init(struct _http_response *rsp)
 void http_response_clean(struct _http_response *rsp)
 {
 	if (http_buffchunk_dynamic(&rsp->buffchunk)) {
-		log_test("buffchunk dynamic");
+		log_trace("buffchunk dynamic");
 		mem_free(rsp->buffchunk.buff);
 	}
 }
@@ -778,7 +778,7 @@ bool http_response_recv_finish(struct _http_response *rsp)
 {
 	http_response_preparse(rsp);
 
-	log_test("bodylen:%d", rsp->body.len);
+	log_trace("bodylen:%d", rsp->body.len);
 
 	if (rsp->body.len == rsp->content_length) 
 		return TRUE;
@@ -801,7 +801,7 @@ void http_response_dump(struct _http_response *rsp)
 				h->val.len, h->val.p);
 		}
 	}
-	log_test("HTTP Text:\n%.*s", rsp->buffchunk.length, rsp->buffchunk.buff);
+	log_trace("HTTP Text:\n%.*s", rsp->buffchunk.length, rsp->buffchunk.buff);
 	log_info("--------------------------------");
 }
 
@@ -888,13 +888,13 @@ void http_connect_dump(struct _http_connect *c)
 {
 	struct _awoke_tcp_connect *tcp_conn = &c->_conn;
 	
-	log_test(">>> connect dump:");
-	log_test("------------------------");
-	log_test("address:%s", inet_ntoa(tcp_conn->addr.sin_addr));
-	log_test("port:%d", htons(tcp_conn->addr.sin_port));
-	log_test("socket:%d", tcp_conn->sock);
-	log_test("status:0x%x", tcp_conn->status);
-	log_test("------------------------");
+	log_trace(">>> connect dump:");
+	log_trace("------------------------");
+	log_trace("address:%s", inet_ntoa(tcp_conn->addr.sin_addr));
+	log_trace("port:%d", htons(tcp_conn->addr.sin_port));
+	log_trace("socket:%d", tcp_conn->sock);
+	log_trace("status:0x%x", tcp_conn->status);
+	log_trace("------------------------");
 }
 
 void http_connect_release(struct _http_connect *c)
@@ -971,7 +971,7 @@ err_type http_request(const char *uri, const char *method, const char *protocol,
 	}
 
 connected:
-	log_test("connected");
+	log_trace("connected");
 	request.uri = request.conn.uri;
 	request.extend_headers = headers;
 	request.method = mem_mk_ptr(method);
@@ -992,7 +992,7 @@ connected:
 		goto release;
 	}
 
-	log_test("http_request_package ok");
+	log_trace("http_request_package ok");
 
 	ret = http_request_send(&request);
 	if (ret != et_ok) {
@@ -1000,7 +1000,7 @@ connected:
 		goto release;
 	}
 
-	log_test("request send ok");
+	log_trace("request send ok");
 
 	http_response_init(&response);
 	ret = http_response_recv(&request, &response);
@@ -1009,12 +1009,12 @@ connected:
 		goto release;
 	}
 
-	log_test("response receive ok");
+	log_trace("response receive ok");
 
 	http_response_dump(&response);
 	
 	if (rsp) {
-		log_test("response need copy");
+		log_trace("response need copy");
 		response_copy(rsp, &response);
 	}
 
@@ -1024,9 +1024,9 @@ connected:
 	
 release:
 	http_request_clean(&request);
-	log_test("http_request_clean ok");
+	log_trace("http_request_clean ok");
 	if (!rsp) {
-		log_test("!rsp");
+		log_trace("!rsp");
 		http_response_clean(&response);
 	}
 	return ret;

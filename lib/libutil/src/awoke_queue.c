@@ -4,6 +4,17 @@
 #include "awoke_queue.h"
 #include "awoke_log.h"
 
+
+
+static void awoke_dumpinfo_set(struct _awoke_queue_dumpinfo *di, int width,
+    void (*value_dump)(struct _awoke_minpq *, int, char *, int),
+    void (*prior_dump)(struct _awoke_minpq *, int, char *, int))
+{
+    di->width = width;
+    di->value_dump = value_dump;
+    di->priro_dump = prior_dump;
+}
+
 bool awoke_queue_empty(awoke_queue *q)
 {
 	return ((q->curr+1) == 0);
@@ -263,7 +274,6 @@ bool awoke_minpq_empty(struct _awoke_minpq *q)
 
 err_type awoke_minpq_resize(struct _awoke_minpq *q, int capcaity)
 {
-    int i;
     char *new;
     
     if (capcaity <= q->node_nr) {
@@ -428,7 +438,6 @@ awoke_minpq *awoke_minpq_create(size_t nodesize, int capacity,
 
     q->node_nr = 0;
     q->nodesize = nodesize;
-    q->info_width = 4;
 
     q->capacity = capacity;
     if (capacity == 0) {
@@ -454,21 +463,19 @@ awoke_minpq *awoke_minpq_create(size_t nodesize, int capacity,
     return q;
 }
 
-void awoke_minpq_info_set_handle(struct _awoke_minpq *q, int width,
-    void (*info_prior_handle)(struct _awoke_minpq *, int, char *, int),
-    void (*info_value_handle)(struct _awoke_minpq *, int, char *, int))
+void awoke_minpq_dumpinfo_set(struct _awoke_minpq *q, int width,
+    void (*value_dump)(void *, int, char *, int),
+    void (*prior_dump)(void *, int, char *, int))
 {
-    q->info_width = width;
-    q->info_prior_handle = info_prior_handle;
-    q->info_value_handle = info_value_handle;
+	awoke_dumpinfo_set(&q->dumpinfo, width, value_dump, prior_dump);
 }
 
-static void minpq_build_infodump_line(char *buff, int len, int line_nr)
+static void dumpinfo_build_comment_line(char *buff, int size, int length)
 {
     int i;
-    build_ptr bp = build_ptr_init(buff, len);
+    build_ptr bp = build_ptr_init(buff, size);
 
-    for (i=0; i<line_nr; i++) {
+    for (i=0; i<length; i++) {
         build_ptr_string(bp, "-");
     }
 }
@@ -476,67 +483,68 @@ static void minpq_build_infodump_line(char *buff, int len, int line_nr)
 void awoke_minpq_info_dump(struct _awoke_minpq *q)
 {
     int i;
-    int line_nr;
+    int comment_length;
     char buff[256] = {'\0'};
+	struct _awoke_queue_dumpinfo *di = &q->dumpinfo;
 
     build_ptr bp = build_ptr_init(buff, 256);
 
     /* calculate line number */
-    line_nr = (q->capacity+1)*q->info_width + 6;
+    comment_length = (q->capacity+1)*di->width + 6;
 
     /* dump header */
-    log_debug("");
-    log_debug("-- MinPQ dump --");
-    log_debug("capacity:%d", q->capacity);
-    log_debug("size:%d", q->node_nr);
-    log_debug("flag:0x%x", q->flags);
+    log_trace("");
+    log_trace("-- MinPQ dump --");
+    log_trace("capacity:%d", q->capacity);
+    log_trace("size:%d", q->node_nr);
+    log_trace("flag:0x%x", q->flags);
 
     /* dump line */
-    minpq_build_infodump_line(buff, 256, line_nr);
-    log_debug("%s", buff);
+    dumpinfo_build_comment_line(buff, 256, comment_length);
+    log_trace("%s", buff);
     memset(buff, 0x0, 256);
 
     /* dump index */
     build_ptr_string(bp, "index:");
     for (i=0; i<(q->capacity+1); i++) {
-        build_ptr_format(bp, "%*d", q->info_width, i);
+        build_ptr_format(bp, "%*d", di->width, i);
     }
-    log_debug("%.*s", bp.len, bp.head);
+    log_trace("%.*s", bp.len, bp.head);
     memset(buff, 0x0, 256);
 
     /* dump line */
-    minpq_build_infodump_line(buff, 256, line_nr);
-    log_debug("%s", buff);
+    dumpinfo_build_comment_line(buff, 256, comment_length);
+    log_trace("%s", buff);
     memset(buff, 0x0, 256);
 
     /* dump priority */
     if (mask_exst(q->flags, AWOKE_MINPQ_F_CDC) && 
-        (q->info_prior_handle)) {
-        q->info_prior_handle(q, q->info_width, buff, 256);
-        log_debug("%s", buff);
+        (di->priro_dump)) {
+        di->priro_dump(q, di->width, buff, 256);
+        log_trace("%s", buff);
     } else {
         bp = build_ptr_make(buff, 256);
         build_ptr_string(bp, "prior:");
         for (i=0; i<(q->node_nr+1); i++) {
             build_ptr_format(bp, "%3d", q->p[i]);
-            log_debug("%.*s", bp.len, bp.head);
+            log_trace("%.*s", bp.len, bp.head);
         }
     }
     memset(buff, 0x0, 256);
     
     /* dump line */
-    minpq_build_infodump_line(buff, 256, line_nr);
-    log_debug("%s", buff);
+    dumpinfo_build_comment_line(buff, 256, comment_length);
+    log_trace("%s", buff);
     memset(buff, 0x0, 256);
 
     /* dump value */
-    if (q->info_value_handle) {
-        q->info_value_handle(q, q->info_width, buff, 256);
-        log_debug("%s", buff);
+    if (di->value_dump) {
+        di->value_dump(q, di->width, buff, 256);
+        log_trace("%s", buff);
         memset(buff, 0x0, 256);
         /* dump line */
-        minpq_build_infodump_line(buff, 256, line_nr);
-        log_debug("%s", buff);
+        dumpinfo_build_comment_line(buff, 256, comment_length);
+        log_trace("%s", buff);
     }
 }
 
@@ -550,5 +558,196 @@ minpq_namespace const MinPQ = {
     .create = awoke_minpq_create,
     .info = awoke_minpq_info_dump,
     .get = awoke_minpq_get,
-    .set_info_handle = awoke_minpq_info_set_handle,
+    .set_info_handle = awoke_minpq_dumpinfo_set,
 };
+
+bool awoke_fifo_empty(struct _awoke_fifo *f)
+{
+	if (!f) {
+		return FALSE;
+	} else if (f->node_nr == 0) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
+bool awoke_fifo_full(struct _awoke_fifo *f)
+{
+	if (!f) {
+		return FALSE;
+	} else if (f->node_nr == f->capacity) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
+err_type awoke_fifo_resize(struct _awoke_fifo *f, unsigned int capacity)
+{
+	return et_ok;
+}
+
+err_type awoke_fifo_size(struct _awoke_fifo *f)
+{
+	return f->node_nr;
+}
+
+err_type awoke_fifo_get(struct _awoke_fifo *f, void *u, int index)
+{
+	char *addr;
+
+	if (!f || !u || index<0) {
+		return et_param;
+	}
+
+	if (awoke_fifo_empty(f)) {
+		log_trace("FIFO empty");
+		return et_empty;
+	}
+
+	addr = f->q + ((f->head + index)%f->capacity)*f->nodesize;
+
+	memcpy(u, addr, f->nodesize);
+	return et_ok;
+}
+
+err_type *awoke_fifo_dequeue(struct _awoke_fifo *f, void *u)
+{
+	char *addr;
+	
+	if (!f || !u) {
+		log_err("FIFO or unit NULL");
+		return et_param;
+	}
+
+	if (awoke_fifo_empty(f)) {
+		log_err("FIFO empty");
+		return et_empty;
+	}
+
+	addr = f->q + f->head*f->nodesize;
+	memcpy(u, addr, f->nodesize);
+	f->head = (f->head + 1) % f->capacity;
+	f->node_nr--;
+	return et_ok;
+}
+
+err_type *awoke_fifo_enqueue(struct _awoke_fifo *f, void *u)
+{
+	char *addr;
+	
+	if (!f || !u) {
+		log_err("FIFO or unit NULL");
+		return et_param;
+	}
+
+	if (awoke_fifo_full(f)) {
+		if (mask_exst(f->flags, AWOKE_FIFO_F_RBK)) {
+			char *_free = mem_alloc_z(f->nodesize);
+			awoke_fifo_dequeue(f, _free);
+			mem_free(_free);
+		} else if (mask_exst(f->flags, AWOKE_FIFO_F_RES)) {
+			awoke_fifo_resize(f, f->capacity*2);
+		} else {
+			log_err("FIFO full");
+			return et_full;
+		}
+	}
+
+	f->tail = (f->tail + 1) % f->capacity;
+	addr = f->q + f->tail*f->nodesize;
+	memcpy(addr, u, f->nodesize);
+	f->node_nr++;
+	return et_ok;
+}
+
+awoke_fifo *awoke_fifo_create(size_t nodesize, int capacity, uint16_t flags)
+{
+	int allocnr = 0;
+	
+    if (nodesize <= 0) {log_err("nodesize zero");return NULL;}
+    if (capacity < 0) {log_err("capacity invaild");return NULL;}
+
+	awoke_fifo *f = mem_alloc_z(sizeof(awoke_fifo));
+	if (!f) {log_err("FIFO create error");return NULL;}
+
+	f->head = 0;
+	f->tail = -1;
+    f->node_nr = 0;
+    f->nodesize = nodesize;
+
+	f->capacity = capacity;
+    if (capacity == 0) {
+        mask_push(f->flags, AWOKE_MINPQ_F_RES);
+    }
+
+	mask_push(f->flags, flags);
+
+    if (!capacity) {
+        allocnr = 1;
+    } else {
+        allocnr = capacity;
+    }
+
+	f->q = mem_alloc_z(allocnr*f->nodesize);
+
+	return f;
+}
+
+void awoke_fifo_dumpinfo_set(struct _awoke_fifo *f, int width,
+    void (*value_dump)(void *, int, char *, int),
+    void (*prior_dump)(void *, int, char *, int))
+{
+	awoke_dumpinfo_set(&f->dumpinfo, width, value_dump, prior_dump);
+}
+
+void awoke_fifo_dump(struct _awoke_fifo *f)
+{
+    int i;
+    int comment_length;
+    char buff[256] = {'\0'};
+	struct _awoke_queue_dumpinfo *di = &f->dumpinfo;
+
+    build_ptr bp = build_ptr_init(buff, 256);
+
+    /* calculate comment line */
+    comment_length = (f->capacity+1)*di->width + 6;
+
+    /* dump header */
+    log_trace("");
+    log_trace("-- FIFO dump --");
+    log_trace("capacity:%d", f->capacity);
+    log_trace("size:%d", f->node_nr);
+    log_trace("flag:0x%x", f->flags);
+	log_trace("head:%d", f->head);
+	log_trace("tail:%d", f->tail);
+
+    /* dump line */
+    dumpinfo_build_comment_line(buff, 256, comment_length);
+    log_trace("%s", buff);
+    memset(buff, 0x0, 256);
+
+    /* dump index */
+    build_ptr_string(bp, "index:");
+    for (i=0; i<f->capacity; i++) {
+        build_ptr_format(bp, "%*d", di->width, i);
+    }
+    log_trace("%.*s", bp.len, bp.head);
+    memset(buff, 0x0, 256);
+
+    /* dump line */
+    dumpinfo_build_comment_line(buff, 256, comment_length);
+    log_trace("%s", buff);
+    memset(buff, 0x0, 256);
+
+	/* dump value */
+    if (di->value_dump) {
+        di->value_dump(f, di->width, buff, 256);
+        log_trace("%s", buff);
+        memset(buff, 0x0, 256);
+        /* dump line */
+        dumpinfo_build_comment_line(buff, 256, comment_length);
+        log_trace("%s", buff);
+    }
+}

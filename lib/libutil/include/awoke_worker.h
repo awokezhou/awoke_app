@@ -114,7 +114,7 @@ void awoke_worker_destroy(awoke_worker *wk);
 bool awoke_worker_should_stop(awoke_worker *wk);
 void awoke_worker_should_suspend(awoke_worker *wk);
 awoke_worker *awoke_worker_create(char *name, uint32_t tick, 
-		uint16_t features, err_type (*handler)(struct _awoke_worker *), void *data);
+		uint16_t features, err_type (*handler)(void *ctx), void *data);
 
 void awoke_tmwkr_stop(awoke_tmwkr *twk);
 void awoke_tmwkr_start(awoke_tmwkr *twk);

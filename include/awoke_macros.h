@@ -26,10 +26,13 @@
 #define awoke_get_pagesize() 		sysconf(_SC_PAGESIZE)
 
 
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define awoke_offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+
+#ifndef container_of
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+	(type *)( (char *)__mptr - awoke_offsetof(type,member) );})
+#endif 
 
 #define array_size(array) (sizeof(array)/sizeof(array[0]))
 
@@ -78,6 +81,19 @@
 			 __i < size;							\
 			 __i++, 								\
 				p = &head[__i]) 					\
+
+#define array_foreach_start(head, size, p) 		\
+{												\
+	int __i;									\
+	p = &head[0];								\
+	for (__i = 0;								\
+		__i < size;								\
+		__i++, 									\
+		p = &head[__i]) 						\
+
+#define array_foreach_end() \
+}
+
 
 #define print_ip_format "%d.%d.%d.%d"
 #define print_ip(addr)	\
