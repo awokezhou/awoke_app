@@ -108,7 +108,7 @@ err_type awoke_tcp_connect_create(awoke_tcp_connect *c, const char *addr, uint16
 	c->addr.sin_port = htons(port);
 	c->addr.sin_addr.s_addr = inet_addr(addr);
 
-	log_test("port:%d", port);
+	log_trace("port:%d", port);
 
 	tcp_connect_status_set(c, tcp_init);
 

@@ -425,6 +425,38 @@ err_type awoke_minpq_delmin(struct _awoke_minpq *q, void *u, int *p)
     return et_ok;
 }
 
+err_type awoke_minpq_init(struct _awoke_minpq *q, size_t nodesize, int capacity, 
+    bool(*comparator)(void *, void *), uint16_t flags)
+{
+	int allocnr;
+	
+	q->node_nr = 0;
+    q->nodesize = nodesize;
+
+    q->capacity = capacity;
+    if (capacity == 0) {
+        mask_push(q->flags, AWOKE_MINPQ_F_RES);
+    }
+
+    if (comparator != NULL) {
+        q->comparator = comparator;
+        mask_push(q->flags, AWOKE_MINPQ_F_CDC);
+    }
+    
+    mask_push(q->flags, flags);
+
+    if (!capacity) {
+        allocnr = 1;
+    } else {
+        allocnr = capacity + 1;
+    }
+
+    q->p = mem_alloc_z(allocnr*sizeof(int));
+    q->q = mem_alloc_z(allocnr*q->nodesize);
+
+	return et_ok;
+}
+
 awoke_minpq *awoke_minpq_create(size_t nodesize, int capacity, 
     bool(*comparator)(void *, void *), uint16_t flags)
 {
@@ -458,7 +490,7 @@ awoke_minpq *awoke_minpq_create(size_t nodesize, int capacity,
     }
 
     q->p = mem_alloc_z(allocnr*sizeof(int));
-    q->q = mem_alloc_z(allocnr*q->node_nr);
+    q->q = mem_alloc_z(allocnr*q->nodesize);
 
     return q;
 }

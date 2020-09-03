@@ -74,7 +74,6 @@ void awoke_event_del(awoke_event_loop *loop, awoke_event *event)
     }
 
     fd = event->fd;
-
     if (event->mask & EVENT_READ) {
         FD_CLR(event->fd, &ctx->rfds);
     }
@@ -99,7 +98,6 @@ void awoke_event_del(awoke_event_loop *loop, awoke_event *event)
     }
 
     ctx->events[fd] = NULL;
-
     /* Reset the status and mask */
     AWOKE_EVENT_NEW(event);
         

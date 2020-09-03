@@ -107,6 +107,7 @@ static inline void AWOKE_EVENT_NEW(awoke_event *e)
 awoke_event_loop *awoke_event_loop_create(int size);
 err_type awoke_event_add(awoke_event_loop *loop, int fd,
                  int type, uint32_t mask, void *data);
+void awoke_event_del(awoke_event_loop *loop, awoke_event *event);
 int awoke_event_wait(awoke_event_loop *loop, uint32_t tm);
 err_type awoke_event_channel_create(awoke_event_loop *loop, 
 									 int *r_fd, int *w_fd, void *data);

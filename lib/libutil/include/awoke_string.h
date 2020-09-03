@@ -55,6 +55,7 @@ static inline int __build_ptr(build_ptr *ptr, const char *fmt, ...)
 char *awoke_string_dup(const char *s);
 int awoke_string_str2bcd(uint8_t *bin_data, const char *str_data, uint16_t bin_len);
 int awoke_string_bcd2str(char *out, const uint8_t *in, uint16_t b_len);
+int awoke_string_str2bcdv2(uint8_t *bin_data, const char *str_data, uint16_t bin_len);
 
 
 #endif /* __AWOKE_STRING_H__ */

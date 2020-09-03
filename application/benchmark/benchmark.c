@@ -1107,6 +1107,143 @@ static err_type benchmark_fifo_test(int argc, char *argv[])
 	awoke_fifo_dump(fifo);
 }
 
+static err_type benchmark_md5_test(int argc, char *argv[])
+{
+	char *p;
+	char buf[1024];
+	char md5in[32];
+	char md5out[16];
+	char imeihex[8];
+	char imeibcd[16];
+	char *imeistr = "0123456789012347";
+	char *slatstr = "secret";
+	uint8_t version = 0;
+	uint8_t slat_byte[8] = {0x0};
+	uint8_t imei_byte[8] = {0x0};
+	uint8_t *pos = buf;
+	uint8_t *plast = (uint8_t *)slatstr;
+
+	awoke_string_str2bcd(imei_byte, imeistr, strlen(imeistr));
+	awoke_string_bcd2str(imeibcd, imei_byte, 8);
+	log_trace("imei:%s", imeistr);
+	awoke_hexdump_trace(imei_byte, 8);
+	log_trace("imeibcd:%s", imeibcd);
+	
+	memcpy(slat_byte, plast, 6);
+
+	p = md5in;
+	memcpy(p, imei_byte, 8);
+	p += 8;
+	memcpy(p, slat_byte, 8);
+
+	//log_debug("MD5in:");
+	//awoke_hexdump_trace(md5in, 16);
+	md5(md5in, 16, md5out);
+
+	pkg_push_byte(version, pos);
+	pkg_push_bytes(imei_byte, pos, 8);
+	pkg_push_bytes(md5out, pos, 16);
+
+	log_trace("version:%d", version);
+	log_trace("imei:%s", imeistr);
+	log_trace("slat:%s", slatstr);
+	log_debug("MD5:");
+	awoke_hexdump_trace(md5out, 16);
+	log_debug("LoginRequest:");
+	awoke_hexdump_trace(buf, 25);
+
+	return et_ok;
+}
+
+static err_type benchmark_socket_poll_test(int argc, char *argv[])
+{
+	int fd_server, fd_client;
+	struct sockaddr_in servaddr, clientaddr;
+	
+	fd_server = socket(PF_INET, SOCK_STREAM, 0);
+	log_debug("serverfd:%d", fd_server);
+	memset(&servaddr, 0, sizeof(servaddr));
+	servaddr.sin_family = PF_INET;
+	servaddr.sin_port = htons(8008);
+	inet_pton(PF_INET, "0.0.0.0", &servaddr.sin_addr);
+
+	bind(fd_server, (struct sockaddr*)&servaddr, sizeof(servaddr));
+	log_debug("bind");
+	listen(fd_server, 5);
+	log_debug("listen");
+
+	fd_client = socket(PF_INET, SOCK_STREAM, 0);
+	log_debug("clientfd:%d", fd_client);
+	connect(fd_client, (struct sockaddr*)&servaddr, sizeof(servaddr));
+	
+
+	/*
+	struct pollfd fds[2];
+
+	fds[0].fd = fd_server;
+	fds[0].events = POLLIN;
+	fds[0].revents = 0;
+
+	fds[1].fd = fd_client;
+	fds[1].events = POLLIN | POLLOUT;
+	fds[1].revents = 0;
+
+	int ret = poll(fds, 2, 1000);
+	log_debug("ret:%d", ret);
+	log_debug("fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
+	log_debug("fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
+
+	fds[0].events |= POLLOUT;
+
+	ret = poll(fds, 2, 1000);
+	log_debug("fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
+	log_debug("fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
+	*/
+
+	fd_set readfds, writefds, errfds;
+	int max_fd = 0;
+	FD_ZERO(&readfds);
+	FD_ZERO(&writefds);
+	FD_ZERO(&errfds);
+
+	FD_SET(fd_server, &readfds);
+	FD_SET(fd_client, &readfds);
+
+	select(max_fd + 1, &readfds, &writefds, &errfds, 1000);
+	if (FD_ISSET(fd_server, &readfds)) {
+		log_debug("server read");
+	}
+	if (FD_ISSET(fd_client, &readfds)) {
+		log_debug("client read");
+	}
+
+	if (FD_ISSET(fd_server, &writefds)) {
+		log_debug("server write");
+	}
+	if (FD_ISSET(fd_client, &writefds)) {
+		log_debug("client write");
+	}
+
+	FD_SET(fd_server, &writefds);
+	select(max_fd + 1, &readfds, &writefds, &errfds, 1000);
+	if (FD_ISSET(fd_server, &readfds)) {
+		log_debug("server read");
+	}
+	if (FD_ISSET(fd_client, &readfds)) {
+		log_debug("client read");
+	}
+
+	if (FD_ISSET(fd_server, &writefds)) {
+		log_debug("server write");
+	}
+	if (FD_ISSET(fd_client, &writefds)) {
+		log_debug("client write");
+	}
+
+	close(fd_client);
+	close(fd_server);
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -1137,6 +1274,8 @@ int main(int argc, char *argv[])
         {"queue-test",          no_argument,        NULL,   arg_queue_test},
         {"minpq-test",          no_argument,        NULL,   arg_minpq_test},
 		{"fifo-test",  			no_argument, 		NULL,   arg_fifo_test},
+		{"md5-test",			no_argument, 		NULL,	arg_md5_test},
+		{"socket-poll-test",	no_argument,		NULL,	arg_socket_poll_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1225,6 +1364,14 @@ int main(int argc, char *argv[])
 
 			case arg_fifo_test:
 				bmfn = benchmark_fifo_test;
+				break;
+
+			case arg_md5_test:
+				bmfn = benchmark_md5_test;
+				break;
+
+			case arg_socket_poll_test:
+				bmfn = benchmark_socket_poll_test;
 				break;
 
             case '?':

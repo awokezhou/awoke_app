@@ -85,6 +85,12 @@ static inline void mem_free(void *ptr)
     free(ptr);
 }
 
+static inline void mem_free_trace(void *ptr, const char *reason)
+{
+	log_trace("%s", reason);
+	free(ptr);
+}
+
 typedef struct
 {
     const char *p;

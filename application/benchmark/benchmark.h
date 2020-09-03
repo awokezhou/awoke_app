@@ -15,8 +15,10 @@
 #include "awoke_string.h"
 #include "awoke_http.h"
 #include "awoke_buffer.h"
+#include "awoke_package.h"
 #include "vin_parser.h"
 #include "condition_action.h"
+#include <poll.h>
 
 typedef enum {
 	arg_none = 0,
@@ -39,6 +41,8 @@ typedef enum {
     arg_queue_test,
     arg_minpq_test,
     arg_fifo_test,
+    arg_md5_test,
+    arg_socket_poll_test,
 } benchmark_args;
 
 typedef enum {

@@ -85,6 +85,8 @@ err_type awoke_minpq_delmin(struct _awoke_minpq *q, void *u, int *p);
 awoke_minpq *awoke_minpq_create(size_t node_size, int capacity, 
     bool(*comparator)(void *, void *), uint16_t flags);
 err_type awoke_minpq_get(struct _awoke_minpq *q, void *u, int *p, int index);
+err_type awoke_minpq_init(struct _awoke_minpq *q, size_t nodesize, int capacity, 
+    bool(*comparator)(void *, void *), uint16_t flags);
 /*}-- MinPQ -- */
 
 
