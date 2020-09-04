@@ -229,7 +229,7 @@ void awoke_queue_clean(awoke_queue *q)
 	_front = NULL;
 }
 
-void hqnb_queue_free(awoke_queue **q)
+void awoke_queue_free(awoke_queue **q)
 {
 	awoke_queue *p;
 

@@ -67,6 +67,7 @@ void awoke_buffchunk_pool_free(struct _awoke_buffchunk_pool **p_pool);
 void awoke_buffchunk_pool_dump(struct _awoke_buffchunk_pool *pool);
 err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool, 
 	struct _awoke_buffchunk *chunk);
+struct _awoke_buffchunk *awoke_buffchunk_pool_chunkget(struct _awoke_buffchunk_pool *pool);
 struct _awoke_buffchunk *awoke_buffchunk_pool2chunk(struct _awoke_buffchunk_pool *pool);
 /* }-- public interface -- */
 

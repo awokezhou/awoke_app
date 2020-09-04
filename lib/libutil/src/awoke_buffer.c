@@ -18,7 +18,7 @@ uint16_t buffchunk_id(struct _awoke_buffchunk *chunk)
 	int addr1 = (int)&magic;
 	int addr2 = (int)&chunk->id;
 	id = ((addr1>>23)^magic) + ((magic>>5)^addr2);
-	log_debug("id:%d", id);
+	log_trace("id:%d", id);
 	return id;
 
 }
@@ -258,14 +258,14 @@ int awoke_buffchunk_sizelimit()
 
 void awoke_buffchunk_dump(struct _awoke_buffchunk *chunk)
 {
-	log_debug("\n");
-	log_debug(">>> buffchunk dump:");
-	log_debug("------------------------");
-	log_debug("id:%d", chunk->id);
-	log_debug("size:%d", chunk->size);
-	log_debug("length:%d", chunk->length);
-	log_debug("------------------------");
-	log_debug("\n");
+	log_trace("");
+	log_trace(">>> buffchunk dump:");
+	log_trace("------------------------");
+	log_trace("id:%d", chunk->id);
+	log_trace("size:%d", chunk->size);
+	log_trace("length:%d", chunk->length);
+	log_trace("------------------------");
+	log_trace("");
 }
 
 struct _awoke_buffchunk_pool *awoke_buffchunk_pool_create(int maxsize)
@@ -333,19 +333,19 @@ void awoke_buffchunk_pool_dump(struct _awoke_buffchunk_pool *pool)
 {
 	awoke_buffchunk *c;
 	
-	log_debug("\n");
-	log_debug(">>> buffchunk pool dump:");
-	log_debug("------------------------");
-	log_debug("chunk number:%d", pool->chunknr);
-	log_debug("size:%d", pool->size);
-	log_debug("length:%d", pool->length);
+	log_trace("");
+	log_trace(">>> buffchunk pool dump:");
+	log_trace("------------------------");
+	log_trace("chunk number:%d", pool->chunknr);
+	log_trace("size:%d", pool->size);
+	log_trace("length:%d", pool->length);
 
 	list_for_each_entry(c, &pool->chunklist, _head) {
-		log_debug("  chunk[%d] length:%d size:%d", c->id, c->length, c->size);
+		log_trace("  chunk[%d] length:%d size:%d", c->id, c->length, c->size);
 	}
 	
-	log_debug("------------------------");
-	log_debug("\n");	
+	log_trace("------------------------");
+	log_trace("");	
 }
 
 err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool, 
@@ -365,7 +365,7 @@ err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool,
 
 	list_for_each_entry(c, &pool->chunklist, _head) {
 		if (c->id == chunk->id) {
-			log_debug("chunk[%d] exist", chunk->id);
+			log_trace("chunk[%d] exist", chunk->id);
 			return et_exist;
 		}
 	}
@@ -375,9 +375,25 @@ err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool,
 	pool->size += chunk->size;
 	pool->length += chunk->length;
 
-	log_debug("chunk[%d] add to pool", chunk->id);
+	log_trace("chunk[%d] add to pool", chunk->id);
 	
 	return et_ok;
+}
+
+struct _awoke_buffchunk *awoke_buffchunk_pool_chunkget(struct _awoke_buffchunk_pool *pool)
+{
+	awoke_buffchunk *chunk;
+	
+	if (!pool || !pool->chunknr) {
+		return NULL;
+	}
+
+	chunk = list_entry_first(&pool->chunklist, awoke_buffchunk, _head);
+	if (!chunk) {
+		return NULL;
+	}
+
+	return chunk;
 }
 
 struct _awoke_buffchunk *awoke_buffchunk_pool2chunk(struct _awoke_buffchunk_pool *pool)

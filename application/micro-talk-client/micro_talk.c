@@ -1,5 +1,5 @@
 
-#include "micro-talk.h"
+#include "micro_talk.h"
 #include "awoke_log.h"
 #include <netdb.h>
 #include <unistd.h>
@@ -11,32 +11,112 @@
 #include "md5.h"
 
 err_type mtk_handle_write_event(struct _mtk_context *ctx, struct _mtk_connect *conn);
-err_type light_link_read(struct _mtk_context *ctx, struct _mtk_connect *conn);
-err_type light_link_write(struct _mtk_context *ctx, struct _mtk_connect *conn);
+err_type light_link_read(struct _mtk_connect *conn);
+err_type light_link_write(struct _mtk_connect *conn);
+err_type short_link_read(struct _mtk_connect *conn);
 
-static mtk_protocol_handle proto_light_link = {
+
+static struct _mtk_protocol_handle proto_light_link = {
 	.name = "LightLink",
 	.handle_read = light_link_read,
 	.handle_write = light_link_write,
 };
 
-err_type light_link_read(struct _mtk_context *ctx, struct _mtk_connect *conn)
+static struct _mtk_protocol_handle proto_short_link = {
+	.name = "ShortLink",
+	.handle_read = short_link_read,
+	.handle_write = light_link_write,
+};
+
+err_type short_link_read(struct _mtk_connect *conn)
 {
+	int n;
+	awoke_buffchunk *chunk;
+	mtk_context *ctx = conn->context;
+	
 	if (conn->event.mask & EVENT_WRITE) {
 		return mtk_handle_write_event(ctx, conn);
 	}
 
-	/* read data */
+	//awoke_buffchunk_pool_dump(&ctx->rx_pool);
 
+	/* read data */
+	chunk = awoke_buffchunk_pool_chunkget(&ctx->rx_pool);
+	if (!chunk) {
+		log_err("rx pool empty");
+		return et_sock_recv;
+	}
+
+	if (!awoke_buffchunk_remain(chunk)) {
+		log_err("some data need to be read");
+		ctx->callback(conn, MTK_CALLBACL_CONNECTION_RECEIVE, 
+			conn->user, chunk->p, chunk->length);
+	} else {
+
+		n = recv(conn->event.fd, chunk->p, chunk->size, 0);
+		if (n < 0) {
+			log_err("receive error:%d", errno);
+			return et_sock_recv;
+		}
+		chunk->length = n;
+		log_trace("receive data length:%d", n);
+		ctx->callback(conn, MTK_CALLBACL_CONNECTION_RECEIVE, 
+			conn->user, chunk->p, chunk->length);
+	}
+
+	if (!conn->f_keepalive) {
+		log_debug("connect[%d] not support keepalive, release it", conn->chntype);
+		mtk_connect_release(&conn);
+	}
+	
 	return et_ok;
 }
 
-err_type light_link_write(struct _mtk_context *ctx, struct _mtk_connect *conn)
+err_type light_link_read(struct _mtk_connect *conn)
+{
+	int n;
+	awoke_buffchunk *chunk;
+	mtk_context *ctx = conn->context;
+	
+	if (conn->event.mask & EVENT_WRITE) {
+		return mtk_handle_write_event(ctx, conn);
+	}
+
+	//awoke_buffchunk_pool_dump(&ctx->rx_pool);
+
+	/* read data */
+	chunk = awoke_buffchunk_pool_chunkget(&ctx->rx_pool);
+	if (!chunk) {
+		log_err("rx pool empty");
+		return et_sock_recv;
+	}
+
+	if (!awoke_buffchunk_remain(chunk)) {
+		log_err("some data need to be read");
+		ctx->callback(conn, MTK_CALLBACL_CONNECTION_RECEIVE, 
+			conn->user, chunk->p, chunk->length);
+	} else {
+
+		n = recv(conn->event.fd, chunk->p, chunk->size, 0);
+		if (n < 0) {
+			log_err("receive error:%d", errno);
+			return et_sock_recv;
+		}
+		chunk->length = n;
+		log_trace("receive data length:%d", n);
+		ctx->callback(conn, MTK_CALLBACL_CONNECTION_RECEIVE, 
+			conn->user, chunk->p, chunk->length);
+	}
+	
+	return et_ok;
+}
+
+err_type light_link_write(struct _mtk_connect *conn)
 {
 	return et_ok;
 }
 
-uint64_t mtk_now_usec()
+uint64_t mtk_now_usec(void)
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -48,6 +128,8 @@ void mtk_context_release(struct _mtk_context *ctx)
 	if (ctx->evloop) {
 		awoke_event_loop_clean(&ctx->evloop);
 	}
+
+	awoke_buffchunk_pool_clean(&ctx->rx_pool);
 	
 	mem_free_trace(ctx, "mtk context");
 }
@@ -62,9 +144,11 @@ static bool work_us_comparator(void *d1, void *d2)
 void mtk_event_change_mask(struct _awoke_event_loop *evl, struct _awoke_event *e, 
 	uint32_t and, uint32_t or, void *data)
 {
+	uint32_t prevmask = e->mask;
 	awoke_event_del(evl, e);
-	e->mask = (e->mask & ~and) | or;
+	e->mask = (prevmask & ~and) | or;
 	awoke_event_add(evl, e->fd, e->type, e->mask, data);
+	log_trace("event[%d] 0x%x->0x%x", e->fd, prevmask, e->mask);
 }
 
 err_type mtk_callback_on_writable(struct _mtk_connect *conn)
@@ -80,10 +164,9 @@ err_type mtk_callback_as_writeable(struct _mtk_connect *conn)
 
 err_type mtk_handle_write_event(struct _mtk_context *ctx, struct _mtk_connect *conn)
 {
-	int n;
 	err_type ret;
 	
-	ret = conn->protocol->handle_write(ctx, conn);
+	ret = conn->protocol->handle_write(conn);
 	if (ret != et_ok) {
 		log_err("protocol handle write error:%d", ret);
 		return ret;
@@ -124,6 +207,20 @@ struct _mtk_context *mtk_context_create(void)
 		goto err;
 	}
 
+	ret = awoke_buffchunk_pool_init(&ctx->rx_pool, 1024*8);
+	if (ret != et_ok) {
+		log_err("rx pool create error:%d", ret);
+		goto err;
+	}
+
+	awoke_buffchunk *chunk = awoke_buffchunk_create(4096);
+	if (!chunk) {
+		log_err("buff chunk create error");
+		goto err;
+	}
+	awoke_buffchunk_pool_chunkadd(&ctx->rx_pool, chunk);
+	awoke_buffchunk_pool_dump(&ctx->rx_pool);
+	
 	return ctx;
 
 err:
@@ -131,7 +228,7 @@ err:
 	return NULL;
 }
 
-uint64_t mtk_work_service(struct _awoke_minpq *wq, uint64_t nowus)
+uint64_t mtk_service_work(struct _awoke_minpq *wq, uint64_t nowus)
 {
 	if (!wq || awoke_minpq_empty(wq))
 		return 0;
@@ -162,13 +259,18 @@ err_type mtk_service_connect(struct _mtk_context *ctx, struct _mtk_connect *conn
 {
 	err_type ret;
 
-	ret = conn->protocol->handle_read(ctx, conn);
+	ret = conn->protocol->handle_read(conn);
 	if (ret != et_ok) {
 		log_err("read error:%d");
 		return ret;
 	}
 
 	return ret;
+}
+
+static bool mtk_service_adjust_timeout(struct _mtk_context *ctx)
+{
+	return TRUE;
 }
 
 err_type mtk_service_run(struct _mtk_context *ctx, uint32_t timeout_ms)
@@ -178,26 +280,49 @@ err_type mtk_service_run(struct _mtk_context *ctx, uint32_t timeout_ms)
 	awoke_event *event;
 	awoke_event_loop *evloop = ctx->evloop;
 	uint64_t us, timeout_us;
-	
-	log_burst("service run");
-	
-	timeout_us = timeout_ms * 1000;
-	
-	us = mtk_work_service(&ctx->works_pq, mtk_now_usec());
 
 
-	awoke_event_wait(evloop, 1000);
+	/* if timeout not set, give a default timeout with 2 second */
+	if (timeout_ms <= 0)
+		timeout_ms = 2 * MTK_MS_PER_SEC;
+	
+	timeout_us = timeout_ms * MTK_US_PER_MS;
+
+	/* schedule works in workqueue */
+	us = mtk_service_work(&ctx->works_pq, mtk_now_usec());
+	if (us && (us<timeout_us)) {
+		timeout_us = us;
+		log_burst("update timeout:%d(us)", timeout_us);
+	}
+
+	/* is there pending things that needs service forcing? */
+	if (!mtk_service_adjust_timeout(ctx)) {
+		log_trace("adjust timeout");
+		timeout_us = 0;
+	}
+
+
+	/* 
+	 * IO multiplexing event loop
+	 */
+	awoke_event_wait(evloop, timeout_us/MTK_US_PER_MS);
+	
 	awoke_event_foreach(event, evloop) {
 
-        if (event->type & EVENT_IDLE) {
+        if (event->type & EVENT_IDLE)
             continue;
-        }
+
+		log_trace("event[%d] 0x%x 0x%x", event->fd, event->type, event->mask);
 			
 		if (event->type == EVENT_CONNECTION) {
-			log_debug("event[%d]", event->fd);
+			
 			conn = (mtk_connect *)event;
-			log_debug("conn->fd:%d", conn->fd);
+			
 			ret = mtk_service_connect(ctx, conn);
+			if (ret != et_ok) {
+				log_err("event[%d] service error:%d", ret);
+				return ret;
+			}
 		}
 	}
 
@@ -240,9 +365,8 @@ int build_login_request_pkt(uint8_t *buf, uint8_t version, char *imei_stri, char
 	pkg_push_bytes(md5out, pos, 16);
 
 	len = pos - buf;
-	log_info("imei:%s", imei_stri);
-	log_info("salt:%s", slat_stri);
-	awoke_hexdump_trace(buf, len);
+	log_trace("imei:%s", imei_stri);
+	log_trace("salt:%s", slat_stri);
 
 	return len;
 }
@@ -272,13 +396,16 @@ err_type mtk_nc_login(struct _mtk_context *ctx, struct _mtk_connect *conn,
 	uint8_t buf[1024], ret;
 	uint32_t raddr = 0;
 	uint16_t rport = 0;
+
+	log_info("login start");
 	
 	len = build_login_request_pkt(buf, 0,
 		"0123456789012347", 
 		"$%&^4tt2123232@!21@WEEDQ#wewrw3r1eg5$%$%");
-	
-	log_debug("packet len:%d", len);
-	
+
+	log_trace("login request(%d):", len);
+	awoke_hexdump_trace(buf, len);
+		
 	n = send(conn->fd, buf, len, 0);
 	if (n < 0) {
 		log_err("send error");
@@ -288,14 +415,13 @@ err_type mtk_nc_login(struct _mtk_context *ctx, struct _mtk_connect *conn,
 
 	memset(buf, 0x0, 1024);
 	n = read(conn->fd, buf, 1024);
-	log_trace("read:%d", n);
 	if (n < 0) {
 		log_err("read error:%d", errno);
 		close(conn->fd);
 		return et_sock_recv;
 	}
 
-	log_trace("recvdata:");
+	log_trace("login response(%d):", n);
 	awoke_hexdump_trace(buf, n);
 
 	switch (buf[0]) {
@@ -378,23 +504,41 @@ err_type mtk_tcp_connect(struct _mtk_connect *conn,
 	return et_ok;
 }
 
+bool mtk_connect_keepalive(struct _mtk_connect *c)
+{
+	if ((c->ka_timeout_us > 0) || (c->f_keepalive == 1))
+		return TRUE;
+	else
+		return FALSE;
+}
+
 void mtk_connect_release(struct _mtk_connect **c)
 {
 	mtk_connect *p;
+	mtk_context *ctx;
 	
 	if (!*c || !c)
 		return;
 
 	p = *c;
+	ctx = p->context;
 
+	ctx->callback(p, MTK_CALLBACK_CONNECTION_CLOSED, p->user, NULL, 0);
+
+	awoke_event_del(ctx->evloop, &p->event);
+	log_trace("event[%d] remove", p->event.fd);
+	
 	if (p->fd > 0) {
 		close(p->fd);
+		log_trace("fd[%d] close", p->event.fd);
 	}
 
 	if (p->ring) {
 		awoke_queue_free(&p->ring);
 	}
-}
+
+	log_info("connect[%d] release\n", p->chntype);
+ }
 
 err_type mtk_connect_write(struct _mtk_connect *conn, uint8_t *buf, size_t len)
 {
@@ -416,24 +560,43 @@ err_type mtk_client_connect_via_info(struct _mtk_client_connect_info *i)
 	mtk_context *ctx = i->context;
 	mtk_connect *conn = &ctx->connects[i->channel];
 
-	log_debug("channel:%d", i->channel);
 	conn->chntype = i->channel;
+	
+	conn->ka_timeout_us = i->ka_timeout_us;
+	if (conn->ka_timeout_us) 
+		conn->f_keepalive = 1;
 	
 	if (i->channel == MTK_CHANNEL_DATA) {
 		sprintf(chinfo, "DATA");
+		conn->protocol = &proto_short_link;
 	} else {
 		sprintf(chinfo, "NOTICE");
 		conn->protocol = &proto_light_link;
 	}
 
-	log_info("%s:%d channel:%s protocol:%s", i->address, i->port, 
-		chinfo, conn->protocol->name);
+	log_info("");
+	log_info("connect[%d] informaion:", i->channel);
+	log_info("------------------------");
+	log_info("address:%s:%d", i->address, i->port);
+	log_info("channel:%s", chinfo);
+	log_info("protocol:%s", conn->protocol->name);
+	if (conn->f_keepalive) {
+		log_info("ka timeout:%d(us)", conn->ka_timeout_us);
+	}
+	log_info("------------------------");
+	log_info("");
+
+	log_debug("connecting...");
+
+	ctx->callback(conn, MTK_CALLBACK_PROTOCOL_INIT, conn->user, NULL, 0);
 
 	ret = mtk_tcp_connect(conn, i);
 	if (ret != et_ok) {
 		log_err("TCP connect error:%d", ret);
 		return ret;
 	}
+
+	log_debug("TCP connected");
 
 	if (i->channel == MTK_CHANNEL_NOTICE) {
 		ret = mtk_nc_login(i->context, conn, i);
@@ -442,6 +605,8 @@ err_type mtk_client_connect_via_info(struct _mtk_client_connect_info *i)
 			goto err;
 		}
 	}
+
+	log_info("connect[%d] established", i->channel);
 
 	conn->event.fd = conn->fd;
 	conn->event.type = EVENT_CONNECTION;
@@ -454,9 +619,9 @@ err_type mtk_client_connect_via_info(struct _mtk_client_connect_info *i)
 		goto err;
 	}
 	log_debug("event[%d] add to evloop", conn->fd);
-	conn->ring = awoke_queue_create(sizeof(mtk_notice_msg), 8, AWOKE_QUEUE_F_RB);
 	conn->context = ctx;
-
+	
+	ctx->callback(conn, MTK_CALLBACK_CONNECTION_ESTABLISHED, conn->user, NULL, 0);
 	return et_ok;
 	
 err:
@@ -468,10 +633,10 @@ err_type mtk_work_schedule(struct _mtk_context *ctx,
 	err_type (*cb)(struct _awoke_minpq *q), uint64_t us)
 {
 	uint64_t usec = us + mtk_now_usec();
-	log_trace("work enqueue");
 	mtk_work work;
 	work.handle = cb;
 	work.us = usec;
+	log_trace("work enqueue");
 	return awoke_minpq_insert(&ctx->works_pq, &work, 0);
 }
 
