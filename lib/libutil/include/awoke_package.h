@@ -73,4 +73,9 @@ typedef struct _pkg_header_example {
 #define pkg_pull_stris(data, p, len)	_pkg_stris_pull(data, p, len)
 
 
+
+uint16_t awoke_checksum_u16(void *data, int len);
+uint16_t awoke_crc16(uint8_t *data, int len);
+
+
 #endif /* __AWOKE_PACKAGE_H__ */

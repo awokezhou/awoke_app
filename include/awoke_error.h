@@ -12,6 +12,8 @@ typedef enum
     et_exist,
     et_full,
     et_empty,
+    et_encode,
+    et_decode,
     et_sock_set,
     et_sock_creat,
     et_sock_bind,

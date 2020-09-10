@@ -23,6 +23,7 @@
 /* Event triggered for file descriptors  */
 #define EVENT_EMPTY             0x0000
 #define EVENT_READ              0x0001
+#define EVENT_ERROR				0x0002
 #define EVENT_WRITE             0x0004
 #define EVENT_SLEEP             0x0008
 #define EVENT_CLOSE             (0x0010 | 0x0008 | 0x2000)
@@ -64,10 +65,12 @@ typedef struct _awoke_event_ctx {
     /* Original set of file descriptors */
     fd_set rfds;
     fd_set wfds;
+	fd_set efds;
 
     /* Populated before every select(2) */
     fd_set _rfds;
     fd_set _wfds;
+	fd_set _efds;
 
     int queue_size;
     awoke_event **events;  /* full array to register all events */

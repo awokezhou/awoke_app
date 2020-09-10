@@ -82,6 +82,11 @@ void awoke_event_del(awoke_event_loop *loop, awoke_event *event)
         FD_CLR(event->fd, &ctx->wfds);
     }
 
+	/*
+    if (event->mask & EVENT_ERROR) {
+        FD_CLR(event->fd, &ctx->efds);
+    }*/
+	
      /* Update max_fd, lookup */
     if (event->fd == ctx->max_fd) {
         for (i = (ctx->max_fd - 1); i > 0; i--) {
@@ -131,6 +136,11 @@ err_type awoke_event_add(awoke_event_loop *loop, int fd,
         FD_SET(fd, &ctx->wfds);
     }
 
+	/*
+    if (mask & EVENT_ERROR) {
+        FD_SET(fd, &ctx->efds);
+    }*/
+	
     event = (awoke_event *) data;
     event->fd   = fd;
     event->type = type;
@@ -156,12 +166,13 @@ int awoke_event_wait(awoke_event_loop *loop, uint32_t tm)
 
     memcpy(&ctx->_rfds, &ctx->rfds, sizeof(fd_set));
     memcpy(&ctx->_wfds, &ctx->wfds, sizeof(fd_set));
+	//memcpy(&ctx->_efds, &ctx->efds, sizeof(fd_set));
 
     memset(&tv, 0x0, sizeof(tv));
     tv.tv_sec = tm/1000;
     tv.tv_usec = tm%1000;
 
-    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, NULL, &tv);
+    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, &ctx->_efds, &tv);
     if (loop->n_events <= 0) {
         return loop->n_events;
     }
@@ -180,9 +191,14 @@ int awoke_event_wait(awoke_event_loop *loop, uint32_t tm)
         }
 
         if (FD_ISSET(i, &ctx->_wfds)) {
-            mask |= EVENT_READ;
+            mask |= EVENT_WRITE;
         }
 
+		/*
+        if (FD_ISSET(i, &ctx->_efds)) {
+            mask |= EVENT_ERROR;
+        }*/
+		
         if (mask) {
             fired = &ctx->fired[f];
             fired->fd   = i;

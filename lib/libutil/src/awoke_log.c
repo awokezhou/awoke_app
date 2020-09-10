@@ -265,7 +265,7 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 		va_end(args);
 		
 #if defined(AWOKE_LOG_COLOR)
-
+#if defined(AWOKE_LOG_TIME)
 	    extern_print("%s[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s] [%s:%d]%s %s%s%s\n",
 	    	_levelmap->header_color,
 			current->tm_year + 1900,
@@ -279,6 +279,16 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
        		func, line, reset_color,
         	_levelmap->body_color, buff, reset_color);
 #else
+		extern_print("%s[%s] [%s] [%s:%d]%s %s%s%s\n",
+			_levelmap->header_color,
+			_modulemap->string,
+			_levelmap->string,
+			func, line, reset_color,
+			_levelmap->body_color, buff, reset_color);
+
+#endif
+#else
+#if defined(AWOKE_LOG_TIME)
 	    extern_print("[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s] [%s:%d] %s\n", 
 	    	current->tm_year + 1900,
 			current->tm_mon + 1,
@@ -289,6 +299,12 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 			_modulemap->string,
 			_levelmap->string,
 			func, line, buff);
+#else
+		extern_print("[%s] [%s] [%s:%d] %s\n", 
+			_modulemap->string,
+			_levelmap->string,
+			func, line, buff);
+#endif
 #endif
 	    
 	    fflush(stdout);
@@ -296,7 +312,7 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 		
 		build_ptr bp = build_ptr_init(buff, 1024);
 
-	
+#if defined(AWOKE_LOG_TIME)
 		build_ptr_format(bp, "[%i/%02i/%02i %02i:%02i:%02i] ", 
 					     current->tm_year + 1900,
 					     current->tm_mon + 1,
@@ -304,7 +320,7 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 					     current->tm_hour,
 					     current->tm_min,
 					     current->tm_sec);
-		
+#endif
 		build_ptr_format(bp, "[%s] [%s:%d] ", _levelmap->string, func, line);
 		
 		va_start(args, format);

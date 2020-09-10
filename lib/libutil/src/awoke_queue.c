@@ -495,6 +495,23 @@ awoke_minpq *awoke_minpq_create(size_t nodesize, int capacity,
     return q;
 }
 
+void awoke_minpq_free(struct _awoke_minpq **q)
+{
+	awoke_minpq *p;
+	
+	if (!q || !*q)
+		return;
+
+	p = *q;
+
+	if (p->p)
+		mem_free(p->p);
+	if (p->q)
+		mem_free(p->q);
+	mem_free(p);
+	p = NULL;
+}
+
 void awoke_minpq_dumpinfo_set(struct _awoke_minpq *q, int width,
     void (*value_dump)(void *, int, char *, int),
     void (*prior_dump)(void *, int, char *, int))

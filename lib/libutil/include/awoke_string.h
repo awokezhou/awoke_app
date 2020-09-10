@@ -56,6 +56,7 @@ char *awoke_string_dup(const char *s);
 int awoke_string_str2bcd(uint8_t *bin_data, const char *str_data, uint16_t bin_len);
 int awoke_string_bcd2str(char *out, const uint8_t *in, uint16_t b_len);
 int awoke_string_str2bcdv2(uint8_t *bin_data, const char *str_data, uint16_t bin_len);
+int awoke_string_from_hex(const uint8_t *hex, char *string, uint16_t hex_len);
 
 
 #endif /* __AWOKE_STRING_H__ */
