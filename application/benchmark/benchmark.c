@@ -882,10 +882,11 @@ void bmms_info_prior_handle(awoke_minpq *q, int width, char *buff, int len)
     int i;
     int p;
     bmms s;
+	char *space = " ";
     
     build_ptr bp = build_ptr_init(buff, len);
 
-    build_ptr_string(bp, "prior:");
+    build_ptr_format(bp, "prior:%*s", width, space);
     for (i=1; i<=MinPQ.size(q); i++) {
         MinPQ.get(q, &s, &p, i);
         build_ptr_format(bp, "%*d", width, s.p);
@@ -897,10 +898,11 @@ void bmms_info_value_handle(awoke_minpq *q, int width, char *buff, int len)
     int i;
     int p;
     bmms s;
-    
+	char *space = " ";
+	
     build_ptr bp = build_ptr_init(buff, len);
 
-    build_ptr_string(bp, "value:");
+    build_ptr_format(bp, "value:%*s", width, space);
     for (i=1; i<=MinPQ.size(q); i++) {
         MinPQ.get(q, &s, &p, i);
         build_ptr_format(bp, "%*d", width, s.data);
@@ -942,35 +944,31 @@ static err_type benchmark_minpq_custom_test(int argc, char *argv[])
     bmms_init(&k, 7, 11);
 
     MinPQ.insert(q, &a, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &b, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &c, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &d, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &e, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &f, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &g, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &h, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &i, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &j, 0);
-    MinPQ.info(q);
+    //MinPQ.info(q);
     MinPQ.insert(q, &k, 0);
     MinPQ.info(q);
 
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", x.p, x.data);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", x.p, x.data);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", x.p, x.data);
-    MinPQ.info(q);
+	awoke_minpq_del(q, &x, &p, 5);
+	log_debug("delmin:%d %d", x.p, x.data);
+	MinPQ.info(q);
 
     MinPQ.delmin(q, &x, &p);
     log_debug("delmin:%d %d", x.p, x.data);
@@ -978,7 +976,13 @@ static err_type benchmark_minpq_custom_test(int argc, char *argv[])
     log_debug("delmin:%d %d", x.p, x.data);
     MinPQ.delmin(q, &x, &p);
     log_debug("delmin:%d %d", x.p, x.data);
-    MinPQ.info(q);
+
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
+    MinPQ.delmin(q, &x, &p);
+    log_debug("delmin:%d %d", x.p, x.data);
 
     MinPQ.delmin(q, &x, &p);
     log_debug("delmin:%d %d", x.p, x.data);

@@ -5,7 +5,7 @@
 
 
 err_type mtk_pkg_request_header(struct _mtk_request_msg *msg, mtk_method_e method, 
-	int dlen, mtk_lbl_e label)
+	int dlen, mtk_lbl_e label, const char *imei)
 {
 	int n, i;
 	uint8_t checksum;
@@ -18,7 +18,7 @@ err_type mtk_pkg_request_header(struct _mtk_request_msg *msg, mtk_method_e metho
 	uint8_t *pos = msg->payload;
 
 	/* IMEI encode BCD8421 */
-	n = awoke_string_str2bcdv2(token, "0123456789012347", 16);
+	n = awoke_string_str2bcdv2(token, imei, 16);
 	if (n < 0) {
 		log_err("imei encode error");
 		return et_encode;

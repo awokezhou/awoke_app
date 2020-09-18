@@ -33,7 +33,7 @@ err_type mtk_session_start(struct _mtk_context *ctx, struct _mtk_work *work)
 	}
 
 	/* new session can schedule now */
-	log_trace("session[%d] sched", ss->id);
+	log_debug("session[%d] sched", ss->id);
 	mtk_connect_session_add(conn, ss);
 	return mtk_work_schedule(ctx, mtk_dc_connect, 1*MTK_US_PER_MS);
 }
@@ -45,6 +45,7 @@ mtk_session *mtk_session_clone(struct _mtk_session *src)
 		log_err("alloc session error");
 		return NULL;
 	}
+	memset(ss, 0x0, sizeof(mtk_session));
 
 	ss->type = MTK_SESSION_DYNAMIC;
 	ss->name = awoke_string_dup(src->name);
@@ -62,6 +63,7 @@ void mtk_session_free(struct _mtk_session *ss)
 
 	if (ss->data) {
 		ss->destory(ss->data);
+		ss->data = NULL;
 	}
 
 	if (ss->name) {
@@ -74,6 +76,7 @@ void mtk_session_free(struct _mtk_session *ss)
 static err_type chunkrecv_request(struct _mtk_connect *c)
 {
 	err_type ret;
+	mtk_context *ctx = c->context;
 	mtk_chunkinfo *ci = c->session->data;
 	mtk_request_msg msg;
 
@@ -92,7 +95,7 @@ static err_type chunkrecv_request(struct _mtk_connect *c)
 	 */
 
 	memset(&msg, 0x0, sizeof(msg));
-	msg.payload = mem_alloc_trace(MTK_REQ_HEADER_LENGTH+6, "Request");
+	msg.payload = mem_alloc_trace(MTK_REQ_HEADER_LENGTH+6, "GET ChunkData Request");
 	if (!msg.payload) {
 		log_err("alloc Request error");
 		return et_nomem;
@@ -110,12 +113,14 @@ static err_type chunkrecv_request(struct _mtk_connect *c)
 
 	/* header */
 	c->last_method = MTK_METHOD_GET;
-	ret = mtk_pkg_request_header(&msg, MTK_METHOD_GET, 6, MTK_LBL_COMMAND);
+	ret = mtk_pkg_request_header(&msg, MTK_METHOD_GET, 6, MTK_LBL_FILE, ctx->imei);
 	if (ret != et_ok) {
 		log_err("header error:%d", ret);
 		mem_free(msg.payload);
-		return ret;
+		goto err;
 	}
+
+	log_debug("GET ChunkData Request(%d)", msg.length);
 
 	log_trace("");
 	log_trace("GET Request(%d)", msg.length);
@@ -126,6 +131,8 @@ static err_type chunkrecv_request(struct _mtk_connect *c)
 	log_trace("----------------");
 	log_trace("");
 
+	log_info("request chunk %d", ci->index);
+
 	awoke_queue_enq(c->ring, &msg);
 
 	mtk_callback_on_writable(c);
@@ -133,6 +140,10 @@ static err_type chunkrecv_request(struct _mtk_connect *c)
 	c->session->state = MTK_SESSION_RSP;
 
 	return et_ok;
+
+err:
+	mtk_connect_session_del(c);
+	return ret;
 }
 
 static err_type chunkrecv_response(struct _mtk_connect *c, struct _mtk_response_msg *m)
@@ -182,6 +193,8 @@ static err_type chunkrecv_response(struct _mtk_connect *c, struct _mtk_response_
 
 	if (!ci->chunk_pq) {
 
+		log_debug("GET ChunkData Response(%d)", m->len);
+
 		log_trace("");
 		log_trace("ChunkData Response(%d):", m->len);
 		log_trace("----------------");
@@ -221,6 +234,7 @@ static err_type chunkrecv_response(struct _mtk_connect *c, struct _mtk_response_
 		goto err;
 	}
 
+	log_info("chunk %d length %d [%d:%d]", ci->index, dlen, chunk->length, chunk->length+dlen-1);
 	ret = awoke_buffchunk_write(chunk, (const char *)pos, dlen, FALSE);
 	if (ret != et_ok) {
 		log_err("chunkdata write error");
@@ -231,25 +245,25 @@ static err_type chunkrecv_response(struct _mtk_connect *c, struct _mtk_response_
 	mem_free(chunk);
 
 	if (!awoke_minpq_full(ci->chunk_pq)) {
-		log_trace("ChunkData recv not finish");
+		log_trace("file %d recv not finish", ci->fileid);
 		ci->index++;
 		ss->state = MTK_SESSION_REQ;
 		return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
 	}
 
-	log_info("ChunkData recv finish");
+	log_info("get file %d finish", ci->fileid);
 	ret = mtk_chunkdata_merge(ci);
 	if (ret != et_ok) {
 		log_err("chunkdata merge error:%d", ret);
 		goto err;
 	}
 
+	log_debug("session[%d] FIN", ss->id);
 	ss->state = MTK_SESSION_FIN;
 
 	return et_ok;
 
 err:
-	mtk_session_free(ss);
 	mtk_connect_session_del(c);
 	return ret;
 }
@@ -257,6 +271,7 @@ err:
 err_type chunksend_request(struct _mtk_connect *c)
 {
 	err_type ret;
+	mtk_context *ctx = c->context;
 	mtk_chunkinfo *ci = c->session->data;
 	mtk_request_msg msg;
 	int header_length = 12;
@@ -281,7 +296,7 @@ err_type chunksend_request(struct _mtk_connect *c)
 	 */
 
 	memset(&msg, 0x0, sizeof(msg));
-	msg.payload = mem_alloc_trace(MTK_REQ_HEADER_LENGTH+header_length+ci->chunksize, "Request");
+	msg.payload = mem_alloc_trace(MTK_REQ_HEADER_LENGTH+header_length+ci->chunksize, "PUT ChunkData Request");
 	if (!msg.payload) {
 		log_err("alloc buffer error");
 		return et_nomem;
@@ -315,19 +330,22 @@ err_type chunksend_request(struct _mtk_connect *c)
 	ret = mtk_chunkdata_copy(ci, pos, start, dlen);
 	if (ret != et_ok) {
 		log_err("copy error:%d", ret);
-		return ret;
+		goto err;
 	}
-	log_info("index:%d [%llu:%llu] size:%d", ci->index, start, 
+	log_info("chunk:%d [%llu:%llu] size:%d", ci->index, start, 
 		start+dlen-1, dlen);
 	
 	/* header */
 	c->last_method = MTK_METHOD_PUT;
-	ret = mtk_pkg_request_header(&msg, MTK_METHOD_PUT, header_length+dlen, MTK_LBL_COMMAND);
+	ret = mtk_pkg_request_header(&msg, MTK_METHOD_PUT, header_length+dlen, 
+		MTK_LBL_FILE, ctx->imei);
 	if (ret != et_ok) {
 		log_err("header error:%d", ret);
 		mem_free(msg.payload);
-		return ret;
+		goto err;
 	}
+
+	log_info("PUT ChunkData Request(%d)", msg.length);
 
 	awoke_queue_enq(c->ring, &msg);
 
@@ -338,6 +356,10 @@ err_type chunksend_request(struct _mtk_connect *c)
 	c->session->state = MTK_SESSION_RSP;
 
 	return et_ok;
+
+err:
+	mtk_connect_session_del(c);
+	return ret;
 }
 
 static err_type chunksend_response(struct _mtk_connect *c, struct _mtk_response_msg *m)
@@ -369,10 +391,10 @@ static err_type chunksend_response(struct _mtk_connect *c, struct _mtk_response_
 
 	log_debug("code:%d fileid:%d", code, fileid);
 
-	if (ci->index == (ci->chunknum-1)) {
-		log_info("session[%d] finish", ss->id);
+	if ((ci->index == (ci->chunknum-1)) && (code != 0x1)) {
+		log_notice("there maybe some error on server");
 		ss->state = MTK_SESSION_FIN;
-		return et_ok; 
+		return et_ok;
 	}
 
 	if (code == 0x3) {
@@ -389,9 +411,104 @@ static err_type chunksend_response(struct _mtk_connect *c, struct _mtk_response_
 		ss->state = MTK_SESSION_REQ;
 		return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
 	} else {
-		log_info("session[%d] finish", ss->id);
+		log_info("send file %s finish", ci->filepath);
+		log_debug("session[%d] FIN", ss->id);
 		ss->state = MTK_SESSION_FIN;
+		c->last_fileid = fileid;
+		log_debug("record last fileid %d");
 	}
+
+	return et_ok;
+}
+
+static err_type getcmd_request(struct _mtk_connect *c)
+{
+	err_type ret;
+	mtk_context *ctx = c->context;
+	mtk_request_msg msg;
+
+	/*
+	 * GET Command Request has no DAT
+	 */
+
+	memset(&msg, 0x0, sizeof(msg));
+	msg.payload = mem_alloc_trace(MTK_REQ_HEADER_LENGTH, "GET Command Request");
+	if (!msg.payload) {
+		log_err("alloc Request error");
+		return et_nomem;
+	}
+
+	/* header */
+	c->last_method = MTK_METHOD_GET;
+	ret = mtk_pkg_request_header(&msg, MTK_METHOD_GET, 0, MTK_LBL_COMMAND, ctx->imei);
+	if (ret != et_ok) {
+		log_err("header error:%d", ret);
+		mem_free(msg.payload);
+		return ret;
+	}
+
+	log_debug("GET Command Request(%d)", msg.length);
+
+	log_trace("");
+	log_trace("GET Command Request(%d)", msg.length);
+	log_trace("----------------");
+	awoke_hexdump_trace(msg.payload, msg.length);
+	log_trace("----------------");
+	log_trace("");
+
+	awoke_queue_enq(c->ring, &msg);
+
+	mtk_callback_on_writable(c);
+
+	c->session->state = MTK_SESSION_RSP;
+
+	return et_ok;	
+}
+
+static err_type getcmd_response(struct _mtk_connect *c, struct _mtk_response_msg *m)
+{
+	uint8_t cmdtype;
+	uint32_t fileid;
+	uint8_t *pos = m->data;
+	char filepath[32] = {'\0'};
+
+	log_debug("record last fileid %d", c->last_fileid);
+	
+	/*  
+	 *  -- GET Command Response Format --
+	 *
+	 *  +--------------------------------+--------+
+	 *  |             fileid             | cmdtype|
+	 *  +--------------------------------+--------+
+	 *  |             4Byte              |  1Byte |
+	 *  +--------------------------------+--------+
+	 */
+
+	
+	log_debug("GET Command Response(%d)", m->len);
+
+	if (!m->len) {
+		log_debug("no command");
+		return et_ok;
+	}
+
+	/* fileid */
+	pkg_pull_dwrd(fileid, pos);
+	fileid = htonl(fileid);
+
+	/* cmdtype */
+	pkg_pull_byte(cmdtype, pos);
+
+	if (fileid && (fileid != c->last_fileid)) {
+		log_trace("fileid:%d, cmdtype:%d", fileid, cmdtype);
+		log_info("file %d need download", fileid);
+		sprintf(filepath, "test-recv-%d.amr", fileid);
+		mtk_voicefile_recv(c->context, filepath, fileid);
+	} else {
+		log_info("no file need to download");
+	}
+	
+	c->session->state = MTK_SESSION_FIN;
 
 	return et_ok;
 }
@@ -416,3 +533,109 @@ mtk_session chunksend = {
 	.state = MTK_SESSION_NONE,
 };
 
+mtk_session getcmd = {
+	.id = 0,
+	.name = "getcmd",
+	.req_process = getcmd_request,
+	.rsp_process = getcmd_response,
+	.type = MTK_SESSION_STATIC,
+	.channel = MTK_CHANNEL_DATA,
+	.state = MTK_SESSION_NONE,
+};
+
+err_type mtk_session_add(struct _mtk_context *ctx, struct _mtk_session *clone, void *data, 
+	void (*destory)(void *))
+{
+	mtk_session *ss;
+	ss = mtk_session_clone(clone);
+	ss->id = mtk_session_id_get(ctx);
+	ss->data = data;
+	ss->state = MTK_SESSION_REQ;
+	ss->destory = destory;
+
+	log_debug("session[%d] create", ss->id);
+
+	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_SEC, ss);
+}
+
+err_type mtk_voicefile_recv(struct _mtk_context *ctx, const char *filepath, uint32_t fileid)
+{
+	mtk_session *ss;
+	mtk_chunkinfo *ci;
+
+	ci = mem_alloc_trace(sizeof(mtk_chunkinfo), "chunkinfo");
+	if (!ci) {
+		log_err("alloc chunkinfo error");
+		return et_nomem;
+	}
+	memset(ci, 0x0, sizeof(mtk_chunkinfo));
+	ci->index = 0;
+	ci->fileid = fileid;
+	if (filepath)
+		ci->filepath = awoke_string_dup(filepath);
+	ci->type = MTK_CHUNKTYPE_FILE;
+
+	ss = mtk_session_clone(&chunkrecv);
+	ss->id = mtk_session_id_get(ctx);
+	ss->data = ci;
+	ss->state = MTK_SESSION_REQ;
+	ss->destory = mtk_chunkinfo_free;
+
+	log_debug("session[%d] create", ss->id);
+	log_debug("recv file %d to %s", fileid, filepath);
+
+	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
+}
+
+err_type mtk_voicebuff_recv(struct _mtk_context *ctx)
+{
+	mtk_session *ss;
+	mtk_chunkinfo *ci;
+
+	ci = mem_alloc_trace(sizeof(mtk_chunkinfo), "chunkinfo");
+	if (!ci) {
+		log_err("alloc chunkinfo error");
+		return et_nomem;
+	}
+	memset(ci, 0x0, sizeof(mtk_chunkinfo));
+	ci->fileid = 1;
+	ci->index = 0;
+	ci->type = MTK_CHUNKTYPE_BUFF;
+
+	ss = mtk_session_clone(&chunkrecv);
+	ss->id = mtk_session_id_get(ctx);
+	ss->data = ci;
+	ss->state = MTK_SESSION_REQ;
+	ss->destory = mtk_chunkinfo_free;
+
+	log_debug("session[%d] create", ss->id);
+
+	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
+}
+
+err_type mtk_voicefile_send(struct _mtk_context *ctx, const char *filepath, int chunksize)
+{
+	err_type ret;
+	mtk_session *ss;
+	mtk_chunkinfo *ci;
+
+	log_trace("file %s", filepath);
+
+	ret = mtk_chunkinfo_generate_from_file(filepath, chunksize, &ci);
+	if (ret != et_ok) {
+		log_err("generate chunkinfo error:%d", ret);
+		return ret;
+	}
+
+	ss = mtk_session_clone(&chunksend);
+	ss->id = mtk_session_id_get(ctx);
+	ss->data = ci;
+	ss->state = MTK_SESSION_REQ;
+	ss->destory = mtk_chunkinfo_free;
+
+	log_debug("session[%d] create", ss->id);
+
+	log_info("send file %s", filepath);
+
+	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);	
+}

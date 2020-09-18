@@ -37,6 +37,7 @@ typedef enum {
 	MTK_CALLBACK_CONNECTION_REDIRECT,
 	MTK_CALLBACK_CONNECTION_ESTABLISHED,
 	MTK_CALLBACL_CONNECTION_RECEIVE,
+	MTK_CALLBACK_CONNECTION_RECEIVE_TIMEOUT,
 	MTK_CALLBACL_CONNECTION_WRITABLE,
 	MTK_CALLBACK_CONNECTION_ERROR,
 	MTK_CALLBACK_CONNECTION_CLOSED,
@@ -54,7 +55,8 @@ typedef enum {
 } mtk_method_e;
 
 typedef enum {
-	MTK_LBL_COMMAND = 0,
+	MTK_LBL_FILE = 0,
+	MTK_LBL_COMMAND,
 	MTK_LBL_STATUS,
 	MTK_LBL_MEDIA,
 } mtk_lbl_e;
@@ -71,6 +73,8 @@ typedef struct _mtk_request_msg {
 } mtk_request_msg;
 
 typedef struct _mtk_response_msg {
+	uint8_t mask;
+	uint8_t ret;
 	uint8_t code;
 	uint16_t len;
 	uint8_t *data;
@@ -87,6 +91,13 @@ typedef struct _mtk_put_request_msg {
 	uint8_t *data;
 } mtk_put_request_msg;
 
+typedef struct _mtk_recv_wait {
+	int maxcnt;
+	uint64_t wait_us;
+	uint64_t timeout_us;
+	uint64_t timeout_cnt;
+} mtk_recv_wait;
+
 typedef struct _mtk_connect {
 
 	awoke_event event;
@@ -94,10 +105,16 @@ typedef struct _mtk_connect {
 	int fd;
 	uint8_t msgindex;
 	uint8_t last_method;
+	uint32_t last_fileid;
+
+
+	uint16_t port;
+	const char *address;
 	
 	mtk_channel_e chntype;
 	
 	struct _awoke_queue *ring;
+	struct _mtk_recv_wait rwait;
 	struct _mtk_context *context;
 	struct _mtk_session *session;
 	struct _mtk_protocol_handle *protocol;
@@ -110,9 +127,8 @@ typedef struct _mtk_connect {
 	    void *user, void *in, size_t len);
 		
 	unsigned int need_do_redirect:1;
-	unsigned int leave_wirtable_active:1;
+	unsigned int f_rwait_timeout:1;
 	unsigned int f_keepalive:1;
-	unsigned int f_connecting:1;
 	unsigned int f_connected:1;
 
 	void *user;
@@ -126,6 +142,9 @@ typedef struct _mtk_client_connect_info {
 	const char *address;
 	
 	uint64_t ka_timeout_us;
+
+	int recv_timout_maxcnt;
+	uint64_t recv_timout_us;
 	
 	struct _mtk_context *context;
 	struct _mtk_session *session;
@@ -142,13 +161,16 @@ typedef struct _mtk_context {
 
 	int session_baseid;
 
+	char *server_address;
+	char *imei;
+	int dc_port;
+	int nc_port;
+
 	struct _awoke_minpq works_pq;
 
 	struct _awoke_event_loop *evloop;
 
 	struct _mtk_connect connects[MTK_CHANNEL_SIZEOF];
-
-	struct _awoke_buffchunk_pool rx_pool;
 
 	struct _awoke_buffchunk *rx_buff;
 
@@ -160,6 +182,9 @@ typedef struct _mtk_work {
 	err_type (*handle)(struct _mtk_context *, struct _mtk_work *);
 	uint64_t us;
 	void *data;
+
+#define MTK_WORK_F_DEL	0x1
+	uint8_t flags;
 } mtk_work;
 
 typedef enum {
@@ -190,9 +215,11 @@ typedef struct _mtk_protocol_handle {
 } mtk_protocol_handle;
 
 
+uint64_t mtk_now_usec(void);
 
 err_type mtk_client_connect_via_info(struct _mtk_client_connect_info *i);
-struct _mtk_context *mtk_context_create(const char *name);
+struct _mtk_context *mtk_context_create(const char *name, const char *addr, int dp, int np, 
+	const char *imei);
 
 err_type mtk_work_schedule(struct _mtk_context *ctx, 
 	err_type (*cb)(struct _mtk_context *, struct _mtk_work *), uint64_t us);
@@ -200,6 +227,8 @@ err_type mtk_retry_work_schedule(struct _mtk_context *ctx,
 	err_type (*cb)(struct _mtk_context *, struct _mtk_work *), uint64_t us);
 err_type mtk_work_schedule_withdata(struct _mtk_context *ctx, 
 	err_type (*cb)(struct _mtk_context *, struct _mtk_work *), uint64_t us, void *data);
+err_type mtk_work_delete(struct _mtk_context *ctx, 
+	err_type (*cb)(struct _mtk_context *, struct _mtk_work *));
 
 bool mtk_service_should_stop(struct _mtk_context *ctx);
 err_type mtk_service_run(struct _mtk_context *ctx, uint32_t timeout_ms);

@@ -14,83 +14,24 @@
 #include "awoke_string.h"
 
 
-err_type mtk_voicefile_recv(struct _mtk_context *ctx, const char *filepath, uint32_t fileid)
+
+err_type mtk_timer_send(struct _mtk_context *ctx, struct _mtk_work *work)
 {
-	mtk_session *ss;
-	mtk_chunkinfo *ci;
-
-	ci = mem_alloc_trace(sizeof(mtk_chunkinfo), "chunkinfo");
-	if (!ci) {
-		log_err("alloc chunkinfo error");
-		return et_nomem;
-	}
-	ci->index = 0;
-	ci->fileid = fileid;
-	if (filepath)
-		ci->filepath = awoke_string_dup(filepath);
-	ci->type = MTK_CHUNKTYPE_FILE;
-
-	ss = mtk_session_clone(&chunkrecv);
-	ss->id = mtk_session_id_get(ctx);
-	ss->data = ci;
-	ss->state = MTK_SESSION_REQ;
-	ss->destory = mtk_chunkinfo_free;
-
-	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
+	mtk_voicefile_send(ctx, "test-recv-29.amr", 32*1024);
+	return mtk_work_schedule(ctx, mtk_timer_send, 60*60*MTK_US_PER_SEC);
 }
 
-err_type mtk_voicebuff_recv(struct _mtk_context *ctx)
-{
-	mtk_session *ss;
-	mtk_chunkinfo *ci;
-
-	ci = mem_alloc_trace(sizeof(mtk_chunkinfo), "chunkinfo");
-	if (!ci) {
-		log_err("alloc chunkinfo error");
-		return et_nomem;
-	}
-	ci->fileid = 1;
-	ci->index = 0;
-	ci->type = MTK_CHUNKTYPE_BUFF;
-
-	ss = mtk_session_clone(&chunkrecv);
-	ss->id = mtk_session_id_get(ctx);
-	ss->data = ci;
-	ss->state = MTK_SESSION_REQ;
-	ss->destory = mtk_chunkinfo_free;
-
-	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);
-}
-
-err_type mtk_voicefile_send(struct _mtk_context *ctx, const char *filepath, int chunksize)
-{
-	err_type ret;
-	mtk_session *ss;
-	mtk_chunkinfo *ci;
-
-	log_trace("file %s", filepath);
-
-	ret = mtk_chunkinfo_generate_from_file(filepath, chunksize, &ci);
-	if (ret != et_ok) {
-		log_err("generate chunkinfo error:%d", ret);
-		return ret;
-	}
-
-	ss = mtk_session_clone(&chunksend);
-	ss->id = mtk_session_id_get(ctx);
-	ss->data = ci;
-	ss->state = MTK_SESSION_REQ;
-	ss->destory = mtk_chunkinfo_free;
-
-	return mtk_work_schedule_withdata(ctx, mtk_session_start, 1*MTK_US_PER_MS, ss);	
-}
 
 typedef enum {
 	arg_none = 0,
+	arg_dport,
+	arg_nport,
+	arg_imei,
 	arg_sendfile,
 	arg_recvfile,
 	arg_chunksize,
 	arg_fileid,
+	arg_katimeout,
 } arg_list;
 
 int main(int argc, char **argv)
@@ -98,14 +39,22 @@ int main(int argc, char **argv)
 	int opt;
 	int mode = 0;
 	int fileid = 1;
+	int loglevel = LOG_DBG;
 	int chunksize = 1024*32;
-	int loglevel = LOG_TRACE;
 	char *filepath = "test";
+	char *serveraddr = "112.124.201.252";
+	char *devimei = "0134653629865946";
+	int nc_port = 8972;
+	int dc_port = 8970;
 	err_type ret;
 	mtk_context *ctx;
 
 	static const struct option long_opts[] = {
 		{"loglevel",			required_argument,	NULL,	'l'},
+		{"serveraddr",			required_argument,	NULL,	's'},
+		{"dport",				required_argument,  NULL,   arg_dport},
+		{"nport",				required_argument,  NULL,   arg_nport},
+		{"imei",				required_argument,	NULL,   arg_imei},
 		{"sendfile",			required_argument,  NULL,	arg_sendfile},
 		{"recvfile",			required_argument,  NULL,	arg_recvfile},
 		{"chunksize",			required_argument,  NULL,	arg_chunksize},
@@ -113,12 +62,28 @@ int main(int argc, char **argv)
 		{NULL, 0, NULL, 0},
 	};
 
-	while ((opt = getopt_long(argc, argv, "l:s:r:?h-", long_opts, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "l:s:?h-", long_opts, NULL)) != -1)
 	{
 		switch (opt) {
 
 		case 'l':
 			loglevel = atoi(optarg);
+			break;
+
+		case 's':
+			serveraddr = optarg;
+			break;
+
+		case arg_dport:
+			dc_port = atoi(optarg);
+			break;
+
+		case arg_nport:
+			nc_port = atoi(optarg);
+			break;
+
+		case arg_imei:
+			devimei = optarg;
 			break;
 
 		case arg_sendfile:
@@ -132,7 +97,7 @@ int main(int argc, char **argv)
 			break;
 
 		case arg_chunksize:
-			chunksize = 1024*atoi(optarg);
+			chunksize = atoi(optarg);
 			break;
 
 		case arg_fileid:
@@ -146,25 +111,24 @@ int main(int argc, char **argv)
 
 	awoke_log_init(loglevel, loglevel);
 	
-	ctx = mtk_context_create("Micro Talk Client");
+	ctx = mtk_context_create("Micro Talk Client", serveraddr, dc_port, nc_port, devimei);
 	if (!ctx) {log_err("mtk context create error"); return 0;}
 
 	log_info("%s start", ctx->name);
 	
-	//mtk_work_schedule(ctx, mtk_nc_connect, 0);
-	//mtk_work_schedule_withdata(ctx, dc_normal_get, 1, &ctx->connects[MTK_CHANNEL_DATA]);
-	//mtk_work_schedule(ctx, dc_file_send, 1*MTK_US_PER_SEC);
-	//mtk_work_schedule(ctx, dc_file_recv, 1*MTK_US_PER_SEC);
-	//mtk_voicefile_recv(ctx, 0);
+	mtk_work_schedule(ctx, mtk_nc_connect, 0);
+
+	mtk_work_schedule(ctx, mtk_timer_send, 60*MTK_US_PER_SEC);
 
 	if (mode == 1)
 		mtk_voicefile_send(ctx, filepath, chunksize);
 	else if (mode == 2)
 		mtk_voicefile_recv(ctx, filepath, fileid);
+	/*
 	else 
-		mtk_voicefile_recv(ctx, filepath, 1);
+		//mtk_voicefile_recv(ctx, filepath, 1);
 		//mtk_voicefile_send(ctx, "linux-c-api-ref.pdf", 1024*32);
-		//mtk_voicefile_send(ctx, "helloworld.txt", 1);
+		mtk_voicefile_send(ctx, "helloworld.txt", 1);*/
 	
 	
 	/* service loop run */

@@ -86,6 +86,7 @@ awoke_minpq *awoke_minpq_create(size_t node_size, int capacity,
     bool(*comparator)(void *, void *), uint16_t flags);
 void awoke_minpq_free(struct _awoke_minpq **q);
 err_type awoke_minpq_get(struct _awoke_minpq *q, void *u, int *p, int index);
+err_type awoke_minpq_del(struct _awoke_minpq *q, void *u, int *p, int index);
 err_type awoke_minpq_init(struct _awoke_minpq *q, size_t nodesize, int capacity, 
     bool(*comparator)(void *, void *), uint16_t flags);
 /*}-- MinPQ -- */
@@ -151,6 +152,7 @@ typedef struct _minpq_namespace {
         bool(*comparator)(void *, void *), uint16_t flags);
     void (*info)(awoke_minpq *q);
     err_type (*get)(struct _awoke_minpq *q, void *u, int *p, int index);
+	err_type (*del)(struct _awoke_minpq *q, void *u, int *p, int index);
     void (*set_info_handle)(struct _awoke_minpq *q, int,
         void (*info_prior_handle)(struct _awoke_minpq *, int, char *, int),
         void (*info_value_handle)(struct _awoke_minpq *, int, char *, int))

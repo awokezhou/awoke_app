@@ -274,22 +274,31 @@ bool awoke_minpq_empty(struct _awoke_minpq *q)
 
 err_type awoke_minpq_resize(struct _awoke_minpq *q, int capcaity)
 {
-    char *new;
+    char *new_v, *new_p;
     
     if (capcaity <= q->node_nr) {
         log_err("capcaity invaild");
         return et_param;
     }
 
-    new = mem_alloc_z(q->nodesize*(capcaity+1));
-    if (!new) {
-        log_err("alloc new error");
+    new_v = mem_alloc_z(q->nodesize*(capcaity+1));
+    if (!new_v) {
+        log_err("alloc new value error");
         return et_nomem;
     }
 
-    memcpy(new, q->q, q->nodesize*(q->node_nr+1));
+	new_p = mem_alloc_z(sizeof(int)*(capcaity+1));
+    if (!new_p) {
+        log_err("alloc new prior error");
+        return et_nomem;
+    }
+
+    memcpy(new_v, q->q, q->nodesize*(q->node_nr+1));
+	memcpy(new_p, q->q, sizeof(int)*(q->node_nr+1));
     mem_free(q->q);
-    q->q = new;
+	mem_free(q->p);
+    q->q = new_v;
+	q->p = new_p;
     q->capacity = capcaity;
     return et_ok;
 }
@@ -393,6 +402,41 @@ err_type awoke_minpq_insert(struct _awoke_minpq *q, void *u, int p)
     memcpy(addr, u, q->nodesize);
     minpq_swim(q, q->node_nr);
     return et_ok;
+}
+
+err_type awoke_minpq_del(struct _awoke_minpq *q, void *u, int *p, int index)
+{
+	char *addr1, *addr2;
+
+    if (awoke_minpq_empty(q)) {
+        log_err("MinPQ empty");
+        return et_empty;
+    }
+
+	if (index < 1) {
+		log_err("MinPQ index error");
+		return et_param;
+	}
+
+	addr1 = q->q + q->nodesize*index;
+	memcpy(u, addr1, q->nodesize);
+    *p = q->p[index];
+    q->p[index] = q->p[q->node_nr];
+    addr2 = q->q + q->nodesize*q->node_nr;
+    memcpy(addr1, addr2, q->nodesize);
+    q->node_nr--;
+    minpq_sink(q, index);
+    q->p[q->node_nr+1] = 0;
+
+    if ((q->node_nr>0) && 
+        (q->node_nr==(q->capacity-1)/4) &&
+        mask_exst(q->flags, AWOKE_MINPQ_F_RES)) {
+        awoke_minpq_resize(q, q->capacity/2);
+    }
+
+    addr2 = q->q + q->nodesize*(q->node_nr+1);
+    memset(addr2, 0x0, q->nodesize);
+    return et_ok;	
 }
 
 err_type awoke_minpq_delmin(struct _awoke_minpq *q, void *u, int *p)
@@ -533,6 +577,7 @@ void awoke_minpq_info_dump(struct _awoke_minpq *q)
 {
     int i;
     int comment_length;
+	char *space = " ";
     char buff[256] = {'\0'};
 	struct _awoke_queue_dumpinfo *di = &q->dumpinfo;
 
@@ -573,9 +618,9 @@ void awoke_minpq_info_dump(struct _awoke_minpq *q)
         log_trace("%s", buff);
     } else {
         bp = build_ptr_make(buff, 256);
-        build_ptr_string(bp, "prior:");
+		build_ptr_format(bp, "prior:%*s", di->width, space);
         for (i=0; i<(q->node_nr+1); i++) {
-            build_ptr_format(bp, "%3d", q->p[i]);
+            build_ptr_format(bp, "%*d", di->width, q->p[i]);
             log_trace("%.*s", bp.len, bp.head);
         }
     }
@@ -607,6 +652,7 @@ minpq_namespace const MinPQ = {
     .create = awoke_minpq_create,
     .info = awoke_minpq_info_dump,
     .get = awoke_minpq_get,
+    .del = awoke_minpq_del,
     .set_info_handle = awoke_minpq_dumpinfo_set,
 };
 
