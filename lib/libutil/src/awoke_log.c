@@ -7,60 +7,57 @@
 
 #include "awoke_log.h"
 #include "awoke_type.h"
+#include "awoke_memory.h"
 
 
 
-/*
- * Config
- * AWOKE_LOG_WITH_COLOR
- * AWOKE_LOG_WITH_MODULE
- * AWOKE_LOG_TO_FILE
- */
-
-
-
-#if defined(AWOKE_LOG_COLOR)
+#if defined(AWOKE_CONFIG_LOG_COLOR)
 static awoke_log_levelmap levelmap[] = {
-	{NULL,			LOG_NONE,	LOG_COLOR_WHITE_LIGHT,		LOG_COLOR_WHITE_LIGHT},
-	{"burst",		LOG_BURST,	LOG_COLOR_WHITE_LIGHT,		LOG_COLOR_WHITE_LIGHT},
-	{"trace",		LOG_TRACE,	LOG_COLOR_WHITE_LIGHT,		LOG_COLOR_WHITE_LIGHT},
-	{"DEBUG", 		LOG_DBG,	LOG_COLOR_GREEN_LIGHT,		LOG_COLOR_GREEN_LIGHT},
-	{"INFO", 		LOG_INFO,	LOG_COLOR_CYAN_LIGHT,		LOG_COLOR_CYAN_LIGHT},
-	{"NOTICE",		LOG_NOTICE,	LOG_COLOR_YELLOW_LIGHT,		LOG_COLOR_YELLOW_LIGHT},
-	{"WARN", 		LOG_WARN,	LOG_COLOR_PINK_LIGHT,		LOG_COLOR_PINK_LIGHT},
-	{"ERROR", 		LOG_ERR,	LOG_COLOR_RED_LIGHT,		LOG_COLOR_RED_LIGHT},
-	{"BUG", 		LOG_BUG,	LOG_COLOR_RED,				LOG_COLOR_RED},
+	{NULL,		LOG_NONE,		FALSE, LOG_COLOR_RESET},
+	{"b",		LOG_BURST,		FALSE, LOG_COLOR_RESET},
+	{"t",		LOG_TRACE,		FALSE, LOG_COLOR_WHITE},
+	{"D", 		LOG_DBG,		TRUE,  LOG_COLOR_GREEN_LIGHT},
+	{"I", 		LOG_INFO,		TRUE,  LOG_COLOR_CYAN_LIGHT},
+	{"N",		LOG_NOTICE,		TRUE,  LOG_COLOR_YELLOW_LIGHT},
+	{"W", 		LOG_WARN,		TRUE,  LOG_COLOR_PINK_LIGHT},
+	{"E", 		LOG_ERR,		TRUE,  LOG_COLOR_RED_LIGHT},
+	{"B", 		LOG_BUG,		TRUE,  LOG_COLOR_RED},
 };
 #else
 static awoke_log_levelmap levelmap[] = {
-	{NULL,			LOG_NONE},
-	{"burst",		LOG_BURST},
-	{"trace",		LOG_TRACE},
-	{"DEBUG",		LOG_DBG},
-	{"INFO",		LOG_INFO},
-	{"NOTICE",		LOG_NOTICE},
-	{"WARN",		LOG_WARN},
-	{"ERROR",		LOG_ERR},
-	{"BUG", 		LOG_BUG},
+	{NULL,		LOG_NONE},
+	{"b",		LOG_BURST},
+	{"t",		LOG_TRACE},
+	{"D",		LOG_DBG},
+	{"I",		LOG_INFO},
+	{"N",		LOG_NOTICE},
+	{"W",		LOG_WARN},
+	{"E",		LOG_ERR},
+	{"B", 		LOG_BUG},
 };
 #endif
 
-
 static awoke_log_modulemap modulemap[] = {
-	{NULL,			LOG_M_NONE},
-	{"OS",			LOG_M_OS},
-	{"EV",			LOG_M_EVENT},
-	{"Queue",		LOG_M_QUEUE},
-	{"HTTP",		LOG_M_HTTP},
-	{"PKT",			LOG_M_PKT},
-	{"worker",		LOG_M_WORKER},
-	{"mc-client",	LOG_M_MC_CLIENT},
-	{"mc-server",	LOG_M_MC_SERVER},
+	{NULL,			LOG_M_NONE,	LOG_NONE},
+	{"sys",			LOG_M_SYS,	LOG_NONE},
+	{"drv",			LOG_M_DRV,	LOG_NONE},
+	{"pkt",			LOG_M_PKT,	LOG_NONE},
+
+	{"bk",			LOG_M_BK,	LOG_TRACE},
+	{"mk",			LOG_M_MK,	LOG_TRACE},
 };
 
 static awoke_log_context logctx = {
 	.level = LOG_TRACE,
 	.direction = LOG_D_STDOUT,
+	.mmask = LOG_M_ALL,
+	.fc = {
+		.name = "awoke.log",
+		.maxsize = 8*1024,		/* 64KB */
+		.cachenum = 0,
+		.cachemax = 3,
+		.init_finish = 0,
+	},
 };
 
 awoke_log_context *hqlog_context_get(void)
@@ -80,263 +77,337 @@ static bool level_visible(uint8_t level)
 
 static bool module_visible(uint32_t module)
 {
-	return (test_bit(module, logctx.mbitmap));
+	if (mask_exst(logctx.mmask, module))
+		return TRUE;
+	return FALSE;
 }
 
-static const char *module_string_get(uint16_t module)
+static awoke_log_modulemap *module_get(uint32_t module)
 {
 	int size;
 	awoke_log_modulemap *p, *h;
-	
+
+	h = modulemap;
+	size = array_size(modulemap);
+	array_foreach_start(h, size, p) {
+		if (p->mmask == module)
+			return p;
+	} array_foreach_end();
+
+	return NULL;
+}
+
+static const char *module_string_get(uint32_t module)
+{
+	int size;
+	awoke_log_modulemap *p, *h;
+
 	h = modulemap;
 	size = array_size(modulemap);
 
-	array_foreach(h, size, p) {
-		if (p->mbit == module)
+	array_foreach_start(h, size, p) {
+		if (p->mmask == module)
 			return p->string;
-	}
+	} array_foreach_end();
 
 	return modulemap[LOG_M_NONE].string;
 }
-
 
 void awoke_log_init(uint8_t level, uint16_t mmask)
 {
 	logctx.level = level;
 }
 
-void awoke_log_set_module(uint32_t mmask)
+static bool log_file_exist(const char *filepath)
 {
-	awoke_set_bit(mmask, logctx.mbitmap);
-}
-
-static bool direction_stdout(void)
-{
-	return (logctx.direction == LOG_D_STDOUT);
-}
-
-static void _log_file_write(char *file, char *str, int len)
-{
+	int r;
 	FILE *fp;
-	struct stat st;
-	long long file_size;
 
-	fp = fopen(file, "r");
+	fp = fopen(filepath, "r");
 	if (!fp) {
-		fp = fopen(file, "w");
-		fclose(fp);
+		return FALSE;
 	}
 
-	if (stat(file, &st) < 0) {
+	fclose(fp);
+	return TRUE;
+}
+
+static log_file_size(const char *filepath)
+{
+	struct stat statbuff;
+
+	if (stat(filepath, &statbuff) < 0) {
+		return -1;
+	} else {
+		return statbuff.st_size;
+	}	
+}
+
+static void log_filecahce_item_add(log_filecache *fc, int id)
+{
+	log_filecache_item *ni;
+	char name[32] = {'\0'};
+	
+	ni = mem_alloc_z(sizeof(log_filecache_item));
+	if (!ni) {
+		log_err("alloc filecache item error");
 		return;
 	}
 
-	file_size = (long long)st.st_size;
+	sprintf(name, "%s.%d", fc->name, id);
+	rename(fc->name, name);
+	ni->id = id;
+	list_append(&ni->_head, &fc->caches);
+	fc->cachenum++;
+}
 
-	if (file_size >= LOG_FILE_SIZE) {
-		fp = fopen(file, "w+");
-	} else {
-		fp = fopen(file, "a+");
+static bool log_filecache_full(log_filecache *fc)
+{
+	int size;
+
+	size = log_file_size(fc->name);
+
+	if (size >= fc->maxsize) {
+		return TRUE;
 	}
 
-	fwrite(str, len, 1, fp);
+	return FALSE;
+}
+
+static void log_filecahce_init(log_filecache *fc)
+{
+	int i;
+	char name[32] = {'\0'};
+	
+	/* init cache list */
+	list_init(&fc->caches);
+
+	/* record all existed cache file */
+	for (i=fc->cachemax; i>0; i--) {
+
+		memset(name, 0x0, 32);
+		sprintf(name, "%s.%d", fc->name, i);
+
+		if (log_file_exist(name)) {
+			log_filecahce_item_add(fc, i);
+		}
+	}
+	
+	fc->init_finish = 1;
+}
+
+static void log_filecahce_update(log_filecache *fc)
+{
+	log_filecache_item *i;
+	char name[32] = {'\0'};
+	char sname[32] = {'\0'};
+
+	/* if cache full, delete last */
+	if (fc->cachenum >= fc->cachemax) {
+		i = list_entry_first(&fc->caches, log_filecache_item, _head);
+		list_unlink(&i->_head);
+		sprintf(name, "%s.%d", fc->name, i->id);
+		mem_free(i);
+		remove(name);
+	}
+
+	list_for_each_entry(i, &fc->caches, _head) {
+		memset(name, 0x0, 32);
+		sprintf(sname, "%s.%d", fc->name, i->id);
+		i->id++;
+		sprintf(name, "%s.%d", fc->name, i->id);
+		rename(sname, name);
+	}
+
+	log_filecahce_item_add(fc, 1);
+}
+
+static void log_filecache_write(log_filecache *fc, char *message, int length)
+{
+	FILE *fp;
+
+	fp = fopen(fc->name, "a+");
+	if (!fp) {
+		fp = fopen(fc->name, "w");
+		if (!fp) {
+			return;
+		}
+	}
+
+	fwrite(message, length, 1, fp);
 	fclose(fp);
+}
+
+static void awoke_log_file_write(log_filecache *fc, char *message, int length)
+{
+	
+	/* check and do init */
+	if (!fc->init_finish) {
+		log_filecahce_init(fc);
+	}
+
+	/* if file full, dump to cache */
+	if (log_filecache_full(fc)) {
+		log_filecahce_update(fc);
+	}
+
+	log_filecache_write(fc, message, length);
 }
 
 #define extern_print(fmt, args...)	printf(fmt, ##args)
 
 void awoke_log(int level, const char *func, int line, const char *format, ...)
 {
-	int len;
-	char buff[1024];
-    time_t now;
-    va_list args;
-    struct tm result;
-    struct tm *current;
-	char log_file[128] = {"\0"};
-#if defined(AWOKE_LOG_COLOR)
-	const char *reset_color = LOG_COLOR_RESET;
-#endif
+	int n;
+	va_list args;
+	time_t now;
+	struct tm date;
+	char buff[AWOKE_LOG_BUFF_MAXLEN] = {'\0'};
 
 	if (!level_visible(level))
 		return;
 
-	awoke_log_levelmap *_levelmap = &levelmap[level];
-	
-	now = time(NULL);
-	current = localtime_r(&now, &result);
+	build_ptr bp = build_ptr_init(buff, AWOKE_LOG_BUFF_MAXLEN);
 
-	if (direction_stdout()) {		// print to stdout
+	awoke_log_levelmap *map = &levelmap[level];
 
-		va_start(args, format);
-		vsprintf(buff, format, args);
-		va_end(args);
-		
-#if defined(AWOKE_LOG_COLOR)
 
-	    extern_print("%s[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s:%d]%s %s%s%s\n",
-	    	_levelmap->header_color,
-			current->tm_year + 1900,
-			current->tm_mon + 1,
-			current->tm_mday,
-			current->tm_hour,
-			current->tm_min,
-			current->tm_sec,
-        	_levelmap->string,
-       		func, line, reset_color,
-        	_levelmap->body_color, buff, reset_color);
-#else
-	    extern_print("[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s:%d] %s\n", 
-	    	current->tm_year + 1900,
-			current->tm_mon + 1,
-			current->tm_mday,
-			current->tm_hour,
-			current->tm_min,
-			current->tm_sec,
-			_levelmap->string,
-			func, line, buff);
-#endif
-	    
-	    fflush(stdout);
-	} else {
-		
-		build_ptr bp = build_ptr_init(buff, 1024);
-
-	
-		build_ptr_format(bp, "[%i/%02i/%02i %02i:%02i:%02i] ", 
-					     current->tm_year + 1900,
-					     current->tm_mon + 1,
-					     current->tm_mday,
-					     current->tm_hour,
-					     current->tm_min,
-					     current->tm_sec);
-		
-		build_ptr_format(bp, "[%s] [%s:%d] ", _levelmap->string, func, line);
-		
-		va_start(args, format);
-		len = vsnprintf(bp.p, bp.max, format, args);
-		va_end(args);
-		bp.p += len;
-		bp.max -= len;
-		bp.len += len;
-		
-		build_ptr_string(bp, "\n");
-
-		sprintf(log_file, "%s%s", LOG_FILE_PATH, LOG_FILE_POSTFIX);
-		_log_file_write(log_file, bp.head, bp.len);
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+	/* color start */
+	if (map->use_color) {
+		build_ptr_format(bp, "%s", map->color);
 	}
-	
-    return;
+#endif
+
+#if defined(AWOKE_CONFIG_LOG_TIME)
+	now = time(NULL);
+	localtime_r(&now, &date);
+	build_ptr_format(bp, "[%i/%02i/%02i %02i:%02i:%02i] ",
+		date.tm_year + 1900,
+		date.tm_mon + 1,
+		date.tm_mday,
+		date.tm_hour,
+		date.tm_min,
+		date.tm_sec);
+#endif
+
+	build_ptr_format(bp, "[%s] [%s:%d] ", map->string, func, line);
+
+	va_start(args, format);
+	n = vsnprintf(bp.p, bp.max, format, args);
+	va_end(args);
+
+	bp.p += n;
+	bp.max -= n;
+	bp.len += n;
+
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+	/* color end */
+	if (map->use_color) {
+		build_ptr_format(bp, "%s", LOG_COLOR_RESET);
+	}
+#endif
+
+	build_ptr_string(bp, "\n");
+
+	switch (logctx.direction) {
+
+	case LOG_D_STDOUT:
+		printf("%.*s", bp.len, bp.head);
+		break;
+
+	case LOG_D_FILE:
+		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		break;
+
+	default:
+		break;
+	}
 }
 
 void awoke_logm(int level, uint32_t module, const char *func, int line, const char *format, ...)
 {
-	int len;
-	char buff[1024];
-    time_t now;
+	int n;
     va_list args;
-    struct tm result;
-    struct tm *current;
-	char log_file[128] = {"\0"};
-#if defined(AWOKE_LOG_COLOR)
-	const char *reset_color = LOG_COLOR_RESET;
-#endif
+	time_t now;
+    struct tm date;
+	char *mstring;
+	char buff[AWOKE_LOG_BUFF_MAXLEN] = {'\0'};
 
-	printf("<debug> module:%d\r\n", module);
-
-	if (!level_visible(level))
+	awoke_log_modulemap *mmap = module_get(module);
+	if (!mmap)
 		return;
 
-	if (!module_visible(module))
+	if ((level != LOG_NONE) && (level < mmap->mlevel)) {
 		return;
-
-	printf("<debug> module:%d visible\r\n", module);
-
-	awoke_log_levelmap *_levelmap = &levelmap[level];
-	awoke_log_modulemap *_modulemap = &modulemap[module];
-	
-	now = time(NULL);
-	current = localtime_r(&now, &result);
-
-	if (direction_stdout()) {		// print to stdout
-
-		va_start(args, format);
-		vsprintf(buff, format, args);
-		va_end(args);
-		
-#if defined(AWOKE_LOG_COLOR)
-#if defined(AWOKE_LOG_TIME)
-	    extern_print("%s[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s] [%s:%d]%s %s%s%s\n",
-	    	_levelmap->header_color,
-			current->tm_year + 1900,
-			current->tm_mon + 1,
-			current->tm_mday,
-			current->tm_hour,
-			current->tm_min,
-			current->tm_sec,
-			_modulemap->string,
-        	_levelmap->string,
-       		func, line, reset_color,
-        	_levelmap->body_color, buff, reset_color);
-#else
-		extern_print("%s[%s] [%s] [%s:%d]%s %s%s%s\n",
-			_levelmap->header_color,
-			_modulemap->string,
-			_levelmap->string,
-			func, line, reset_color,
-			_levelmap->body_color, buff, reset_color);
-
-#endif
-#else
-#if defined(AWOKE_LOG_TIME)
-	    extern_print("[%i/%02i/%02i %02i:%02i:%02i] [%s] [%s] [%s:%d] %s\n", 
-	    	current->tm_year + 1900,
-			current->tm_mon + 1,
-			current->tm_mday,
-			current->tm_hour,
-			current->tm_min,
-			current->tm_sec,
-			_modulemap->string,
-			_levelmap->string,
-			func, line, buff);
-#else
-		extern_print("[%s] [%s] [%s:%d] %s\n", 
-			_modulemap->string,
-			_levelmap->string,
-			func, line, buff);
-#endif
-#endif
-	    
-	    fflush(stdout);
-	} else {
-		
-		build_ptr bp = build_ptr_init(buff, 1024);
-
-#if defined(AWOKE_LOG_TIME)
-		build_ptr_format(bp, "[%i/%02i/%02i %02i:%02i:%02i] ", 
-					     current->tm_year + 1900,
-					     current->tm_mon + 1,
-					     current->tm_mday,
-					     current->tm_hour,
-					     current->tm_min,
-					     current->tm_sec);
-#endif
-		build_ptr_format(bp, "[%s] [%s:%d] ", _levelmap->string, func, line);
-		
-		va_start(args, format);
-		len = vsnprintf(bp.p, bp.max, format, args);
-		va_end(args);
-		bp.p += len;
-		bp.max -= len;
-		bp.len += len;
-		
-		build_ptr_string(bp, "\n");
-
-		sprintf(log_file, "%s%s", LOG_FILE_PATH, LOG_FILE_POSTFIX);
-		_log_file_write(log_file, bp.head, bp.len);
+	} else if (!level_visible(level)) {
+		return;
 	}
 	
-    return;	
+	if (!module_visible(module)) {
+		log_err("module not visible");
+		return;
+	}
+
+	build_ptr bp = build_ptr_init(buff, AWOKE_LOG_BUFF_MAXLEN);
+
+	awoke_log_levelmap *lmap = &levelmap[level];
+	mstring = module_string_get(module);
+
+
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+	/* color start */
+	if (lmap->use_color && (logctx.direction != LOG_D_FILE)) {
+		build_ptr_format(bp, "%s", lmap->color);
+	}
+#endif
+
+#if defined(AWOKE_CONFIG_LOG_TIME)
+	now = time(NULL);
+	localtime_r(&now, &date);
+	build_ptr_format(bp, "[%i/%02i/%02i %02i:%02i:%02i] ",
+		date.tm_year + 1900,
+		date.tm_mon + 1,
+		date.tm_mday,
+		date.tm_hour,
+		date.tm_min,
+		date.tm_sec);
+#endif
+
+	build_ptr_format(bp, "[%s] [%s] [%s:%d] ",
+		mstring, lmap->string, func, line);
+
+	va_start(args, format);
+	n = vsnprintf(bp.p, bp.max, format, args);
+	va_end(args);
+
+	bp.p += n;
+	bp.max -= n;
+	bp.len += n;
+
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+	/* color end */
+	if (lmap->use_color && (logctx.direction != LOG_D_FILE)) {
+		build_ptr_format(bp, "%s", LOG_COLOR_RESET);
+	}
+#endif
+
+	build_ptr_string(bp, "\n");
+
+	switch (logctx.direction) {
+
+	case LOG_D_STDOUT:
+		printf("%.*s", bp.len, bp.head);
+		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		break;
+
+	case LOG_D_FILE:
+		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		break;
+
+	default:
+		break;
+	}
 }
 
 void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, size_t len)

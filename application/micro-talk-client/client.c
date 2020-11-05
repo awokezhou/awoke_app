@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 	
 	mtk_work_schedule(ctx, mtk_nc_connect, 0);
 
-	mtk_work_schedule(ctx, mtk_timer_send, 60*MTK_US_PER_SEC);
+	//mtk_work_schedule(ctx, mtk_timer_send, 60*MTK_US_PER_SEC);
 
 	if (mode == 1)
 		mtk_voicefile_send(ctx, filepath, chunksize);
@@ -131,6 +131,9 @@ int main(int argc, char **argv)
 		mtk_voicefile_send(ctx, "helloworld.txt", 1);*/
 	
 	
+	mtk_voicefile_send(ctx, "test-recv-46.amr", 1024*32);
+	mtk_voicefile_send(ctx, "test-recv-46.amr", 1024*32);
+
 	/* service loop run */
 	do {
 

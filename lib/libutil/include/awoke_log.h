@@ -2,11 +2,23 @@
 #define __AWOKE_LOG_H__
 
 
+
+#include "awoke_list.h"
 #include "awoke_macros.h"
 #include "awoke_string.h"
-#include "awoke_bitmap.h"
 
-#define AWOKE_LOG_COLOR
+
+
+/* -- feature macros --{*/
+#define AWOKE_CONFIG_LOG_TIME
+#define AWOKE_CONFIG_LOG_COLOR
+/*}-- feature macros -- */
+
+
+
+#define AWOKE_LOG_BUFF_MAXLEN	256
+
+
 
 void awoke_log(int level, const char *func, int line, const char *format, ...);
 void awoke_logm(int level, uint32_t module, const char *func, int line, const char *format, ...);
@@ -15,23 +27,30 @@ void awoke_log_set_module(uint32_t mmask);
 void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, size_t len);
 
 
-#if defined(AWOKE_LOG_COLOR)
-#define LOG_COLOR_RESET			"\033[0m"
-#define LOG_COLOR_RED			"\033[31m"
-#define LOG_COLOR_GREEN			"\033[32m"
-#define LOG_COLOR_YELLOW		"\033[33m"
-#define LOG_COLOR_BLUE			"\033[34m"
-#define LOG_COLOR_PINK			"\033[35m"
-#define LOG_COLOR_CYAN			"\033[36m"
-#define LOG_COLOR_WHITE			"\033[37m"
-#define LOG_COLOR_RED_LIGHT		"\033[91m"
-#define LOG_COLOR_GREEN_LIGHT	"\033[92m"
-#define LOG_COLOR_YELLOW_LIGHT	"\033[93m"
-#define LOG_COLOR_BLUE_LIGHT	"\033[94m"
-#define LOG_COLOR_PINK_LIGHT	"\033[95m"
-#define LOG_COLOR_CYAN_LIGHT	"\033[96m"
-#define LOG_COLOR_WHITE_LIGHT	"\033[97m"
+
+/*
+ * Log Color {
+ */
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+#define LOG_COLOR_RESET				"\033[0m"
+#define LOG_COLOR_RED				"\033[31m"
+#define LOG_COLOR_GREEN				"\033[32m"
+#define LOG_COLOR_YELLOW			"\033[33m"
+#define LOG_COLOR_BLUE				"\033[34m"
+#define LOG_COLOR_PINK				"\033[35m"
+#define LOG_COLOR_CYAN				"\033[36m"
+#define LOG_COLOR_WHITE				"\033[37m"
+#define LOG_COLOR_RED_LIGHT			"\033[91m"
+#define LOG_COLOR_GREEN_LIGHT		"\033[92m"
+#define LOG_COLOR_YELLOW_LIGHT		"\033[93m"
+#define LOG_COLOR_BLUE_LIGHT		"\033[94m"
+#define LOG_COLOR_PINK_LIGHT		"\033[95m"
+#define LOG_COLOR_CYAN_LIGHT		"\033[96m"
+#define LOG_COLOR_WHITE_LIGHT		"\033[97m"
 #endif
+/*
+ * Log Color }
+ */
 
 
 
@@ -51,9 +70,9 @@ typedef enum {
 typedef struct _awoke_log_levelmap {
 	const char *string;
 	awoke_log_level level;
-#if defined(AWOKE_LOG_COLOR)
-	const char *header_color;
-	const char *body_color;
+#if defined(AWOKE_CONFIG_LOG_COLOR)
+	bool use_color;
+	const char *color;
 #endif
 } awoke_log_levelmap;
 /*}-- Log Level -- */
@@ -75,9 +94,22 @@ typedef enum {
 	LOG_M_SIZEOF,
 } awoke_log_module;
 
+#define LOG_M_OFFSET(n) 	(0x00000001 << (n))
+
+#define LOG_M_NONE			0x00000000
+#define LOG_M_SYS			LOG_M_OFFSET(0)
+#define LOG_M_DRV			LOG_M_OFFSET(1)
+#define LOG_M_PKT			LOG_M_OFFSET(2)
+
+#define LOG_M_BK			LOG_M_OFFSET(8)
+#define LOG_M_MK			LOG_M_OFFSET(9)
+#define LOG_M_ALL			0xFFFFFFFF
+
+
 typedef struct _awoke_log_modulemap {
 	const char *string;
-	unsigned int mbit;
+	uint32_t mmask;
+	uint8_t mlevel;
 } awoke_log_modulemap;
 /*}-- Log Module -- */
 
@@ -86,15 +118,31 @@ typedef struct _awoke_log_modulemap {
 typedef enum {
 	LOG_D_STDOUT = 1,
 	LOG_D_FILE,
+	LOG_D_UART,
 } awoke_log_direction;
 /*}-- Log Direction -- */
 
 
 /* -- Log Context --{*/
+typedef struct _hqlog_filecache_item {
+	int id;
+	awoke_list _head;
+} log_filecache_item;
+
+typedef struct _hqlog_filecache {
+	char *name;
+	int maxsize;
+	int cachenum;
+	int cachemax;
+	awoke_list caches;
+	uint8_t init_finish:1;
+} log_filecache;
+
 typedef struct _awoke_log_context {
-	awoke_log_level level;
-	awoke_log_direction direction;
-	awoke_bitmap(mbitmap, LOG_M_SIZEOF);
+	uint8_t level;
+	uint8_t direction;
+	uint32_t mmask;
+	log_filecache fc;
 } awoke_log_context;
 /*}-- Log Context -- */
 
@@ -110,6 +158,16 @@ typedef struct _awoke_log_context {
 #define log_err(...)        awoke_log(LOG_ERR,    __func__, __LINE__, __VA_ARGS__)
 #define log_warn(...)       awoke_log(LOG_WARN,   __func__, __LINE__, __VA_ARGS__)
 #define log_bug(...)        awoke_log(LOG_BUG,    __func__, __LINE__, __VA_ARGS__)
+
+#define logm_burst(module, ...)		awoke_logm(LOG_BURST, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_trace(module, ...)		awoke_logm(LOG_TRACE, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_debug(module, ...)		awoke_logm(LOG_DBG, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_info(module, ...)		awoke_logm(LOG_INFO, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_notice(module, ...)	awoke_logm(LOG_NOTICE,	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_err(module, ...)		awoke_logm(LOG_ERR, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_warn(module, ...)		awoke_logm(LOG_WARN, 	module, __func__, __LINE__, __VA_ARGS__)
+#define logm_bug(module, ...)		awoke_logm(LOG_BUG, 	module, __func__, __LINE__, __VA_ARGS__)
+
 
 #define awoke_hexdump_burst(...)	awoke_hexdump(LOG_BURST, 	__func__, __LINE__, __VA_ARGS__)
 #define awoke_hexdump_trace(...)	awoke_hexdump(LOG_TRACE, 	__func__, __LINE__, __VA_ARGS__)

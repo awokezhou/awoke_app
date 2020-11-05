@@ -24,6 +24,8 @@
 #include "benchmark.h"
 #include "awoke_log.h"
 
+#include "bk_filecache.h"
+
 
 static void usage(int ex)
 {
@@ -730,18 +732,29 @@ static err_type benchmark_valist_test(int argc, char *argv[])
 	return et_ok;
 }
 
+#define mask_offset(n)	(0x00000001 << (n))
+#define mask_test	mask_offset(0)
+#define mask_drv	mask_offset(1)
+#define mask_app	mask_offset(2)
+#define mask_sys	mask_offset(3)
+
 static err_type benchmark_time_zero_test(int argc, char *argv[])
 {
     time_t now, zero;
     struct tm *tm;
-    
+    uint64_t us;
     time(&now);
+    struct timeval tmus;
+    gettimeofday(&tmus, NULL);
+    us = tmus.tv_sec*1000000 + tmus.tv_usec;
     tm = gmtime(&now);
     tm->tm_sec = 0;
     tm->tm_min = 0;
     tm->tm_hour = 0;
     zero = mktime(tm);
     log_debug("now:%d zero:%d", now, zero);
+    log_debug("mask_test:0x%x, 0x%x, 0x%x, 0x%x", mask_test, mask_drv, mask_app, mask_sys);
+    log_debug("us:%ld", us);
     return et_ok;
 }
 
@@ -1248,6 +1261,244 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 	close(fd_server);
 }
 
+typedef struct {
+	int d;
+	awoke_list _head;
+} listtest;
+
+static void listtest_dump(awoke_list *xlist)
+{
+	listtest *p;
+	log_debug("");
+	log_debug("xlist dump");
+	log_debug("----------------");
+	list_for_each_entry(p, xlist, _head) {
+		log_debug("%d", p->d);
+	}
+	log_debug("----------------");
+	log_debug("");
+}
+
+static void listtest_insert(listtest *x, awoke_list *xlist)
+{	
+	listtest *p;
+
+	if (list_empty(xlist)) {
+		return list_append(&x->_head, xlist);
+	}
+	
+	list_for_each_entry(p, xlist, _head) {
+		if (p->d > x->d) {
+			return list_append(&x->_head, &p->_head);
+		}
+	}
+
+	list_append(&x->_head, xlist);
+}
+
+static err_type benchmark_list_test(int argc, char *argv[])
+{
+	listtest a, b, c, d, e, f, g, h;
+	awoke_list xlist;
+
+	list_init(&xlist);
+
+	a.d = 1;
+	b.d = 2;
+	c.d = 3;
+	d.d = 4;
+	e.d = 5;
+	f.d = 6;
+	g.d = 7;
+	h.d = 8;
+
+	listtest_insert(&d, &xlist);
+	listtest_insert(&f, &xlist);
+	listtest_insert(&e, &xlist);
+	listtest_insert(&a, &xlist);
+	listtest_insert(&h, &xlist);
+
+	listtest_dump(&xlist);
+
+	listtest_insert(&g, &xlist);
+	listtest_insert(&b, &xlist);
+
+	listtest_dump(&xlist);
+	
+	return et_ok;
+}
+
+typedef struct {
+	int id;
+	char name[32];
+	awoke_list _head;
+} logfile_cache;
+
+typedef struct {
+	char currname[32];
+	int currsize;
+	int maxsize;
+	int cachenum;
+	int cachemax;
+	awoke_list logfile_caches;
+} logfile_struct;
+
+static logfile_struct logfilem;
+
+static bool logfile_full(logfile_struct *m)
+{
+	int size;
+
+	size = m->currsize;
+
+	if (size >= m->maxsize) {
+		log_debug("current file full");
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+static void logfile_curr2cache(logfile_struct *m)
+{
+	char rn[32] = {'\0'};
+	logfile_cache *c;
+	logfile_cache *newc;
+		
+	if (m->cachenum < m->cachemax) {
+		list_for_each_entry(c, &m->logfile_caches, _head) {
+			memset(rn, 0x0, 32);
+			c->id++;
+			sprintf(rn, "xxx.log.%d", c->id);
+			log_trace("file:%s rename to %s", c->name, rn);
+			sprintf(c->name, rn);
+		}
+
+		newc = mem_alloc_z(sizeof(logfile_cache));
+		newc->id = 1;
+		sprintf(newc->name, "xxx.log.%d", newc->id);
+		log_trace("name:%s", newc->name);
+		list_append(&newc->_head, &m->logfile_caches);
+		log_trace("file %d:%s add to cache", newc->id, newc->name);
+		m->cachenum++;
+		m->currsize = 0;
+		return;
+	}
+
+	log_trace("cache full");
+
+	c = list_entry_first(&m->logfile_caches, logfile_cache, _head);
+	log_trace("remove cache %d:%s", c->id, c->name);
+	list_unlink(&c->_head);
+	mem_free(c);
+	
+	list_for_each_entry(c, &m->logfile_caches, _head) {
+		memset(rn, 0x0, 32);
+		c->id++;
+		sprintf(rn, "xxx.log.%d", c->id);
+		log_trace("file:%s rename to %s", c->name, rn);
+		sprintf(c->name, rn);
+	}
+
+	newc = mem_alloc_z(sizeof(logfile_cache));
+	newc->id = 1;
+	sprintf(newc->name, "xxx.log.%d", newc->id);
+	list_append(&newc->_head, &m->logfile_caches);
+	log_trace("file %d:%s add to cache", newc->id, newc->name);
+	m->currsize = 0;
+}
+
+static void logfile_cache_dump(logfile_struct *m)
+{
+	logfile_cache *c;
+	
+	log_debug("");
+	log_debug("cache dump");
+	log_debug("----------------");
+
+	list_for_each_entry(c, &m->logfile_caches, _head) {
+		log_debug("id:%d name:%s", c->id, c->name);
+	}
+
+	log_debug("----------------");
+	log_debug("");
+}
+
+static void *logfile_cache_write_message(void *ctx)
+{
+	log_trace("write message");
+
+	if (logfile_full(&logfilem)) {
+		logfile_curr2cache(&logfilem);
+	}
+
+	logfilem.currsize += 553;
+	log_trace("currsize:%d", logfilem.currsize);
+
+	logfile_cache_dump(&logfilem);
+}
+
+static err_type benchmark_logfile_cache_test(int argc, char *argv[])
+{
+	logfilem.cachemax = 3;
+	logfilem.cachenum = 0;
+	logfilem.maxsize = 2048;
+	logfilem.currsize = 0;
+	list_init(&logfilem.logfile_caches);
+
+	sprintf(logfilem.currname, "xxx.log");
+
+	log_info("");
+	log_info("logfile cache test start");
+	log_info("");
+
+	awoke_worker *wk = awoke_worker_create("logfile-cache-test", 1, 
+										   WORKER_FEAT_PERIODICITY|WORKER_FEAT_SUSPEND,
+								  		   logfile_cache_write_message, NULL);
+	awoke_worker_start(wk);
+
+	sleep(30);
+
+	awoke_worker_stop(wk);
+	awoke_worker_destroy(wk);
+
+	log_info("");
+	log_info("logfile cache test end");
+	log_info("");
+
+	return et_ok;	
+}
+
+static err_type benchmark_log_color_test(int argc, char *argv[])
+{
+	log_burst("log color test");
+	log_trace("log color test");
+	log_debug("log color test");
+	log_info("log color test");
+	log_notice("log color test");
+	log_err("log color test");
+	log_warn("log color test");
+	log_bug("log color test");
+}
+
+static void *log_cache_work(void *ctx)
+{
+	bk_debug("cache test");
+}
+
+static err_type benchmark_log_cache_test(int argc, char *argv[])
+{
+	awoke_worker *wk = awoke_worker_create("log-cache", 200,
+										   WORKER_FEAT_PERIODICITY|WORKER_FEAT_SUSPEND|WORKER_FEAT_TICK_MSEC,
+								  		   log_cache_work, NULL);
+	awoke_worker_start(wk);
+
+	sleep(120);
+
+	awoke_worker_stop(wk);
+	awoke_worker_destroy(wk);
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -1280,6 +1531,11 @@ int main(int argc, char *argv[])
 		{"fifo-test",  			no_argument, 		NULL,   arg_fifo_test},
 		{"md5-test",			no_argument, 		NULL,	arg_md5_test},
 		{"socket-poll-test",	no_argument,		NULL,	arg_socket_poll_test},
+		{"list-test",			no_argument,		NULL,	arg_list_test},
+		{"logfile-cache-test",	no_argument, 		NULL,	arg_logfile_cache_test},
+		{"filecache-test",		no_argument, 		NULL,	arg_filecache_test},
+		{"log-color-test",		no_argument,		NULL,	arg_log_color_test},
+		{"log-cache-test",		no_argument,		NULL,	arg_log_cache_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1376,6 +1632,26 @@ int main(int argc, char *argv[])
 
 			case arg_socket_poll_test:
 				bmfn = benchmark_socket_poll_test;
+				break;
+
+			case arg_list_test:
+				bmfn = benchmark_list_test;
+				break;
+
+			case arg_logfile_cache_test:
+				bmfn = benchmark_logfile_cache_test;
+				break;
+
+			case arg_filecache_test:
+				bmfn = benchmark_filecache_test;
+				break;
+
+			case arg_log_color_test:
+				bmfn = benchmark_log_color_test;
+				break;
+
+			case arg_log_cache_test:
+				bmfn = benchmark_log_cache_test;
 				break;
 
             case '?':

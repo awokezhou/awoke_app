@@ -43,6 +43,11 @@ typedef enum {
     arg_fifo_test,
     arg_md5_test,
     arg_socket_poll_test,
+    arg_list_test,
+    arg_logfile_cache_test,
+    arg_filecache_test,
+    arg_log_color_test,
+    arg_log_cache_test,
 } benchmark_args;
 
 typedef enum {
@@ -97,6 +102,17 @@ typedef struct _timer_worker_test_t {
 	awoke_tmwkr *twk;
 	int x;
 } timer_worker_test_t;
+
+
+#define bk_burst(...) 	logm_burst(LOG_M_BK, 	__VA_ARGS__)
+#define bk_trace(...) 	logm_trace(LOG_M_BK, 	__VA_ARGS__)
+#define bk_debug(...) 	logm_debug(LOG_M_BK, 	__VA_ARGS__)
+#define bk_info(...) 	logm_info(LOG_M_BK, 	__VA_ARGS__)
+#define bk_notice(...) 	logm_notice(LOG_M_BK, 	__VA_ARGS__)
+#define bk_err(...) 	logm_err(LOG_M_BK, 		__VA_ARGS__)
+#define bk_warn(...) 	logm_warn(LOG_M_BK, 	__VA_ARGS__)
+#define bk_bug(...) 	logm_bug(LOG_M_BK, 		__VA_ARGS__)
+
 
 
 #endif /* __BENCHMARK_H__ */

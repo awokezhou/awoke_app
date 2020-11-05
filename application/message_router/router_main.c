@@ -57,7 +57,7 @@ rt_param *router_param_create()
 		return NULL;
 
 	param->daemon = FALSE;
-	param->log_mode = LOG_SYS;
+	param->log_mode = LOG_M_SYS;
 	param->log_level = LOG_DBG;
 
 	return param;
@@ -410,8 +410,6 @@ int main(int argc, char **argv)
 	rt_param *param;
 	rt_manager *manager;
 
-	log_level(param->log_level);
-	log_mode(param->log_mode);
 	log_info("application message-router launched...");
 
 	param = router_param_parse(argc, argv);
