@@ -38,13 +38,14 @@ static awoke_log_levelmap levelmap[] = {
 #endif
 
 static awoke_log_modulemap modulemap[] = {
-	{NULL,			LOG_M_NONE,	LOG_NONE},
-	{"sys",			LOG_M_SYS,	LOG_NONE},
-	{"drv",			LOG_M_DRV,	LOG_NONE},
-	{"pkt",			LOG_M_PKT,	LOG_NONE},
+	{NULL,			LOG_M_NONE,	    LOG_NONE},
+	{"sys",			LOG_M_SYS,	    LOG_NONE},
+	{"drv",			LOG_M_DRV,	    LOG_NONE},
+	{"pkt",			LOG_M_PKT,	    LOG_NONE},
 
-	{"bk",			LOG_M_BK,	LOG_TRACE},
-	{"mk",			LOG_M_MK,	LOG_TRACE},
+	{"bk",			LOG_M_BK,	    LOG_TRACE},
+	{"mk",			LOG_M_MK,	    LOG_TRACE},
+	{"cmd",         LOG_M_CMDER,    LOG_TRACE},
 };
 
 static awoke_log_context logctx = {
