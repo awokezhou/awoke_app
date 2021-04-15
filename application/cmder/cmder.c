@@ -770,7 +770,7 @@ static err_type litetalk_command_process(struct cmder_protocol *proto,
 	cmder_trace("info->cmdtype %d", info->cmdtype);
 
 	array_foreach(pri->cmdlist, pri->cmdlist_nr, p) {
-		if (info->cmdtype == p->type) {
+		if (info->cmdtype == p->type) {
 			if (mask_exst(info->flag, LITETALK_CMD_F_WRITE)) {
 				ret = p->set(proto, info, in, length);
 				if (ret != et_ok) {

@@ -23,7 +23,8 @@ INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
 				 -I$(LIB_PATH)/libvinparser/include \
 				 -I$(LIB_PATH)/libhttp/include \
 				 -I$(CURR_DIR)/nvm \
-				 -I$(CURR_DIR)/sync
+				 -I$(CURR_DIR)/sync \
+				 -I$(CURR_DIR)/include
 
 all: prepare compile build
 
@@ -34,15 +35,15 @@ prepare:
 	if [ ! -d "obj" ];then mkdir obj;fi;
 
 .PHONY: compile
-compile: $(SUB_DIRS) $(OBJ_FILES)
+compile:$(SUB_DIRS) $(OBJ_FILES)
 
 .PHONY: $(SUB_DIRS)
 $(SUB_DIRS):
 	$(MAKE) -C $@
-	
+
 $(OBJ_FILES): obj/%.o:%.c
 obj/%.o:%.c
-	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -I$(INCLUDE_FILES) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -c $< -o $@
 
 .PHONY: build
 build:$(EXEC)

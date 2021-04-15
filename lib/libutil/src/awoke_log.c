@@ -46,7 +46,7 @@ static awoke_log_modulemap modulemap[] = {
 
 	{"bk",			LOG_M_BK,		LOG_TRACE},
 	{"mk",			LOG_M_MK,		LOG_TRACE},
-	{"mk",			LOG_M_CMDER,	LOG_TRACE},
+	{"cmd",			LOG_M_CMDER,	LOG_TRACE},
 };
 
 static awoke_log_context logctx = {
