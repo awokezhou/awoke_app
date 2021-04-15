@@ -1499,6 +1499,137 @@ static err_type benchmark_log_cache_test(int argc, char *argv[])
 	awoke_worker_destroy(wk);
 }
 
+#define PACKED_ALIGN_BYTE __attribute__ ((packed,aligned(1)))
+
+struct CameraConfig {
+
+	uint32_t mark;
+
+	uint16_t goal;
+	uint16_t goal_min;
+	uint16_t goal_max;
+	
+	uint16_t expo;
+	uint16_t expo_min;
+	uint16_t expo_max;
+
+	uint16_t gain;
+	uint16_t gain_min;
+	uint16_t gain_max;
+
+	uint8_t fps;
+	uint8_t fps_min;
+	uint8_t fps_max;
+
+	uint8_t hinvs;
+	uint8_t vinvs;
+
+	uint8_t ae_frame;
+
+	int32_t tec_target;
+	uint32_t tecwork_freq;
+
+	uint32_t ae_enable:1;
+	uint32_t ae_expo_enable:1;
+	uint32_t ae_gain_enable:1;
+	uint32_t hdr_enable:1;
+	uint32_t cst_enable:1;
+	uint32_t dfg_enable:1;
+	uint32_t nrd_enable:1;
+	uint32_t ehc_enable:1;
+	uint32_t shp_enable:1;
+	uint32_t zoom_enable:1;
+	uint32_t epc_testbit:1;
+	uint32_t inversion_enable:1;
+	uint32_t crossview_enable:1;
+	uint32_t config_dump:1;
+	uint32_t epc_info_dump:1;
+	uint32_t tec_enable:1;
+	uint32_t cltest_enable:1;
+	uint32_t frtest_enable:1;
+	uint32_t rsv01:16;
+
+	uint16_t crosscp_x;
+	uint16_t crosscp_y;
+
+	//uint8_t checksum;
+} PACKED_ALIGN_BYTE;
+
+uint8_t config_checksum(uint8_t *buf, int len)
+{
+	int i;
+	uint8_t sum = 0x0;
+
+	for (i=0; i<(len-1); i++) {
+		sum += buf[i];
+		//bk_debug("buf:%d sum:%d", buf[i], sum);
+	}
+
+	return sum;
+}
+
+static err_type benchmark_cameraconfig_test(int argc, char *argv[])
+{
+	int fd, rc;
+	char buffer[1024];
+	uint8_t checksum;
+	struct CameraConfig *cfg;
+
+	fd = open("CameraConfig.bin", O_RDONLY);
+	if (fd < 0) {
+		bk_err("open file CameraConfig.bin error");
+		return et_file_open;
+	}
+
+	rc = read(fd, buffer, 1024);
+	bk_debug("read:%d", rc);
+	close(fd);
+
+	checksum = config_checksum(buffer, rc);
+	bk_debug("checksum:0x%x", checksum);
+
+	cfg = (struct CameraConfig *)buffer;
+	awoke_hexdump_trace(buffer, rc);
+	bk_debug("mark:0x%x", cfg->mark);
+	bk_debug("goal:%d min:%d max:%d", cfg->goal, cfg->goal_min, cfg->goal_max);
+	return et_ok;
+}
+
+static err_type benchmark_sensorconfig_test(int argc, char *argv)
+{
+	int fd, rc, i;
+	char buffer[1024];
+	uint8_t checksum, *pos;
+	uint32_t mark;
+	uint16_t addr;
+	uint8_t value;
+
+	fd = open("SensorConfig.bin", O_RDONLY);
+	if (fd < 0) {
+		bk_err("open file SensorConfig.bin error");
+		return et_file_open;
+	}
+
+	rc = read(fd, buffer, 1024);
+	bk_debug("read:%d", rc);
+	close(fd);
+	checksum = config_checksum(buffer, rc);
+	bk_debug("checksum:0x%x", checksum);
+	awoke_hexdump_trace(buffer, rc);
+
+	pos = (uint8_t *)buffer;
+	pkg_pull_dwrd(mark, pos);
+	bk_debug("mark:0x%x", mark);
+
+	for (i=0; i<50; i++) {
+		pkg_pull_word(addr, pos);
+		pkg_pull_byte(value, pos);
+		bk_debug("addr:0x%x value:0x%x", addr, value);
+	}
+
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -1536,6 +1667,8 @@ int main(int argc, char *argv[])
 		{"filecache-test",		no_argument, 		NULL,	arg_filecache_test},
 		{"log-color-test",		no_argument,		NULL,	arg_log_color_test},
 		{"log-cache-test",		no_argument,		NULL,	arg_log_cache_test},
+		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
+		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1652,6 +1785,14 @@ int main(int argc, char *argv[])
 
 			case arg_log_cache_test:
 				bmfn = benchmark_log_cache_test;
+				break;
+
+			case arg_cameraconfig_test:
+				bmfn = benchmark_cameraconfig_test;
+				break;
+
+			case arg_sensorconfig_test:
+				bmfn = benchmark_sensorconfig_test;
 				break;
 
             case '?':

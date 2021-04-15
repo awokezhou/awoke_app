@@ -48,6 +48,8 @@ typedef enum {
     arg_filecache_test,
     arg_log_color_test,
     arg_log_cache_test,
+    arg_cameraconfig_test,
+    arg_sensorconfig_test,
 } benchmark_args;
 
 typedef enum {
