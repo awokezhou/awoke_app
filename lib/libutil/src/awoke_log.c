@@ -8,6 +8,7 @@
 #include "awoke_log.h"
 #include "awoke_type.h"
 #include "awoke_memory.h"
+#include "awoke_printf.h"
 
 
 
@@ -43,8 +44,9 @@ static awoke_log_modulemap modulemap[] = {
 	{"drv",			LOG_M_DRV,	LOG_NONE},
 	{"pkt",			LOG_M_PKT,	LOG_NONE},
 
-	{"bk",			LOG_M_BK,	LOG_TRACE},
-	{"mk",			LOG_M_MK,	LOG_TRACE},
+	{"bk",			LOG_M_BK,		LOG_TRACE},
+	{"mk",			LOG_M_MK,		LOG_TRACE},
+	{"mk",			LOG_M_CMDER,	LOG_TRACE},
 };
 
 static awoke_log_context logctx = {
@@ -120,7 +122,6 @@ void awoke_log_init(uint8_t level, uint16_t mmask)
 
 static bool log_file_exist(const char *filepath)
 {
-	int r;
 	FILE *fp;
 
 	fp = fopen(filepath, "r");
@@ -132,7 +133,7 @@ static bool log_file_exist(const char *filepath)
 	return TRUE;
 }
 
-static log_file_size(const char *filepath)
+static int log_file_size(const char *filepath)
 {
 	struct stat statbuff;
 
@@ -294,7 +295,8 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
 	build_ptr_format(bp, "[%s] [%s:%d] ", map->string, func, line);
 
 	va_start(args, format);
-	n = vsnprintf(bp.p, bp.max, format, args);
+	//n = vsnprintf(bp.p, bp.max, format, args);
+	n = awoke_vsnprintf(bp.p, bp.max, format, args);
 	va_end(args);
 
 	bp.p += n;
@@ -313,11 +315,12 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
 	switch (logctx.direction) {
 
 	case LOG_D_STDOUT:
-		printf("%.*s", bp.len, bp.head);
+		//printf("%.*s", (int)bp.len, (char *)bp.head);
+		awoke_printf("%.*s", (int)bp.len, (char *)bp.head);
 		break;
 
 	case LOG_D_FILE:
-		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
 	default:
@@ -331,7 +334,7 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
     va_list args;
 	time_t now;
     struct tm date;
-	char *mstring;
+	const char *mstring;
 	char buff[AWOKE_LOG_BUFF_MAXLEN] = {'\0'};
 
 	awoke_log_modulemap *mmap = module_get(module);
@@ -378,7 +381,8 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 		mstring, lmap->string, func, line);
 
 	va_start(args, format);
-	n = vsnprintf(bp.p, bp.max, format, args);
+	//n = vsnprintf(bp.p, bp.max, format, args);
+	n = awoke_vsnprintf(bp.p, bp.max, format, args);
 	va_end(args);
 
 	bp.p += n;
@@ -397,12 +401,13 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 	switch (logctx.direction) {
 
 	case LOG_D_STDOUT:
-		printf("%.*s", bp.len, bp.head);
-		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		//printf("%.*s", (int)bp.len, (char *)bp.head);
+		awoke_printf("%.*s", (int)bp.len, (char *)bp.head);
+		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
 	case LOG_D_FILE:
-		awoke_log_file_write(&logctx.fc, bp.head, bp.len);
+		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
 	default:
@@ -450,6 +455,38 @@ void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, si
 		awoke_log(level, func, linenr, "%s", line);
 		(void)line;
 	}	
+
+	awoke_log(level, func, linenr, "");
+}
+
+void awoke_bitdump(int level, const char *func, int linenr, const void *vbuf, size_t len)
+{
+	unsigned int n;
+	uint32_t *buf = (uint32_t *)vbuf;
+
+	if (!level_visible(level))
+		return;
+
+	if (!len || !vbuf)
+		return;
+
+	awoke_log(level, func, linenr, "");
+
+	for (n=0; n<len; n+=32) {
+		unsigned int start = n, m;
+		char line[80], *p = line;
+
+		p += snprintf(p, 10, "%d:\t", start);
+		for (m = 0; m < 32 && n < len; m++)
+			p += snprintf(p, 5, "%d ", (buf[n/32]&(1<<m))>0);
+		while (m++ < 32)
+			p += snprintf(p, 5, "   ");
+		
+		p += snprintf(p, 5, "   ");
+		*p = '\0';
+		awoke_log(level, func, linenr, "%s", line);
+		(void)line;
+	}
 
 	awoke_log(level, func, linenr, "");
 }

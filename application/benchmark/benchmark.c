@@ -25,6 +25,16 @@
 #include "awoke_log.h"
 
 #include "bk_filecache.h"
+#include "bk_micro_log.h"
+#include "bk_eots_hd.h"
+#include "bk_fbkflow.h"
+#include "autofocus.h"
+#include "bk_mblock.h"
+#include "awoke_kalman.h"
+#include "img_sensor.h"
+#include "bk_nvm.h"
+#include "bk_epc.h"
+
 
 
 static void usage(int ex)
@@ -111,9 +121,11 @@ static void pipech_msg_header_dump(pipech_msg_header *hdr)
 	log_info("data_len:%d", hdr->data_len);
 }
 
-err_type benchmark_event_chn_work(awoke_worker *wk)
+err_type benchmark_event_chn_work(void *data)
 {
 	int rc;
+	awoke_worker_context *ctx = data;
+	awoke_worker *wk = ctx->worker;
 	pipech_msg_header w_header;
 	pipech_msg_header r_header;
 	awoke_event *event;
@@ -207,9 +219,11 @@ static err_type benchmark_event_channel_test(int argc, char *argv[])
 	return et_ok;
 }
 
-static err_type benchmark_test_work(awoke_worker *wk)
+static err_type benchmark_test_work(void *data)
 {
-	log_debug("run");
+	awoke_worker_context *ctx = data;
+	awoke_worker *wk = ctx->worker;
+	log_debug("%s run", wk->name);
 	return et_ok;
 }
 
@@ -300,9 +314,11 @@ static err_type benchmark_bitflag_test(int argc, char *argv[])
 	return et_ok;
 }
 
-err_type worker_lock_test(awoke_worker *wk)
+err_type worker_lock_test(void       *data)
 {
 	err_type ret;
+	awoke_worker_context *ctx = data;
+	awoke_worker *wk = ctx->worker;
 	lock_test_t *x = wk->data;
 
 	log_debug("%s acquire lock", wk->name);
@@ -486,7 +502,7 @@ static err_type benchmark_queue_zero_filter_test(int argc, char *argv[])
 
 	log_debug("average %d", average);
 
-	awoke_queue_clean(&q);
+	awoke_queue_free(&q);
 
 	return et_ok;
 }
@@ -805,17 +821,9 @@ static err_type benchmark_gpsdata_test(int argc, char *argv[])
     return et_ok;
 }
 
-static void queue_dump(awoke_queue *q)
-{
-    int *p;
-    awoke_queue_foreach(q, p, int) {
-        log_debug("%d", *p);
-    }
-}
-
 static err_type benchmark_queue_test(int argc, char *argv[])
 {
-    int x, a, b, c, d, e, f, g, h, i, j, *p, u;
+    int a, b, c, d, e, f, g, h, i, j, *p, u;
     awoke_queue *q = awoke_queue_create(sizeof(int), 10, 
         AWOKE_QUEUE_F_IN|AWOKE_QUEUE_F_RB);
 
@@ -829,7 +837,6 @@ static err_type benchmark_queue_test(int argc, char *argv[])
     h = 8;
     i = 9;
     j = 10;
-    x = 100;
 
     awoke_queue_enq(q, &a);
     awoke_queue_enq(q, &b);
@@ -863,6 +870,8 @@ static err_type benchmark_queue_test(int argc, char *argv[])
     }
 
     log_debug("%d---", i);
+
+	return et_ok;
 }
 
 void private_info(int linenr, char *buff, int len, awoke_minpq *q)
@@ -1009,59 +1018,11 @@ static err_type benchmark_minpq_custom_test(int argc, char *argv[])
     return et_ok;
 }
 
-static err_type benchmark_minpq_test(int argc, char *argv[])
-{
-    int a, b, c, d, e, f, g, h, i, j, k, x, p;
-
-    awoke_minpq *q = MinPQ.create(sizeof(int), 20, NULL, 0x0);
-    MinPQ.info(q);
-
-    a = 1;
-    b = 2;
-    c = 3;
-    d = 4;
-    e = 5;
-    f = 6;
-    g = 7;
-    h = 8;
-
-    MinPQ.insert(q, &a, 2);
-    MinPQ.info(q);
-
-    MinPQ.insert(q, &b, 3);
-    MinPQ.insert(q, &b, 13);
-    MinPQ.insert(q, &d, 11);
-    MinPQ.insert(q, &h, 9);
-    MinPQ.insert(q, &d, 17);
-    MinPQ.insert(q, &c, 8);
-    MinPQ.insert(q, &f, 5);
-    MinPQ.insert(q, &f, 3);
-    MinPQ.info(q);
-
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.info(q);
-
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.delmin(q, &x, &p);
-    log_debug("delmin:%d %d", p, x);
-    MinPQ.info(q);
-
-    return et_ok;
-}
-
-void fifo_test_value_handle(awoke_fifo *f, int width, char *buff, int len)
+void fifo_test_value_handle(void *data, int width, char *buff, int len)
 {
     int i;
-    int p;
     int d;
+	awoke_fifo *f = data;
     
     build_ptr bp = build_ptr_init(buff, len);
 
@@ -1074,9 +1035,9 @@ void fifo_test_value_handle(awoke_fifo *f, int width, char *buff, int len)
 
 static err_type benchmark_fifo_test(int argc, char *argv[])
 {
-	int x, a, b, c, d, e, f, g, h, i, j, k;
+	int x, a, b, c, d, e, f, g, h, i, j;
 
-	awoke_fifo *fifo = awoke_fifo_create(sizeof(int), 8, AWOKE_FIFO_F_RBK);
+	awoke_fifo *fifo = awoke_fifo_create(sizeof(int), 8, 0x0);
 	awoke_fifo_dumpinfo_set(fifo, 4, fifo_test_value_handle, NULL);
 
 	a = 1;
@@ -1093,35 +1054,119 @@ static err_type benchmark_fifo_test(int argc, char *argv[])
 
 	awoke_fifo_dump(fifo);
 
+	bk_debug("enq %d", a);
 	awoke_fifo_enqueue(fifo, &a);
+	bk_debug("enq %d", b);
 	awoke_fifo_enqueue(fifo, &b);
+	bk_debug("enq %d", c);
 	awoke_fifo_enqueue(fifo, &c);
+	bk_debug("enq %d", d);
 	awoke_fifo_enqueue(fifo, &d);
+	bk_debug("enq %d", e);
 	awoke_fifo_enqueue(fifo, &e);
+	bk_debug("enq %d", f);
 	awoke_fifo_enqueue(fifo, &f);
+	bk_debug("enq %d", g);
 	awoke_fifo_enqueue(fifo, &g);
+	bk_debug("enq %d", h);
 	awoke_fifo_enqueue(fifo, &h);
+	bk_debug("enq %d", i);
 	awoke_fifo_enqueue(fifo, &i);
+	bk_debug("enq %d", j);
 	awoke_fifo_enqueue(fifo, &j);
 
 	awoke_fifo_dump(fifo);
 
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 	
 	awoke_fifo_dump(fifo);
 	
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 	awoke_fifo_dequeue(fifo, &x);
+	bk_debug("deq %d", x);
 
 	awoke_fifo_dump(fifo);
 	
 	awoke_fifo_dequeue(fifo, &x);
+	bk_trace("deq %d", x);
 	awoke_fifo_dequeue(fifo, &x);
+	bk_trace("deq %d", x);
+
+	bk_trace("enq %d", e);
+	awoke_fifo_enqueue(fifo, &e);
+	bk_trace("enq %d", f);
+	awoke_fifo_enqueue(fifo, &f);
+	bk_trace("enq %d", h);
+	awoke_fifo_enqueue(fifo, &h);
 
 	awoke_fifo_dump(fifo);
+
+	return et_ok;
+}
+
+typedef struct _bk_btree_node {
+	int v;
+	awoke_btree_node node;
+} bk_btree_node;
+
+static int benchmark_btree_compare(const void *d1, const void *d2)
+{
+	bk_btree_node *n1 = (bk_btree_node *)d1;
+	bk_btree_node *n2 = (bk_btree_node *)d2;
+
+	return (n1->v - n2->v);
+}
+
+static void benchmark_btree_dump(void *data)
+{
+	bk_btree_node *n = (bk_btree_node *)data;
+	bk_trace("v:%d", n->v);
+}
+
+static err_type benchmark_btree_test(int argc, char *argv[])
+{
+	awoke_btree tree;
+	bk_btree_node n1, n2, n3, n4;
+
+	n1.v = 1;
+	n1.node.data = &n1;
+	n1.node.left = NULL;
+	n1.node.right = NULL;
+
+	n2.v = 2;
+	n2.node.data = &n2;
+	n2.node.left = NULL;
+	n2.node.right = NULL;
+
+	n3.v = 3;
+	n3.node.data = &n3;
+	n3.node.left = NULL;
+	n3.node.right = NULL;
+
+	n4.v = 4;
+	n4.node.data = &n4;
+	n4.node.left = NULL;
+	n4.node.right = NULL;
+
+	awoke_btree_init(&tree, benchmark_btree_compare);
+
+	awoke_btree_add(&tree, &n4.node);
+	awoke_btree_add(&tree, &n2.node);
+	awoke_btree_add(&tree, &n1.node);
+	awoke_btree_add(&tree, &n3.node);
+	awoke_btree_add(&tree, &n2.node);
+
+	awoke_btree_traverse(&tree, benchmark_btree_dump);
+
+	return et_ok;
 }
 
 static err_type benchmark_md5_test(int argc, char *argv[])
@@ -1130,14 +1175,13 @@ static err_type benchmark_md5_test(int argc, char *argv[])
 	char buf[1024];
 	char md5in[32];
 	char md5out[16];
-	char imeihex[8];
 	char imeibcd[16];
 	char *imeistr = "0123456789012347";
 	char *slatstr = "secret";
 	uint8_t version = 0;
 	uint8_t slat_byte[8] = {0x0};
 	uint8_t imei_byte[8] = {0x0};
-	uint8_t *pos = buf;
+	uint8_t *pos = (uint8_t *)buf;
 	uint8_t *plast = (uint8_t *)slatstr;
 
 	awoke_string_str2bcd(imei_byte, imeistr, strlen(imeistr));
@@ -1155,7 +1199,7 @@ static err_type benchmark_md5_test(int argc, char *argv[])
 
 	//log_debug("MD5in:");
 	//awoke_hexdump_trace(md5in, 16);
-	md5(md5in, 16, md5out);
+	md5((const uint8_t *)md5in, 16, (uint8_t *)md5out);
 
 	pkg_push_byte(version, pos);
 	pkg_push_bytes(imei_byte, pos, 8);
@@ -1174,8 +1218,9 @@ static err_type benchmark_md5_test(int argc, char *argv[])
 
 static err_type benchmark_socket_poll_test(int argc, char *argv[])
 {
+	struct timeval tv;
 	int fd_server, fd_client;
-	struct sockaddr_in servaddr, clientaddr;
+	struct sockaddr_in servaddr;
 	
 	fd_server = socket(PF_INET, SOCK_STREAM, 0);
 	log_debug("serverfd:%d", fd_server);
@@ -1192,7 +1237,10 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 	fd_client = socket(PF_INET, SOCK_STREAM, 0);
 	log_debug("clientfd:%d", fd_client);
 	connect(fd_client, (struct sockaddr*)&servaddr, sizeof(servaddr));
-	
+
+    memset(&tv, 0x0, sizeof(tv));
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
 
 	/*
 	struct pollfd fds[2];
@@ -1226,7 +1274,7 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 	FD_SET(fd_server, &readfds);
 	FD_SET(fd_client, &readfds);
 
-	select(max_fd + 1, &readfds, &writefds, &errfds, 1000);
+	select(max_fd + 1, &readfds, &writefds, &errfds, &tv);
 	if (FD_ISSET(fd_server, &readfds)) {
 		log_debug("server read");
 	}
@@ -1242,7 +1290,7 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 	}
 
 	FD_SET(fd_server, &writefds);
-	select(max_fd + 1, &readfds, &writefds, &errfds, 1000);
+	select(max_fd + 1, &readfds, &writefds, &errfds, &tv);
 	if (FD_ISSET(fd_server, &readfds)) {
 		log_debug("server read");
 	}
@@ -1259,6 +1307,8 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 
 	close(fd_client);
 	close(fd_server);
+
+	return et_ok;
 }
 
 typedef struct {
@@ -1298,14 +1348,13 @@ static void listtest_insert(listtest *x, awoke_list *xlist)
 
 static err_type benchmark_list_test(int argc, char *argv[])
 {
-	listtest a, b, c, d, e, f, g, h;
+	listtest a, b, d, e, f, g, h;
 	awoke_list xlist;
 
 	list_init(&xlist);
 
 	a.d = 1;
 	b.d = 2;
-	c.d = 3;
 	d.d = 4;
 	e.d = 5;
 	f.d = 6;
@@ -1371,7 +1420,7 @@ static void logfile_curr2cache(logfile_struct *m)
 			c->id++;
 			sprintf(rn, "xxx.log.%d", c->id);
 			log_trace("file:%s rename to %s", c->name, rn);
-			sprintf(c->name, rn);
+			sprintf(c->name, "%s", rn);
 		}
 
 		newc = mem_alloc_z(sizeof(logfile_cache));
@@ -1397,7 +1446,7 @@ static void logfile_curr2cache(logfile_struct *m)
 		c->id++;
 		sprintf(rn, "xxx.log.%d", c->id);
 		log_trace("file:%s rename to %s", c->name, rn);
-		sprintf(c->name, rn);
+		sprintf(c->name, "%s", rn);
 	}
 
 	newc = mem_alloc_z(sizeof(logfile_cache));
@@ -1424,7 +1473,7 @@ static void logfile_cache_dump(logfile_struct *m)
 	log_debug("");
 }
 
-static void *logfile_cache_write_message(void *ctx)
+static err_type logfile_cache_write_message(void *ctx)
 {
 	log_trace("write message");
 
@@ -1436,6 +1485,8 @@ static void *logfile_cache_write_message(void *ctx)
 	log_trace("currsize:%d", logfilem.currsize);
 
 	logfile_cache_dump(&logfilem);
+
+	return et_ok;
 }
 
 static err_type benchmark_logfile_cache_test(int argc, char *argv[])
@@ -1479,11 +1530,13 @@ static err_type benchmark_log_color_test(int argc, char *argv[])
 	log_err("log color test");
 	log_warn("log color test");
 	log_bug("log color test");
+	return et_ok;
 }
 
-static void *log_cache_work(void *ctx)
+static err_type log_cache_work(void *ctx)
 {
 	bk_debug("cache test");
+	return et_ok;
 }
 
 static err_type benchmark_log_cache_test(int argc, char *argv[])
@@ -1497,19 +1550,451 @@ static err_type benchmark_log_cache_test(int argc, char *argv[])
 
 	awoke_worker_stop(wk);
 	awoke_worker_destroy(wk);
+
+	return et_ok;
+}
+
+static err_type benchmark_micro_log_test(int argc, char *argv[])
+{
+	bk_microlog_info("benchmark");
+	bk_microlog_debug("micro log test");
+	bk_microlog_err("we heve some error");
+	bk_microlog_info("dd");
+	bk_microlog_info("123456");
+
+	bk_microlog_info("123");
+	bk_microlog_info("12345");
+	bk_microlog_err("1234");
+	bk_microlog_err("123456");
+	bk_microlog_err("123456");
+	bk_microlog_err("1234");
+	bk_microlog_err("12345");
+	bk_microlog_debug("12345678");
+
+	bk_microlog_info("bb");
+
+	bk_microlog_info("bbb");
+
+	bk_microlog_info("bbbb");
+
+	bk_microlog_info("bbbbb");
+
+	bk_microlog_info("bbbbbb");
+
+	bk_microlog_info("bbbbbbb");
+
+	bk_microlog_print();
+	
+	return et_ok;
+}
+
+static err_type benchmark_eots_hd_test(int argc, char *argv[])
+{
+	int opt, len = 0;
+	char *input_string;
+	char *input_filepath;
+	uint8_t *pos;
+	uint8_t buffer[256] = {0x0};
+	uint8_t cmd1[6] = {0x81, 0x01, 0x37, 0x02, 0x01, 0xff};
+	//uint8_t cmd2[6] = {0x81, 0x01, 0x37, 0x02, 0x02, 0xff};
+	uint8_t cmd3[6] = {0x81, 0x01, 0x46, 0x00, 0x01, 0xff};
+	//uint8_t cmd4[6] = {0x81, 0x01, 0x46, 0x00, 0x04, 0xff};
+	//uint8_t cmd5[6] = {0x81, 0x01, 0x63, 0x00, 0x04, 0xff};
+	//uint8_t cmd6[6] = {0x81, 0x01, 0x66, 0x00, 0x04, 0xff};
+	//uint8_t cmd7[6] = {0x81, 0x01, 0x66, 0x00, 0x02, 0xff};
+	uint8_t cmd8[6] = {0x81, 0x01, 0x39, 0x00, 0x03, 0xff};
+	//uint8_t cmd9[6] = {0x81, 0x01, 0x39, 0x02, 0x00, 0xff};
+
+		
+	static const struct option long_opts[] = {
+		{"input",		required_argument,	NULL,	arg_eots_ecmd_input},
+		{"fix",			required_argument,	NULL,	arg_eots_ecmd_fix},
+		{"file",		required_argument,	NULL,	arg_eots_ecmd_file},
+        {NULL, 0, NULL, 0}
+    };
+
+	while ((opt = getopt_long(argc, argv, "?h", long_opts, NULL)) != -1)
+    {
+        switch (opt)
+        {
+        	case arg_eots_ecmd_input:
+				input_string = optarg;
+				bk_trace("input string:%s strlen:%d", input_string, strlen(input_string));
+				len = awoke_string_to_hex(input_string, buffer, strlen(input_string));
+				bk_trace("hexlen:%d", len);
+				break;
+
+			case arg_eots_ecmd_fix:
+				pos = buffer;
+				pkg_push_bytes(cmd1, pos, 6);
+				pkg_push_bytes(cmd3, pos, 6);
+				pkg_push_bytes(cmd8, pos, 6);
+				len = pos - buffer;
+				break;
+
+			case arg_eots_ecmd_file:
+				input_filepath = optarg;
+				bk_trace("input filepath:%s", input_filepath);
+				//len = bk_eots_hd_file2buffer(input_filepath, buffer);
+				break;
+				
+			case '?':
+			case 'h':
+			default:
+				break;
+        }
+    }
+
+	awoke_hexdump_trace(buffer, len);
+	//bk_eots_hd_ecmd_process(buffer, len);
+	bk_eots_hd_syscon(buffer, len);
+	return et_ok;
+}
+
+static void afifo_test_value_handle(void *data, int width, char *buff, int len)
+{
+    int i;
+    char d;
+	awoke_fifo *f = data;
+    
+    build_ptr bp = build_ptr_init(buff, len);
+
+    build_ptr_string(bp, "value:");
+    for (i=0; i<awoke_fifo_size(f); i++) {
+        awoke_fifo_get(f, &d, i);
+        build_ptr_format(bp, "%*c", width, d);
+    }
+}
+
+static err_type benchmark_array_fifo_test(int argc, char *argv[])
+{
+	awoke_fifo fifo;
+	char data[3] = {0x0};
+	char a, b, c, x1, x2, x3;
+
+	a = 'A';
+	b = 'B';
+	c = 'C';
+
+	awoke_fifo_init(&fifo, data, sizeof(char), 3, AWOKE_FIFO_F_RBK);
+	awoke_fifo_dumpinfo_set(&fifo, 4, afifo_test_value_handle, NULL);
+
+	awoke_afifo_enqueue(&fifo, &c);
+	awoke_afifo_enqueue(&fifo, &a);
+	awoke_afifo_enqueue(&fifo, &b);
+
+	awoke_afifo_enqueue(&fifo, &a);
+	awoke_afifo_enqueue(&fifo, &c);
+	awoke_afifo_enqueue(&fifo, &a);
+	awoke_afifo_enqueue(&fifo, &b);
+
+	awoke_fifo_get(&fifo, &x1, 0);
+	awoke_fifo_get(&fifo, &x2, 1);
+	awoke_fifo_get(&fifo, &x3, 2);
+
+	bk_debug("x1:%c x2:%c x3:%c", x1, x2, x3);
+
+	if ((x1=='C') && (x2=='A') && (x3=='B')) {
+		bk_info("find BAC");
+	}
+
+	awoke_fifo_dump(&fifo);
+
+	return et_ok;
+}
+
+static err_type benchmark_valuemem_test(int argc, char *argv[])
+{
+
+typedef struct {
+	uint32_t a1;
+	uint32_t a2;
+} valuemem_A;
+
+typedef struct {
+	uint16_t a1_hi;
+	uint16_t a1_lo;
+	uint16_t a2_hi;
+	uint16_t a2_lo;
+} valuemem_B;
+
+	valuemem_A a, atest;
+	valuemem_B b;
+
+	b.a1_hi = 10;
+	b.a1_lo = 12;
+	b.a2_hi = 6;
+	b.a2_lo = 7;
+
+	a.a1 = *(uint32_t *)&b.a1_hi;
+	memcpy(&atest, &b.a1_hi, 4);
+
+	bk_debug("a.a1:0x%x %d", a.a1, a.a1);
+	bk_debug("a.a1:0x%x %d", atest.a1, atest.a1);
+
+	return et_ok;
+}
+
+static int fibonacci(int n)
+{
+	if ((n==1) || (n==2)) {
+		return 1;
+	}
+
+	return fibonacci(n-1) + fibonacci(n-2);
+}
+
+static err_type benchmark_fibonacci_test(int argc, char *argv[])
+{
+	int x = fibonacci(8);
+
+	bk_debug("fibonacci 8: %d", x);
+
+	return et_ok;
+}
+
+typedef struct _bk_version {
+	int major;
+	int monir;
+} bk_version;
+
+#define BK_VERSION_MAJOR	0
+#define BK_VERSION_MINOR	1
+#define BK_VERSION_STRING	"0.1"
+
+#define BK_VERSION_FORMAT	"%d.%d"
+
+#define bk_version_make(m1, m2)		{m1, m2}
+
+#define bk_version_encode(m1, m2)	((m1<<8)|m2)
+
+static char *version_str(void)
+{
+	return BK_VERSION_STRING;
+}
+
+static uint32_t bk_version_code(void)
+{
+	return bk_version_encode(0,1);
+}
+
+static struct _bk_version version_get(void)
+{
+	bk_version ver = bk_version_make(BK_VERSION_MAJOR, BK_VERSION_MINOR);
+	return ver;
+}
+
+static err_type benchmark_version_test(int argc, char *argv[])
+{
+	bk_debug("version str:%s", version_str());
+	bk_debug("version:"BK_VERSION_FORMAT, version_get());
+	bk_debug("version code:0x%x", bk_version_code());
+	
+	return et_ok;
+}
+
+static err_type benchmark_kalman_test(int argc, char *argv[])
+{
+	int i;
+	struct awoke_kalman1d kmf;
+	double xhat;
+	uint32_t ms[30] = {
+		0x03ccd00c, 0x03f94ebe, 0x03d22f26, 0x03f7e8ae, 0x03e4a09e, 0x03eb1f94, 
+		0x03e5785a, 0x03dfea28, 0x03dab934, 0x03f2f9f8, 0x03c0d2de, 0x03df919c,
+		0x03c88cc8, 0x03e28786, 0x03bafbf4, 0x03c4905c, 0x03db5ad2, 0x03a934b8,
+		0x03ca7664, 0x03d8d71e, 0x03c1d9e8, 0x03c7e3d6, 0x03dc9f9c, 0x03b6a898,
+		0x03cb065e, 0x03c9b07e, 0x03af938a, 0x03c57d1c, 0x03c958e2, 0x0420e710};
+	
+	awoke_kalman1d_init(&kmf, 0x02000000, 10000, 0, 100);
+
+	for (i=0; i<30; i++) {
+		xhat = awoke_kalman1d_filter(&kmf, ms[i]);
+		bk_trace("estimate:%f", xhat);
+	}
+
+	return et_ok;
+}
+
+double hqmath_abs(double j)
+{
+    if (j < 0) {
+       j = j *(-1);
+    }
+	
+    return (j);
+}
+
+static void mdiff_calculate(awoke_queue *q)
+{
+	int i;
+	uint32_t v1, v2, sum, absdiff, mdiff;
+	int32_t diff;
+	int size = awoke_queue_size(q);
+
+	//bk_trace("size:%d", size);
+
+	if (size < 2)
+		return;
+
+	sum = 0;
+	
+	for (i=1; i<size; i++) {
+		awoke_queue_get(q, i-1, &v1);
+		awoke_queue_get(q, i, &v2);
+		diff = v2-v1;
+		absdiff = hqmath_abs(diff);
+		sum += absdiff;
+		//bk_trace("v1:%d v2:%d diff:%d absdiff:%d sum:%d", v1, v2, diff, absdiff, sum);
+	}
+
+	mdiff = sum/size;
+
+	bk_trace("sum:%d, \tmdiff:%d", sum, mdiff);
+}
+
+/*
+static void mae_calculate(awoke_queue *q)
+{
+	int i;
+	uint32_t v, avg;
+	uint32_t sum = 0;
+	int size = awoke_queue_size(q);
+
+	for (i=0; i<size; i++) {
+		awoke_queue_get(q, i, &v);
+		sum += v;
+	}
+
+	avg = sum/size;
+
+	for (i=0; i<size; i++) {
+		awoke_queue_get(q, i, &v);
+		sum += v;
+	}
+}*/
+
+static err_type benchmark_mae_test(int argc, char *argv[])
+{
+	int i;
+	uint32_t xhat;
+	struct awoke_kalman1d kmf;
+	awoke_queue *q = awoke_queue_create(sizeof(uint32_t), 30, AWOKE_QUEUE_F_RB);
+
+	awoke_kalman1d_init(&kmf, 0x02000000, 10000, 0, 100);
+
+	uint32_t ms[30] = {
+		0x03ccd00c, 0x03f94ebe, 0x03d22f26, 0x03f7e8ae, 0x03e4a09e, 0x03eb1f94, 
+		0x03e5785a, 0x03dfea28, 0x03dab934, 0x03f2f9f8, 0x03c0d2de, 0x03df919c,
+		0x03c88cc8, 0x03e28786, 0x03bafbf4, 0x03c4905c, 0x03db5ad2, 0x03a934b8,
+		0x03ca7664, 0x03d8d71e, 0x03c1d9e8, 0x03c7e3d6, 0x03dc9f9c, 0x03b6a898,
+		0x03cb065e, 0x03c9b07e, 0x03af938a, 0x03c57d1c, 0x02d958e2, 0x02b0e710};
+
+	for (i=0; i<30; i++) {
+		awoke_queue_enq(q, &ms[i]);
+		mdiff_calculate(q);
+	}
+
+	return et_ok;
+}
+
+static err_type benchmark_checksum_test(int argc, char *argv[])
+{
+	int num, size;
+	uint16_t checksum;
+	uint32_t value, *p;
+	
+	uint32_t data[] = {
+		0x00000000,
+		0x00000000,
+		0x5a5a0123,
+		0x24814520,
+		0x01003e05,
+		0x06a40400,
+		0x09607341,
+		0x00001770,
+		0x5a5a5678,
+	};
+
+	uint8_t data2[] = {
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x5a, 0x5a, 0x23, 0x01,
+		0x81, 0x24, 0x20, 0x45,
+		0x00, 0x01, 0x05, 0x3e,
+		0xa4, 0x06, 0x00, 0x04,
+		0x60, 0x09, 0x41, 0x73, 
+		0x00, 0x00, 0x70, 0x17, 
+		0x5a, 0x5a, 0x78, 0x56,
+	};
+
+	p = (uint32_t *)data2;
+	value = *(p+8);
+	value = htonl(value);
+	bk_trace("value 0x%x", value);
+
+	num = array_size(data);
+	size = sizeof(uint32_t)*num;
+
+	checksum = awoke_checksum_u16((uint8_t *)&data, size);
+	bk_debug("num:%d size:%d checksum:0x%x", num, size, checksum);
+
+	checksum = awoke_checksum_u16((uint8_t *)&data2, size);
+	bk_debug("num:%d size:%d checksum:0x%x", num, size, checksum);
+
+	return et_ok;
+}
+
+static err_type benchmark_sign_exten(int argc, char *argv[])
+{
+	char string[16] = {'\0'};
+	uint8_t data[2] = {0xFC, 0X0B};
+	uint32_t edata;
+	int32_t sdata;
+	uint8_t value1, value2, value3, value4;
+	int symbol = 0;
+	double tmp;
+
+	edata = (data[0]<<4)|data[1];
+	if (edata & 0x800) {
+		bk_debug("negative");
+		sdata = (edata & ~(0x800))*(-1);
+	} else {
+		sdata = edata;
+	}
+
+	bk_debug("edata:0x%x %d", edata, edata);
+	bk_debug("sdata:0x%x %d", sdata, sdata);
+
+	bk_debug("data[0]:0x%x data[1]:0x%x", data[0], data[1]);
+
+	if (mask_exst(edata, 0x800)) {
+		symbol = 1;
+	}
+
+	value1 = (edata & 0x7F8) >> 3;
+	value2 = (edata & 0x4) >> 2;
+	value3 = (edata & 0x2) >> 1;
+	value4 = edata & 0x1;
+
+	bk_debug("value1:0x%x value2:0x%x value3:0x%x value4:0x%x", value1, value2, value3, value4);
+
+	tmp = symbol*(-256) + value1 + 0.5*value2 + 0.25*value3 + 0.125*value4;
+	bk_debug("tmp:%f", tmp);
+
+	awoke_sprintf(string, "%f", tmp);
+	bk_debug("string:%s", string);
+		
+	return et_ok;
 }
 
 int main(int argc, char *argv[])
 {
 	int opt;
-	char *app_id = "benchmark";
 	int loglevel = LOG_TRACE;
-	int logmode = LOG_TRACE;
 	bencmark_func bmfn = NULL;
 
 	static const struct option long_opts[] = {
 		{"loglevel",			required_argument,	NULL,	'l'},
-		{"logmode",				required_argument,	NULL,	'm'},
         {"waitev-test",			no_argument,		NULL,   arg_waitev_test},
         {"condaction-test",  	no_argument,  		NULL,   arg_condaction_test},
         {"event-channel",		no_argument,		NULL,	arg_event_channel},
@@ -1529,6 +2014,7 @@ int main(int argc, char *argv[])
         {"queue-test",          no_argument,        NULL,   arg_queue_test},
         {"minpq-test",          no_argument,        NULL,   arg_minpq_test},
 		{"fifo-test",  			no_argument, 		NULL,   arg_fifo_test},
+		{"btree-test",			no_argument,		NULL,	arg_btree_test},
 		{"md5-test",			no_argument, 		NULL,	arg_md5_test},
 		{"socket-poll-test",	no_argument,		NULL,	arg_socket_poll_test},
 		{"list-test",			no_argument,		NULL,	arg_list_test},
@@ -1536,6 +2022,22 @@ int main(int argc, char *argv[])
 		{"filecache-test",		no_argument, 		NULL,	arg_filecache_test},
 		{"log-color-test",		no_argument,		NULL,	arg_log_color_test},
 		{"log-cache-test",		no_argument,		NULL,	arg_log_cache_test},
+		{"micro-log-test",		no_argument,		NULL,	arg_macro_log_test},
+		{"eots-hd-test",		no_argument,		NULL,	arg_eots_hd_test},
+		{"array-fifo-test",		no_argument,		NULL,	arg_array_fifo_test},
+		{"fbkflow-test",		no_argument,		NULL,	arg_fbkflow_test},
+		{"autofocus-test",		no_argument,		NULL,	arg_autofocus_test},
+		{"valuemem-test",		no_argument,		NULL,	arg_valuemem_test},
+		{"fibonacci-test",		no_argument,		NULL,	arg_fibonacci_test},
+		{"version-test",		no_argument,		NULL,	arg_version_test},
+		{"mblock-test",			no_argument,		NULL,	arg_mblock_test},
+		{"kalman-test",			no_argument,		NULL,	arg_kalman_test},
+		{"mae-test",			no_argument,		NULL,	arg_mae_test},
+		{"checksum-test",		no_argument,		NULL,	arg_checksum_test},
+		{"imgsensor-test",		no_argument,		NULL,	arg_imgsensor_test},
+		{"nvm-test",			no_argument,		NULL,	arg_nvm_test},
+		{"epc-test",			no_argument,		NULL,	arg_epc_test},
+		{"sign-exten",			no_argument,		NULL,	arg_sign_exten},
         {NULL, 0, NULL, 0}
     };	
 
@@ -1545,10 +2047,6 @@ int main(int argc, char *argv[])
         {
         	case 'l':
 				loglevel = atoi(optarg);
-				break;
-
-        	case 'm':
-				logmode = atoi(optarg);
 				break;
 			
             case arg_waitev_test:
@@ -1582,7 +2080,7 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_timer_worker_test;
 				break;
 
-			case arg_queue_zero_filter: 
+			case arg_queue_zero_filter:
 				bmfn = benchmark_queue_zero_filter_test;
 				break;
 
@@ -1626,6 +2124,10 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_fifo_test;
 				break;
 
+			case arg_btree_test:
+				bmfn = benchmark_btree_test;
+				break;
+			
 			case arg_md5_test:
 				bmfn = benchmark_md5_test;
 				break;
@@ -1652,6 +2154,72 @@ int main(int argc, char *argv[])
 
 			case arg_log_cache_test:
 				bmfn = benchmark_log_cache_test;
+				break;
+
+			case arg_macro_log_test:
+				bmfn = benchmark_micro_log_test;
+				break;
+
+			case arg_eots_hd_test:
+				bmfn = benchmark_eots_hd_test;
+				goto run;
+
+			case arg_array_fifo_test:
+				bmfn = benchmark_array_fifo_test;
+				break;
+
+			case arg_fbkflow_test:
+				bmfn = benchmark_fbkflow_test;
+				break;
+
+			case arg_autofocus_test:
+				bmfn = benchmark_autofocus_test;
+				break;
+
+			case arg_valuemem_test:
+				bmfn = benchmark_valuemem_test;
+				break;
+
+			case arg_fibonacci_test:
+				bmfn = benchmark_fibonacci_test;
+				break;
+
+			case arg_version_test:
+				bmfn = benchmark_version_test;
+				break;
+
+			case arg_mblock_test:
+				bmfn = benchmark_mblock_test;
+				//bmfn = benchmark_version_test;
+				bk_trace("mblock test");
+				break;
+
+			case arg_kalman_test:
+				bmfn = benchmark_kalman_test;
+				break;
+
+			case arg_mae_test:
+				bmfn = benchmark_mae_test;
+				break;
+
+			case arg_checksum_test:
+				bmfn = benchmark_checksum_test;
+				break;
+
+			case arg_imgsensor_test:
+				bmfn = benchmark_imgsensor_test;
+				break;
+
+			case arg_nvm_test:
+				bmfn = benchmark_nvm_test;
+				break;
+
+			case arg_epc_test:
+				bmfn = benchmark_epc_test;
+				break;
+
+			case arg_sign_exten:
+				bmfn = benchmark_sign_exten;
 				break;
 
             case '?':

@@ -1,8 +1,11 @@
 
 EXEC = bin/benchmark
 LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern -lvinparser -lhttp
+
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
+
+SUB_DIRS := nvm sync
 
 INCLUDE_FILES = include
 
@@ -18,7 +21,9 @@ INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
                  -I$(LIB_PATH)/libpattern/include \
 				 -I$(LIB_PATH)/libsecurity/include \
 				 -I$(LIB_PATH)/libvinparser/include \
-				 -I$(LIB_PATH)/libhttp/include 
+				 -I$(LIB_PATH)/libhttp/include \
+				 -I$(CURR_DIR)/nvm \
+				 -I$(CURR_DIR)/sync
 
 all: prepare compile build
 
@@ -28,19 +33,22 @@ prepare:
 	if [ ! -d "bin" ];then mkdir bin;fi;
 	if [ ! -d "obj" ];then mkdir obj;fi;
 
-
 .PHONY: compile
-compile:$(OBJ_FILES)
+compile: $(SUB_DIRS) $(OBJ_FILES)
+
+.PHONY: $(SUB_DIRS)
+$(SUB_DIRS):
+	$(MAKE) -C $@
+	
 $(OBJ_FILES): obj/%.o:%.c
 obj/%.o:%.c
 	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -I$(INCLUDE_FILES) -c $< -o $@
 
-
 .PHONY: build
 build:$(EXEC)
-$(EXEC):$(OBJ_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) -L/usr/lib/x86_64-linux-gnu $(LIBS) -lm
-
+$(EXEC):
+	$(CC) $(CFLAGS) -o $@ obj/*.o -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) -L/usr/lib/x86_64-linux-gnu $(LIBS) -lm
+	
 .PHONY: clean
 clean:
-	rm $(OBJ_FILES) $(EXEC)
+	rm $(OBJ_FILES) $(EXEC) obj/*.o

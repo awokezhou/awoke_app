@@ -2,7 +2,7 @@
 #include "bk_filecache.h"
 
 
-
+/*
 static const char * const redundant_string =
 	"No one would have believed in the last years of the nineteenth "
 	"century that this world was being watched keenly and closely by "
@@ -24,6 +24,7 @@ static const char * const redundant_string =
 	"intellects vast and cool and unsympathetic, regarded this earth with "
 	"envious eyes, and slowly and surely drew their plans against us.  And "
 	"early in the twentieth century came the great disillusionment. \n";
+*/
 
 static const char * const log_string = "[2020/10/16 10:00:14] [MK] [DEBUG] [mk_chunkinfo_generate_from_file:204] external call from public api\n";
 
@@ -37,7 +38,6 @@ bk_filecache filecache = {
 
 static bool fc_file_exist(const char *filepath)
 {
-	int r;
 	FILE *fp;
 
 	fp = fopen(filepath, "r");
@@ -49,7 +49,7 @@ static bool fc_file_exist(const char *filepath)
 	return TRUE;
 }
 
-static fc_file_size(const char *filepath)
+static int fc_file_size(const char *filepath)
 {
 	struct stat statbuff;
 
@@ -217,9 +217,10 @@ void bk_filecache_write(char *message, int length)
 	filecache_dump(fc);
 }
 
-static void *filecache_write_work(void *ctx)
+static err_type filecache_write_work(void *ctx)
 {
-	bk_filecache_write(log_string, strlen(log_string));
+	bk_filecache_write((char *)log_string, strlen(log_string));
+	return et_ok;
 }
 
 err_type benchmark_filecache_test(int argc, char *argv[])

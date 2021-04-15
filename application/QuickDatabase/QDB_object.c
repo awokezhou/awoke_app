@@ -193,6 +193,63 @@ QDBObject ModemObject = {
 	NULL, /* point to members */
 };
 
+QDBObjectMember TestBObjectMembers[] = {
+	{
+		"Testbit",
+		QDB_MT_UNSIGNED_INTEGER,
+		QDB_MF_RO,
+		0,
+		0,
+		{(void *)0, (void *)0}  /* validator data */
+	},
+};
+
+QDBObject TestBObject = {
+	7, /* oid:QDB_OID_TEST_B */
+	"TestB", /* object name */
+	0,0, /* flags and instance depth */
+	NULL, /* parent */
+	sizeof(TestBObjectMembers)/sizeof(QDBObjectMember), /* members number */
+	TestBObjectMembers, /* point to members */
+	0, /* members number */
+	NULL, /* point to members */
+};
+
+QDBObjectMember TestAObjectMembers[] = {
+	{
+		"Testbit",
+		QDB_MT_UNSIGNED_INTEGER,
+		QDB_MF_RO,
+		0,
+		0,
+		{(void *)0, (void *)0}  /* validator data */
+	},
+};
+
+QDBObject TestAChilds[] = {
+	{
+		7,
+		"TestB", /* name:Root.TestA.TestB */
+		0,0, /* flags and instance depth */
+		NULL, /* parent */
+		sizeof(TestBObjectMembers)/sizeof(QDBObjectMember), /* members number */
+		TestBObjectMembers, /* point to members */
+		0, /* members number */
+		NULL, /* point to members */
+	},
+};
+
+QDBObject TestAObject = {
+	6, /* oid:QDB_OID_TEST_A */
+	"TestA", /* object name */
+	0,0, /* flags and instance depth */
+	NULL, /* parent */
+	sizeof(TestAObjectMembers)/sizeof(QDBObjectMember), /* members number */
+	TestAObjectMembers, /* point to members */
+	sizeof(TestAChilds)/sizeof(QDBObject), /* childs number */
+	TestAChilds, /* point to childs */
+};
+
 QDBObject RootChilds[] = {
 	{
 		2,
@@ -233,6 +290,16 @@ QDBObject RootChilds[] = {
 		ModemObjectMembers, /* point to members */
 		0, /* members number */
 		NULL, /* point to members */
+	},
+	{
+		6,
+		"TestA", /* name:Root.TestA */
+		0,0, /* flags and instance depth */
+		NULL, /* parent */
+		sizeof(TestAObjectMembers)/sizeof(QDBObjectMember), /* members number */
+		TestAObjectMembers, /* point to members */
+		sizeof(TestAChilds)/sizeof(QDBObject), /* childs number */
+		TestAChilds, /* point to childs */
 	},
 };
 

@@ -13,10 +13,10 @@
 #define BITS_PER_LONG		32
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-#define bits_to_long(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+#define bits_to_long(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(int))
 
 #define awoke_bitmap(name,bits) \
-	unsigned long name[bits_to_long(bits)]
+	unsigned int name[bits_to_long(bits)]
 
 #define BITMAP_FIRST_WORD_MASK(start) (~0UL << ((start) % BITS_PER_LONG))
 #define BITMAP_LAST_WORD_MASK(nbits)					\
@@ -26,9 +26,9 @@
 )
 
 #if defined(AWOKE_HAVE_ATOMIC)
-static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *p)
+static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
@@ -37,10 +37,10 @@ static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *
 	raw_local_irq_restore(flags);
 }
 
-static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long *p)
+static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long flags;
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int flags;
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
@@ -49,10 +49,10 @@ static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long
 	raw_local_irq_restore(flags);
 }
 
-static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned long *p)
+static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long flags;
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int flags;
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
@@ -61,27 +61,27 @@ static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned lon
 	raw_local_irq_restore(flags);
 }
 #else
-static inline void _set_bit(unsigned int bit, volatile unsigned long *p)
+static inline void _set_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
 	*p |= mask;
 }
 
-static inline void _clear_bit(unsigned int bit, volatile unsigned long *p)
+static inline void _clear_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
 	*p &= ~mask;
 }
 
-static inline void _change_bit(unsigned int bit, volatile unsigned long *p)
+static inline void _change_bit(unsigned int bit, volatile unsigned int *p)
 {
-	unsigned long mask = 1UL << (bit & 31);
+	unsigned int mask = 1UL << (bit & 31);
 
 	p += bit >> 5;
 
@@ -89,7 +89,7 @@ static inline void _change_bit(unsigned int bit, volatile unsigned long *p)
 }
 #endif
 
-static inline int test_bit(int nr, const volatile unsigned long *addr)
+static inline int test_bit(int nr, const volatile unsigned int *addr)
 {
 	return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
 }
@@ -113,9 +113,9 @@ static inline int test_bit(int nr, const volatile unsigned long *addr)
 
 
 
-bool awoke_bitmap_empty(const unsigned long *bitmap, int bits);
-void awoke_bitmap_dump(const unsigned long *bitmap, int size);
-void awoke_bitmap_clear(unsigned long *map, int start, int nr);
-void awoke_bitmap_set(unsigned long *map, int start, int nr);
-int awoke_bitmap_full(const unsigned long *bitmap, int bits);
+bool awoke_bitmap_empty(const unsigned int *bitmap, int bits);
+void awoke_bitmap_dump(const unsigned int *bitmap, int size);
+void awoke_bitmap_clear(unsigned int *map, int start, int nr);
+void awoke_bitmap_set(unsigned int *map, int start, int nr);
+int awoke_bitmap_full(const unsigned int *bitmap, int bits);
 #endif /* __AWOKE_BITMAP_H__ */

@@ -113,6 +113,11 @@ static inline void list_unlink(struct _awoke_list *entry)
 	     &pos->member != (head); 					\
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
 
+#define list_foreach(pos, head, member)				\
+		for (pos = list_entry((head)->next, typeof(*pos), member);	\
+			 &pos->member != (head);					\
+			 pos = list_entry(pos->member.next, typeof(*pos), member))
+
 #define list_for_each_entry_safe(pos, tmp, head, member)				\
         for (pos = list_entry((head)->next, typeof(*pos), member),\
              tmp = list_entry(pos->member.next, typeof(*pos), member); \

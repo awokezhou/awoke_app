@@ -49,7 +49,15 @@
                 description="Physical cell ID." />
     </object>
 
+    <object name="Root.TestA" category="Static" description="QDB Struct Test.">
+        <member name="Testbit" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Testbit." />
+    </object>
 
-
+    <object name="Root.TestA.TestB" category="Static" description="QDB Struct Test.">
+        <member name="Testbit" dtype="UnsignedInt" power="ReadOnly" default="0"
+                description="Testbit." />
+    </object>
+    
 </QuickDatabase>
 

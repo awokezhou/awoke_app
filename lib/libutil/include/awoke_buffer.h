@@ -51,6 +51,7 @@ bool awoke_buffchunk_dynamic(struct _awoke_buffchunk *chunk);
 struct _awoke_buffchunk *awoke_buffchunk_create(int size);
 err_type awoke_buffchunk_init(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_clean(struct _awoke_buffchunk *chunk);
+void awoke_buffchunk_clear(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_free(struct _awoke_buffchunk **p_chunk);
 err_type awoke_buffchunk_write(struct _awoke_buffchunk *chunk, const char *data, 
 	int length, bool trybest);
@@ -58,6 +59,7 @@ err_type awoke_buffchunk_resize(struct _awoke_buffchunk *chunk,
 	int resize, bool trybest);
 const char *awoke_buffchunk_version();
 int awoke_buffchunk_sizelimit();
+err_type awoke_buffchunk_copy(struct _awoke_buffchunk *dst, struct _awoke_buffchunk *src);
 int awoke_buffchunk_remain(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_dump(struct _awoke_buffchunk *chunk);
 struct _awoke_buffchunk_pool *awoke_buffchunk_pool_create(int maxsize);

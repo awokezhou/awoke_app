@@ -118,6 +118,12 @@ void awoke_buffchunk_clean(struct _awoke_buffchunk *chunk)
 	buffchunk_init(chunk);
 }
 
+void awoke_buffchunk_clear(struct _awoke_buffchunk *chunk)
+{
+	memset(chunk->p, 0x0, chunk->size);
+	chunk->length = 0;
+}
+
 void awoke_buffchunk_free(struct _awoke_buffchunk **p_chunk)
 {
 	awoke_buffchunk *p;
@@ -254,6 +260,16 @@ int awoke_buffchunk_remain(struct _awoke_buffchunk *chunk)
 int awoke_buffchunk_sizelimit()
 {
 	return AWOKE_BUFFCHUNK_LIMIT;
+}
+
+err_type awoke_buffchunk_copy(struct _awoke_buffchunk *dst, struct _awoke_buffchunk *src)
+{
+	if (src->length > dst->size)
+		return err_empty;
+
+	memcpy(dst->p, src->p, src->length);
+	dst->length = src->length;
+	return et_ok;
 }
 
 void awoke_buffchunk_dump(struct _awoke_buffchunk *chunk)

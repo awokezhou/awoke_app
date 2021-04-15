@@ -103,6 +103,7 @@ typedef enum {
 
 #define LOG_M_BK			LOG_M_OFFSET(8)
 #define LOG_M_MK			LOG_M_OFFSET(9)
+#define LOG_M_CMDER			LOG_M_OFFSET(10)
 #define LOG_M_ALL			0xFFFFFFFF
 
 
@@ -179,6 +180,14 @@ typedef struct _awoke_log_context {
 #define awoke_hexdump_bug(...)		awoke_hexdump(LOG_BUG, 		__func__, __LINE__, __VA_ARGS__)
 
 
+#define awoke_bitdump_burst(...)	awoke_bitdump(LOG_BURST, 	__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_trace(...)	awoke_bitdump(LOG_TRACE, 	__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_debug(...)	awoke_bitdump(LOG_DBG, 		__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_info(...)		awoke_bitdump(LOG_INFO, 	__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_notice(...)	awoke_bitdump(LOG_NOTICE, 	__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_err(...)		awoke_bitdump(LOG_ERR, 		__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_warn(...)		awoke_bitdump(LOG_WARN, 	__func__, __LINE__, __VA_ARGS__)
+#define awoke_bitdump_bug(...)		awoke_bitdump(LOG_BUG, 		__func__, __LINE__, __VA_ARGS__)
 
 
 

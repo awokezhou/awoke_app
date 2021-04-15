@@ -9,6 +9,7 @@
 
 
 /* -- Member Flag --{*/
+/* Parameter Access Control(PAC) */
 #define QDB_MF_RO   0x01
 #define QDB_MF_WO   0x02
 #define QDB_MF_WR   (QDB_MF_RO|QDB_MF_WO)
@@ -25,7 +26,7 @@ typedef enum {
 	QDB_MT_INTEGER,
 	QDB_MT_UNSIGNED_INTEGER,
     QDB_MT_DATETIME,
-
+	
 } QDBMemberType;
 /*}-- Member Type -- */
 

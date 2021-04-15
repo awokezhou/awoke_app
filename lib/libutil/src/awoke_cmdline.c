@@ -19,7 +19,7 @@ err_type awoke_cmdline_read(char *buffer, int maxlen)
 	return et_fail;
 }
 
-awoke_cmdline *awoke_cmdline_get(struct _cmdline_item *command_table, int size)
+awoke_cmdline_item *awoke_cmdline_get(struct _cmdline_item *command_table, int size)
 {
 	err_type ret;
 	char command[AWOKE_CMDLINE_MAXLEN] = {'\0'};

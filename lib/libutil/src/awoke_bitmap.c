@@ -4,7 +4,7 @@
 #include "awoke_string.h"
 
 
-bool awoke_bitmap_empty(const unsigned long *bitmap, int bits)
+bool awoke_bitmap_empty(const unsigned int *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -18,7 +18,7 @@ bool awoke_bitmap_empty(const unsigned long *bitmap, int bits)
 	return 1;
 }
 
-int awoke_bitmap_full(const unsigned long *bitmap, int bits)
+int awoke_bitmap_full(const unsigned int *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -32,12 +32,12 @@ int awoke_bitmap_full(const unsigned long *bitmap, int bits)
 	return 1;
 }
 
-void awoke_bitmap_set(unsigned long *map, int start, int nr)
+void awoke_bitmap_set(unsigned int *map, int start, int nr)
 {
-	unsigned long *p = map + BIT_WORD(start);
+	unsigned int *p = map + BIT_WORD(start);
 	const int size = start + nr;
 	int bits_to_set = BITS_PER_LONG - (start % BITS_PER_LONG);
-	unsigned long mask_to_set = BITMAP_FIRST_WORD_MASK(start);
+	unsigned int mask_to_set = BITMAP_FIRST_WORD_MASK(start);
 
 	while (nr - bits_to_set >= 0) {
 		*p |= mask_to_set;
@@ -52,12 +52,12 @@ void awoke_bitmap_set(unsigned long *map, int start, int nr)
 	}
 }
 
-void awoke_bitmap_clear(unsigned long *map, int start, int nr)
+void awoke_bitmap_clear(unsigned int *map, int start, int nr)
 {
-	unsigned long *p = map + BIT_WORD(start);
+	unsigned int *p = map + BIT_WORD(start);
 	const int size = start + nr;
 	int bits_to_clear = BITS_PER_LONG - (start % BITS_PER_LONG);
-	unsigned long mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
+	unsigned int mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
 
 	while (nr - bits_to_clear >= 0) {
 		*p &= ~mask_to_clear;
@@ -72,7 +72,7 @@ void awoke_bitmap_clear(unsigned long *map, int start, int nr)
 	}
 }
 
-void awoke_bitmap_dump(const unsigned long *bitmap, int size)
+void awoke_bitmap_dump(const unsigned int *bitmap, int size)
 {
 	int i, linenr;
 	char buff[256] = {'\0'};

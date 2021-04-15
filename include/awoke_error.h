@@ -5,6 +5,7 @@
 typedef enum 
 {
     et_ok = 0,
+	et_noeed,
     et_fail,
     et_param,
     et_nomem,
@@ -12,6 +13,7 @@ typedef enum
     et_exist,
     et_full,
     et_empty,
+    et_notfind,
     et_encode,
     et_decode,
     et_sock_set,
@@ -45,6 +47,15 @@ typedef enum
 
 	et_waitev_create,
 	et_waitev_finish,
+
+	err_param,
+	err_exist,
+	err_oom,
+	err_notfind,
+	err_open,
+	err_fail,
+	err_empty,
+	err_send,
 } err_type;
 
 

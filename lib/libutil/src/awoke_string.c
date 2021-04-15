@@ -133,7 +133,7 @@ static int ctoi(char c)
 int awoke_string_to_hex(char *string, uint8_t *hex, uint16_t hex_len)
 {
 	int i;
-    int len;
+    int len = 0;
     char *str = string;
 	
     if (!hex || !string || hex_len<=0) {

@@ -112,13 +112,26 @@ bool awoke_fifo_empty(struct _awoke_fifo *f);
 bool awoke_fifo_full(struct _awoke_fifo *f);
 err_type awoke_fifo_resize(struct _awoke_fifo *f, unsigned int capacity);
 err_type awoke_fifo_size(struct _awoke_fifo *f);
-err_type *awoke_fifo_dequeue(struct _awoke_fifo *f, void *u);
-err_type *awoke_fifo_enqueue(struct _awoke_fifo *f, void *u);
+err_type awoke_fifo_dequeue(struct _awoke_fifo *f, void *u);
+err_type awoke_fifo_enqueue(struct _awoke_fifo *f, void *u);
+err_type awoke_fifo_init(struct _awoke_fifo *f, void *addr, int nodesize, int capacity, uint16_t flags);
 awoke_fifo *awoke_fifo_create(size_t nodesize, int capacity, uint16_t flags);
 void awoke_fifo_dumpinfo_set(struct _awoke_fifo *f, int width,
     void (*value_dump)(void *, int, char *, int),
     void (*prior_dump)(void *, int, char *, int));
+void awoke_fifo_dump(struct _awoke_fifo *f);
 /*}-- FIFO -- */
+
+
+/*
+ * Array FIFO {
+ */
+void awoke_afifo_create(void *addr, int nodesize, int capacity, struct _awoke_fifo *f);
+err_type awoke_afifo_enqueue(struct _awoke_fifo *f, void *u);
+err_type awoke_afifo_dequeue(struct _awoke_fifo *f, void *u);
+/*
+ * } Array FIFO
+ */
 
 
 /* -- Namespace --{*/
@@ -155,7 +168,7 @@ typedef struct _minpq_namespace {
 	err_type (*del)(struct _awoke_minpq *q, void *u, int *p, int index);
     void (*set_info_handle)(struct _awoke_minpq *q, int,
         void (*info_prior_handle)(struct _awoke_minpq *, int, char *, int),
-        void (*info_value_handle)(struct _awoke_minpq *, int, char *, int))
+        void (*info_value_handle)(struct _awoke_minpq *, int, char *, int));
 } minpq_namespace;
 extern minpq_namespace const MinPQ;
 #endif

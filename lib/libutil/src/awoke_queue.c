@@ -707,7 +707,7 @@ err_type awoke_fifo_get(struct _awoke_fifo *f, void *u, int index)
 	return et_ok;
 }
 
-err_type *awoke_fifo_dequeue(struct _awoke_fifo *f, void *u)
+err_type awoke_fifo_dequeue(struct _awoke_fifo *f, void *u)
 {
 	char *addr;
 	
@@ -728,7 +728,7 @@ err_type *awoke_fifo_dequeue(struct _awoke_fifo *f, void *u)
 	return et_ok;
 }
 
-err_type *awoke_fifo_enqueue(struct _awoke_fifo *f, void *u)
+err_type awoke_fifo_enqueue(struct _awoke_fifo *f, void *u)
 {
 	char *addr;
 	
@@ -774,7 +774,7 @@ awoke_fifo *awoke_fifo_create(size_t nodesize, int capacity, uint16_t flags)
 
 	f->capacity = capacity;
     if (capacity == 0) {
-        mask_push(f->flags, AWOKE_MINPQ_F_RES);
+        mask_push(f->flags, AWOKE_FIFO_F_RES);
     }
 
 	mask_push(f->flags, flags);
@@ -788,6 +788,44 @@ awoke_fifo *awoke_fifo_create(size_t nodesize, int capacity, uint16_t flags)
 	f->q = mem_alloc_z(allocnr*f->nodesize);
 
 	return f;
+}
+
+err_type awoke_fifo_init(struct _awoke_fifo *f, void *addr, int nodesize, int capacity, uint16_t flags)
+{
+	int allocnr = 0;
+	
+    if (nodesize <= 0) {
+		log_err("nodesize zero");
+		return et_param;
+	}
+	
+    if (capacity < 0) {
+		log_err("capacity invaild");
+		return et_param;
+	}
+
+	f->head = 0;
+	f->tail = -1;
+    f->node_nr = 0;
+    f->nodesize = nodesize;
+
+	f->capacity = capacity;
+
+    if (capacity == 0) {
+        mask_push(f->flags, AWOKE_FIFO_F_RES);
+    }
+
+	mask_push(f->flags, flags);
+
+    if (!capacity) {
+        allocnr = 1;
+    } else {
+        allocnr = capacity;
+    }
+
+	f->q = addr;
+
+	return et_ok;		
 }
 
 void awoke_fifo_dumpinfo_set(struct _awoke_fifo *f, int width,
@@ -846,3 +884,80 @@ void awoke_fifo_dump(struct _awoke_fifo *f)
         log_trace("%s", buff);
     }
 }
+
+void awoke_afifo_create(void *addr, int nodesize, int capacity, struct _awoke_fifo *f)
+{
+	int allocnr = 0;
+	
+    if (nodesize <= 0) {log_err("nodesize zero");return NULL;}
+    if (capacity < 0) {log_err("capacity invaild");return NULL;}
+
+	f->head = 0;
+	f->tail = -1;
+    f->node_nr = 0;
+    f->nodesize = nodesize;
+
+	f->capacity = capacity;
+
+	mask_push(f->flags, AWOKE_FIFO_F_RBK);
+
+    if (!capacity) {
+        allocnr = 1;
+    } else {
+        allocnr = capacity;
+    }
+
+	f->q = addr;
+
+	return f;	
+}
+
+err_type awoke_afifo_enqueue(struct _awoke_fifo *f, void *u)
+{
+	char *addr;
+	
+	if (!f || !u) {
+		log_err("FIFO or unit NULL");
+		return et_param;
+	}
+
+	if (awoke_fifo_full(f)) {
+		if (mask_exst(f->flags, AWOKE_FIFO_F_RBK)) {
+			addr = f->q + f->head*f->nodesize;
+			memset(addr, 0x0, f->nodesize);
+			f->head = (f->head + 1) % f->capacity;
+			f->node_nr--;
+		} else {
+			log_err("FIFO full");
+			return et_full;
+		}
+	}
+
+	f->tail = (f->tail + 1) % f->capacity;
+	addr = f->q + f->tail*f->nodesize;
+	memcpy(addr, u, f->nodesize);
+	f->node_nr++;
+	return et_ok;
+}
+
+err_type awoke_afifo_dequeue(struct _awoke_fifo *f, void *u)
+{
+	char *addr;
+	
+	if (!f || !u) {
+		log_err("FIFO or unit NULL");
+		return et_param;
+	}
+
+	if (awoke_fifo_empty(f)) {
+		log_err("FIFO empty");
+		return et_empty;
+	}
+
+	addr = f->q + f->head*f->nodesize;
+	memcpy(u, addr, f->nodesize);
+	f->head = (f->head + 1) % f->capacity;
+	f->node_nr--;
+	return et_ok;
+}
+
