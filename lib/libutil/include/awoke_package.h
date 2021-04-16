@@ -76,6 +76,21 @@ typedef struct _pkg_header_example {
 
 uint16_t awoke_checksum_u16(void *data, int len);
 uint16_t awoke_crc16(uint8_t *data, int len);
+uint8_t awoke_checksum_8(uint8_t *buf, int len);
 
+#define awoke_biglittle_swap16(a)	((((uint16_t)(a) & 0xff00) >> 8) | (((uint16_t)(a) & 0x00ff) << 8))
+
+#define awoke_biglittle_swap32(a) 	((((uint32_t)(a) & 0xff000000) >> 24) | \
+								  (((uint32_t)(a) & 0x00ff0000) >> 8) | \
+								  (((uint32_t)(a) & 0x0000ff00) << 8) | \
+								  (((uint32_t)(a) & 0x000000ff) << 24))
+
+
+int awoke_cpu_endian(void);
+unsigned long int awoke_htonl(unsigned long int x);
+unsigned short int awoke_htons(unsigned short int x);
+
+
+#define PACKED_ALIGN_BYTE __attribute__ ((packed,aligned(1)))
 
 #endif /* __AWOKE_PACKAGE_H__ */

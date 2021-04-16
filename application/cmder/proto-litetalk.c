@@ -5,23 +5,36 @@
 #include "awoke_package.h"
 
 
-static bool litetalk_match(struct cmder_protocol *proto, void *buf, int len)
+static err_type litetalk_match(struct cmder_protocol *proto, void *buf, int len)
 {
 	uint8_t *pos = buf;
+	uint8_t flag;
+	uint8_t category;
 	uint32_t marker;
+	uint32_t content_length;
 
 	pkg_pull_dwrd(marker, pos);
-	marker = htonl(marker);
-	cmder_trace("marker:0x%x", marker);
+	marker = awoke_htonl(marker);
+	pkg_pull_byte(category, pos);
+	pkg_pull_byte(flag, pos);
+	pkg_pull_dwrd(content_length, pos);
+	content_length = awoke_htonl(content_length);
+
+	cmder_trace("mark:0x%x", marker);
 	
 	if (marker != 0x13356789) {
-		cmder_trace("match");
-		return FALSE;
+		return err_match;
 	}
 
-	cmder_debug("matched");
+	cmder_trace("len:%d content length:%d", len, content_length);
+	if (len == (content_length+10)) {
+		return et_ok;
+	} else if (len < (content_length+10)) {
+		cmder_trace("rx not finish");
+		return err_unfinished;
+	}
 
-	return TRUE;
+	return et_ok;
 }
 
 static err_type litetalk_stream_download(struct cmder_protocol *proto, 
@@ -89,6 +102,8 @@ static err_type litetalk_read(struct cmder_protocol *proto, void *buf, int len)
 	uint8_t category;
 	uint32_t content_length;
 	uint8_t *pos = (uint8_t *)buf;
+
+	cmder_trace("litetalk read");
 	
 	pos += 4;
 	pkg_pull_byte(category, pos);

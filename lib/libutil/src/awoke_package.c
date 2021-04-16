@@ -76,3 +76,36 @@ uint16_t awoke_crc16(uint8_t *data, int len)
 	return crc;
 }
 
+uint8_t awoke_checksum_8(uint8_t *buf, int len)
+{
+	int i;
+	uint8_t sum = 0x0;
+
+	for (i=0; i<len; i++) {
+		sum += buf[i];
+	}
+
+	return sum;
+}
+
+int awoke_cpu_endian(void)
+{
+	union {
+		unsigned long int i;
+		unsigned char s[4];
+	}c;
+
+	c.i = 0x12345678;
+	return (0x12 == c.s[0]);
+}
+
+unsigned long int awoke_htonl(unsigned long int x)
+{
+	return awoke_cpu_endian() ? x : awoke_biglittle_swap32(x);
+}
+
+unsigned short int awoke_htons(unsigned short int x)
+{
+	return awoke_cpu_endian() ? x : awoke_biglittle_swap16(x);
+}
+

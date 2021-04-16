@@ -284,16 +284,30 @@ static err_type test_bytes_tx(struct cmder *c)
 
 static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 {
+	err_type ret;
 	int readsize, c;
 	awoke_buffchunk *chunk, *buffer;
+	struct cmder_protocol *proto;
 	struct uartcmder *uc = (struct uartcmder *)data;
 
 	buffer = tcvr->rxbuffer;
 
-	c = read(tcvr->fd, buffer->p, buffer->size);
+	c = read(tcvr->fd, buffer->p+buffer->length, buffer->size);
 	if (c > 0) {
-		cmder_trace("read %d", c);
-		buffer->length = c;
+		buffer->length += c;
+		cmder_trace("read %d total:%d", c, buffer->length);
+		if (uc->base.nr_protocols) {
+			list_foreach(proto, &uc->base.protocols, _head) {
+				ret = proto->match(proto, buffer->p, buffer->length);
+				if (ret == err_unfinished) {
+					return et_ok;
+				}
+			}
+		}
+		if (et_ok != ret) {
+			return et_ok;
+		}
+
 		chunk = awoke_buffchunk_create(buffer->length);
 		if (!chunk) {
 			cmder_err("buffer create error");
@@ -443,24 +457,31 @@ static err_type cmder_tab_register(struct cmder *c, const char *name, struct com
 
 static void cmder_static_init(struct uartcmder *c)
 {
-	c->ae_enable = 1;
-	c->ae_expo_en = 1;
-	c->ae_gain_en = 1;
-	c->gain = 0;
-	c->exposure = 1600;
-	c->goal_max = 85;
-	c->goal_min = 65;
-	c->ae_frame = 4;
+	struct cmder_config *cfg = &c->config;
+	
+	cfg->ae_enable = 0;
+	cfg->ae_expo_enable = 0;
+	cfg->ae_gain_enable = 0;
+	cfg->gain = 0;
+	cfg->gain_min = 0;
+	cfg->gain_max = 500;
+	cfg->expo = 1600;
+	cfg->expo_min = 15;
+	cfg->expo_max = 40000;
+	cfg->goal_max = 85;
+	cfg->goal_min = 65;
+	cfg->ae_frame = 4;
 
-	c->fps = 100;
-	c->fps_min = 0;
-	c->fps_max = 125;
-	c->cl_test = 0;
-	c->front_test = 0;
-	c->cross_en = 0;
-	c->cross_cp = (640<<16)|540;
-	c->vinvs = 0;
-	c->hinvs = 0;
+	cfg->fps = 100;
+	cfg->fps_min = 0;
+	cfg->fps_max = 125;
+	cfg->cltest_enable = 0;
+	cfg->frtest_enable = 0;
+	cfg->crossview_enable = 0;
+	cfg->crossview_point.x = 640;
+	cfg->crossview_point.y = 540;
+	cfg->vinvs = 0;
+	cfg->hinvs = 0;
 }
 
 static err_type cmder_init(struct uartcmder *c, const char *port)
@@ -657,6 +678,71 @@ static err_type cmder_command_send(struct uartcmder *uc)
 	return et_ok;
 }
 
+static err_type litk_stream_write(awoke_buffchunk *chunk, uint8_t media)
+{
+	err_type ret;
+	uint8_t *pos;
+	uint8_t checksum;
+	uint32_t mark;
+	struct cmder_config *cfg;
+	
+	switch (media) {
+
+	case LITETALK_MEDIA_DEFCONFIG:
+		cmder_info("media: defconfig");
+		cfg = (struct cmder_config *)chunk->p;
+		if (cfg->mark != LITETALK_MARK) {
+			cmder_err("mark error:0x%x", cfg->mark);
+			return err_param;
+		}
+		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
+		if (checksum != cfg->checksum) {
+			cmder_err("checksum error:0x%x", cfg->checksum);
+			return err_checksum;
+		}
+		break;
+
+	case LITETALK_MEDIA_USRCONFIG:
+		cmder_info("media: usrconfig");
+		cfg = (struct cmder_config *)chunk->p;
+		//mbp_trace("mark:0x%x", cfg->mark);
+		//mbp_trace("goal:%d min:%d max:%d", cfg->goal, cfg->goal_min, cfg->goal_max);
+		//mbp_trace("expo:%d min:%d max:%d", cfg->expo, cfg->expo_min, cfg->expo_max);
+		//mbp_trace("checksum:0x%x 0x%x", cfg->checksum, chunk->p[chunk->length-1]);
+		if (cfg->mark != LITETALK_MARK) {
+			cmder_err("mark error:0x%x", cfg->mark);
+			return err_param;
+		}
+		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
+		if (checksum != cfg->checksum) {
+			cmder_err("checksum error:0x%x 0x%x", cfg->checksum, checksum);
+			return err_checksum;
+		}
+		break;
+
+	case LITETALK_MEDIA_SENSORCFG:
+		cmder_info("media: sensorcfg");
+		pos = (uint8_t *)chunk->p;
+		pkg_pull_dwrd(mark, pos);
+		if (mark != LITETALK_MARK) {
+			cmder_err("mark error:0x%x", mark);
+			return err_param;
+		}
+		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
+		if (checksum != chunk->p[chunk->length-1]) {
+			cmder_err("checksum error");
+			return err_checksum;
+		}
+		break;
+
+	default:
+		cmder_err("unknown media:%d", media);
+		break;
+	}
+
+	return ret;
+}
+
 static err_type litetalk_stream_process(struct cmder_protocol *proto, 
 	void *user, void *in, int length)
 {
@@ -710,6 +796,7 @@ create_pool:
 		awoke_buffchunk_pool_free(&priv->stream_dbpool);
 		priv->stream_dbpool = NULL;
 		awoke_hexdump_trace(merge->p, merge->length);
+		litk_stream_write(merge, sinfo->media);
 		awoke_buffchunk_free(&merge);
 	}
 
@@ -835,29 +922,45 @@ static err_type ltk_exposure_set(struct cmder_protocol *proto,
 {
 	uint8_t *pos = (uint8_t *)in;
 	struct uartcmder *uc = proto->context;
-	struct ltk_exposure expo;
+	struct cmder_config *cfg = &uc->config;
+	struct ltk_exposure exposure;
 
-	pkg_pull_word(expo.gain, pos);
-	expo.gain = htons(expo.gain);
+	pkg_pull_word(exposure.gain, pos);
+	exposure.gain = awoke_htons(exposure.gain);
+	pos += 4;	// skip gain min/max
+	pkg_pull_word(exposure.expo, pos);
+	exposure.expo = awoke_htons(exposure.expo);
+	pos += 4; 	// skip expo min/max	
+	pkg_pull_byte(exposure.ae_enable, pos);
+	pkg_pull_byte(exposure.goal_max, pos);
+	pkg_pull_byte(exposure.goal_min, pos);
+	pkg_pull_byte(exposure.ae_frame, pos);
 
-	pkg_pull_word(expo.exposure, pos);
-	expo.exposure = htons(expo.exposure);	
+	cmder_info("");
+	cmder_info("---- exposure set ----");
+	cmder_info("gain:%d min:%d max:%d", exposure.gain, 
+		exposure.gain_min, exposure.gain_max);
+	cmder_info("expo:%d min:%d max:%d", exposure.expo, 
+		exposure.expo_min, exposure.expo_max);
+	cmder_info("goal min:%d max:%d", exposure.goal_min, exposure.goal_max);
+	cmder_info("ae enable:%d", exposure.ae_enable);
+	cmder_info("ae frame:%d", exposure.ae_frame);
+	cmder_info("---- exposure set ----");
+	cmder_info("");
 
-	pkg_pull_byte(expo.ae_enable, pos);
-	pkg_pull_byte(expo.goal_max, pos);
-	pkg_pull_byte(expo.goal_min, pos);
-	pkg_pull_byte(expo.ae_frame, pos);
 
-	cmder_debug("ae_enable:0x%x", expo.ae_enable);
-	
-	uc->gain = expo.gain;
-	uc->exposure = expo.exposure;
-	uc->ae_enable = expo.ae_enable & 0x1;
-	uc->ae_expo_en = (expo.ae_enable & 0x2) >> 1;
-	uc->ae_gain_en = (expo.ae_enable & 0x4) >> 2;
-	uc->goal_max = expo.goal_max;
-	uc->goal_min = expo.goal_min;
-	uc->ae_frame = expo.ae_frame;
+	if (exposure.gain != cfg->gain) {
+		cfg->gain = exposure.gain;
+	}
+
+	if (exposure.expo != cfg->expo) {
+		cfg->expo = exposure.expo;
+	}
+
+	if (cfg->ae_enable != exposure.ae_enable) {
+		cfg->ae_enable = exposure.ae_enable;
+	}
+
 	
 	return et_ok;
 }
@@ -869,36 +972,45 @@ static err_type ltk_exposure_get(struct cmder_protocol *proto,
 	uint8_t code = 0;
 	uint8_t *head = chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
+	struct ltk_exposure exposure;
 	struct uartcmder *uc = proto->context;
-	struct ltk_exposure expo;
+	struct cmder_config *cfg = &uc->config;
 
-	expo.gain = uc->gain;
-	expo.exposure = uc->exposure;
-	expo.ae_enable = uc->ae_enable | uc->ae_expo_en<<1 | uc->ae_gain_en<<2;
-	expo.goal_max = uc->goal_max;
-	expo.goal_min = uc->goal_min;
-	expo.ae_frame = uc->ae_frame;
+	exposure.gain = awoke_htons(cfg->gain);
+	exposure.gain_min = awoke_htons(cfg->gain_min);
+	exposure.gain_max = awoke_htons(cfg->gain_max);
+	exposure.expo = awoke_htons(cfg->expo);
+	exposure.expo_min = awoke_htons(cfg->expo_min);
+	exposure.expo_max = awoke_htons(cfg->expo_max);
+	exposure.ae_enable = cfg->ae_enable;
+	exposure.goal_max = cfg->goal_max;
+	exposure.goal_min = cfg->goal_min;
+	exposure.ae_frame = cfg->ae_frame;
 
-	cmder_debug("gain:%d", uc->gain);
-	cmder_debug("exposure:%d", uc->exposure);
-	cmder_debug("ae_enable:%d", uc->ae_enable);
-	cmder_debug("goal_max:%d", uc->goal_max);
-	cmder_debug("goal_min:%d", uc->goal_min);
-	cmder_debug("ae_frame:%d", uc->ae_frame);
+	cmder_info("");
+	cmder_info("---- exposure get ----");
+	cmder_info("gain:%d min:%d max:%d", cfg->gain, cfg->gain_min, cfg->gain_max);
+	cmder_info("expo:%d min:%d max:%d", cfg->expo, cfg->expo_min, cfg->expo_max);
+	cmder_info("ae_enable:%d", cfg->ae_enable);
+	cmder_info("goal_max:%d", cfg->goal_max);
+	cmder_info("goal_min:%d", cfg->goal_min);
+	cmder_info("ae_frame:%d", cfg->ae_frame);
+	cmder_info("---- exposure get ----");
+	cmder_info("");
 
 	pkg_push_byte(info->cmdtype, pos);
 	pkg_push_byte(code, pos);
+	pkg_push_word(exposure.gain, pos);
+	pkg_push_word(exposure.gain_min, pos);
+	pkg_push_word(exposure.gain_max, pos);
+	pkg_push_word(exposure.expo, pos);
+	pkg_push_word(exposure.expo_min, pos);
+	pkg_push_word(exposure.expo_max, pos);
+	pkg_push_byte(exposure.ae_enable, pos);
+	pkg_push_byte(exposure.goal_max, pos);
+	pkg_push_byte(exposure.goal_min, pos);
+	pkg_push_byte(exposure.ae_frame, pos);
 
-	expo.gain = htons(expo.gain);
-	pkg_push_word(expo.gain, pos);
-
-	expo.exposure = htons(expo.exposure);
-	pkg_push_word(expo.exposure, pos);
-
-	pkg_push_byte(expo.ae_enable, pos);
-	pkg_push_byte(expo.goal_max, pos);
-	pkg_push_byte(expo.goal_min, pos);
-	pkg_push_byte(expo.ae_frame, pos);
 
 	litetalk_pack_header(chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
@@ -1030,6 +1142,7 @@ static err_type litetalk_service_callback(void *context, uint8_t reasons,
 static err_type cmder_protocol_poll(struct uartcmder *uc)
 {
 	int prior;
+	err_type ret;
 	struct cmder *c = &uc->base;
 	struct cmder_protocol *proto;
 	awoke_buffchunk *chunk;
@@ -1051,10 +1164,12 @@ static err_type cmder_protocol_poll(struct uartcmder *uc)
 
 	list_foreach(proto, &c->protocols, _head) {
 		//cmder_debug("protocol:%s", proto->name);
-		if (proto->match(proto, chunk->p, chunk->length)) {
-			//cmder_debug("%s match", proto->name);
-			return proto->read(proto, chunk->p, chunk->length);
+		ret = proto->match(proto, chunk->p, chunk->length);
+		if (ret != et_ok) {
+			break;
 		}
+		proto->read(proto, chunk->p, chunk->length);
+		break;
 	}
 
 	awoke_buffchunk_free(&chunk);
@@ -1180,7 +1295,7 @@ int main (int argc, char *argv[])
 	err_type ret;
 	uint8_t type, level;
 	struct uartcmder *cmder;
-	const char *serialport = "/dev/ttyS1";
+	const char *serialport = "/dev/ttyS11";
 	
 	cmder = mem_alloc_z(sizeof(struct uartcmder));
 	if (!cmder) {
@@ -1208,7 +1323,7 @@ int main (int argc, char *argv[])
 		//cmder_swift_test_run(cmder);
 		cmder_protocol_poll(cmder);
 		cmder_command_send(cmder);
-		usleep(1000);
+		usleep(100);
 	}
 
 	return 0;

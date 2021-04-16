@@ -6,6 +6,8 @@
 
 #define LITETALK_HEADERLEN	10
 
+#define LITETALK_MARK		0xBBCCCCBB
+
 typedef enum {
 	LITETALK_CALLBACK_PROTOCOL_INIT = 0,
 	LITETALK_CALLBACK_COMMAND,
@@ -26,6 +28,12 @@ typedef enum {
 	LITETALK_CMD_EXPOSURE = 6,
 	LITETALK_CMD_DISPLAY = 7,
 };
+
+typedef enum {
+	LITETALK_MEDIA_DEFCONFIG = 1,
+	LITETALK_MEDIA_USRCONFIG = 2,
+	LITETALK_MEDIA_SENSORCFG = 3,
+} litetalk_media;
 
 struct litetalk_streaminfo {
 	uint8_t media;
@@ -59,7 +67,11 @@ struct litetalk_cmdinfo {
 
 struct ltk_exposure {
 	uint16_t gain;
-	uint16_t exposure;
+	uint16_t gain_min;
+	uint16_t gain_max;
+	uint16_t expo;
+	uint16_t expo_min;
+	uint16_t expo_max;
 	uint8_t ae_enable;
 	uint8_t goal_max;
 	uint8_t goal_min;

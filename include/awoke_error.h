@@ -56,6 +56,9 @@ typedef enum
 	err_fail,
 	err_empty,
 	err_send,
+	err_match,
+	err_unfinished,
+	err_checksum,
 } err_type;
 
 

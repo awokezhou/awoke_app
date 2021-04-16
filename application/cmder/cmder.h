@@ -81,6 +81,63 @@ struct command_transceiver {
 	awoke_list _head;
 };
 
+struct cmder_2dpoint {
+	uint16_t x;
+	uint16_t y;
+};
+
+struct cmder_config {
+	uint32_t mark;
+
+	uint16_t goal;
+	uint16_t goal_min;
+	uint16_t goal_max;
+	
+	uint16_t expo;
+	uint16_t expo_min;
+	uint16_t expo_max;
+
+	uint16_t gain;
+	uint16_t gain_min;
+	uint16_t gain_max;
+
+	uint8_t fps;
+	uint8_t fps_min;
+	uint8_t fps_max;
+
+	uint8_t hinvs;
+	uint8_t vinvs;
+
+	uint8_t ae_frame;
+
+	int32_t tec_target;
+	uint32_t tecwork_freq;
+
+	uint32_t ae_enable:1;
+	uint32_t ae_expo_enable:1;
+	uint32_t ae_gain_enable:1;
+	uint32_t hdr_enable:1;
+	uint32_t cst_enable:1;
+	uint32_t dfg_enable:1;
+	uint32_t nrd_enable:1;
+	uint32_t ehc_enable:1;
+	uint32_t shp_enable:1;
+	uint32_t zoom_enable:1;
+	uint32_t epc_testbit:1;
+	uint32_t inversion_enable:1;
+	uint32_t crossview_enable:1;
+	uint32_t config_dump:1;
+	uint32_t epc_info_dump:1;
+	uint32_t tec_enable:1;
+	uint32_t cltest_enable:1;
+	uint32_t frtest_enable:1;
+	uint32_t rsv01:14;
+
+	struct cmder_2dpoint crossview_point;
+	
+	uint8_t checksum;
+}PACKED_ALIGN_BYTE;
+
 struct cmder {
 	
 	int nr_tabs;
@@ -103,7 +160,11 @@ struct uartcmder {
 	awoke_minpq *txqueue;
 
 	uint16_t gain;
-	uint16_t exposure;
+	uint16_t gain_min;
+	uint16_t gain_max;
+	uint16_t expo;
+	uint16_t expo_min;
+	uint16_t expo_max;
 	uint8_t ae_enable;
 	uint8_t ae_expo_en;
 	uint8_t ae_gain_en;
@@ -123,6 +184,8 @@ struct uartcmder {
 
 	uint16_t regaddr;
 	uint8_t regvalue;
+
+	struct cmder_config config;
 
 	awoke_buffchunk_pool *bpool_filechunk;
 };
