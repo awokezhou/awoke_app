@@ -13,14 +13,15 @@ bool awoke_buffchunk_dynamic(struct _awoke_buffchunk *chunk)
 
 uint16_t buffchunk_id(struct _awoke_buffchunk *chunk)
 {
+	/*
 	uint16_t id;
 	uint16_t magic = 0x1371;
-	int addr1 = (int)&magic;
-	int addr2 = (int)&chunk->id;
-	id = ((addr1>>23)^magic) + ((magic>>5)^addr2);
-	log_trace("id:%d", id);
-	return id;
-
+	uint32_t addr1 = (uint32_t)(&magic);
+	uint32_t addr2 = (uint32_t)(&chunk->id);
+	id = ((addr1>>23)^magic) + ((magic>>5)^addr2);*/
+	static uint16_t id = 0;
+	lib_trace("id:%d", id);
+	return id++;
 }
 
 struct _awoke_buffchunk *awoke_buffchunk_create(int size)
@@ -149,19 +150,19 @@ err_type awoke_buffchunk_write(struct _awoke_buffchunk *chunk, const char *data,
 	int copylen;
 	
 	if (!data || length<=0) {
-		log_err("data invalid");
+		lib_err("data invalid");
 		return et_param;
 	}
 
 	remain = awoke_buffchunk_remain(chunk);
 
 	if (!remain) {
-		log_err("chunk full");
+		lib_err("chunk full");
 		return et_full;
 	}
 
 	if (!trybest && (length > remain)) {
-		log_err("chunk not enough");
+		lib_err("chunk not enough");
 		return et_full;
 	}
 
@@ -200,10 +201,10 @@ err_type awoke_buffchunk_resize(struct _awoke_buffchunk *chunk,
 		_size = min(resize, AWOKE_BUFFCHUNK_LIMIT);
 	} else {
 		if (resize > AWOKE_BUFFCHUNK_LIMIT) {
-			log_err("size limit %d", AWOKE_BUFFCHUNK_LIMIT);
+			lib_err("size limit %d", AWOKE_BUFFCHUNK_LIMIT);
 			return et_mem_limit;
 		} else if (resize < chunk->length) {
-			log_err("resize not enough, length %d", chunk->length);
+			lib_err("resize not enough, length %d", chunk->length);
 			return et_fail;
 		}
 		_size = resize;
@@ -274,14 +275,14 @@ err_type awoke_buffchunk_copy(struct _awoke_buffchunk *dst, struct _awoke_buffch
 
 void awoke_buffchunk_dump(struct _awoke_buffchunk *chunk)
 {
-	log_trace("");
-	log_trace(">>> buffchunk dump:");
-	log_trace("------------------------");
-	log_trace("id:%d", chunk->id);
-	log_trace("size:%d", chunk->size);
-	log_trace("length:%d", chunk->length);
-	log_trace("------------------------");
-	log_trace("");
+	lib_trace("");
+	lib_trace(">>> buffchunk dump:");
+	lib_trace("------------------------");
+	lib_trace("id:%d", chunk->id);
+	lib_trace("size:%d", chunk->size);
+	lib_trace("length:%d", chunk->length);
+	lib_trace("------------------------");
+	lib_trace("");
 }
 
 struct _awoke_buffchunk_pool *awoke_buffchunk_pool_create(int maxsize)
@@ -349,19 +350,19 @@ void awoke_buffchunk_pool_dump(struct _awoke_buffchunk_pool *pool)
 {
 	awoke_buffchunk *c;
 	
-	log_trace("");
-	log_trace(">>> buffchunk pool dump:");
-	log_trace("------------------------");
-	log_trace("chunk number:%d", pool->chunknr);
-	log_trace("size:%d", pool->size);
-	log_trace("length:%d", pool->length);
+	lib_trace("");
+	lib_trace(">>> buffchunk pool dump:");
+	lib_trace("------------------------");
+	lib_trace("chunk number:%d", pool->chunknr);
+	lib_trace("size:%d", pool->size);
+	lib_trace("length:%d", pool->length);
 
 	list_for_each_entry(c, &pool->chunklist, _head) {
-		log_trace("  chunk[%d] length:%d size:%d", c->id, c->length, c->size);
+		lib_trace("  chunk[%d] length:%d size:%d", c->id, c->length, c->size);
 	}
 	
-	log_trace("------------------------");
-	log_trace("");	
+	lib_trace("------------------------");
+	lib_trace("");	
 }
 
 err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool, 
@@ -375,13 +376,13 @@ err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool,
 
 	available = pool->maxsize - pool->size;
 	if (available < chunk->size) {
-		log_err("available:%d, chunk too big", available);
+		lib_err("available:%d, chunk too big", available);
 		return et_mem_limit;
 	}
 
 	list_for_each_entry(c, &pool->chunklist, _head) {
 		if (c->id == chunk->id) {
-			log_trace("chunk[%d] exist", chunk->id);
+			lib_trace("chunk[%d] exist", chunk->id);
 			return et_exist;
 		}
 	}
@@ -391,7 +392,7 @@ err_type awoke_buffchunk_pool_chunkadd(struct _awoke_buffchunk_pool *pool,
 	pool->size += chunk->size;
 	pool->length += chunk->length;
 
-	log_trace("chunk[%d] add to pool", chunk->id);
+	lib_trace("chunk[%d] add to pool", chunk->id);
 	
 	return et_ok;
 }
@@ -417,13 +418,13 @@ struct _awoke_buffchunk *awoke_buffchunk_pool2chunk(struct _awoke_buffchunk_pool
 	awoke_buffchunk *_c, *chunk;
 
 	if (!pool || (!pool->chunknr) || (!pool->length)) {
-		log_err("pool empty");
+		lib_err("pool empty");
 		return NULL;
 	}
 
 	chunk = awoke_buffchunk_create(pool->length);
 	if (!chunk) {
-		log_err("create chunk error");
+		lib_err("create chunk error");
 		return NULL;
 	}
 
@@ -431,7 +432,7 @@ struct _awoke_buffchunk *awoke_buffchunk_pool2chunk(struct _awoke_buffchunk_pool
 		if (_c->length == 0)
 			continue;
 		if (awoke_buffchunk_remain(chunk) < _c->length) {
-			log_err("remain not enough");
+			lib_err("remain not enough");
 			break;
 		}
 		awoke_buffchunk_write(chunk, _c->p, _c->length, FALSE);

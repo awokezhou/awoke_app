@@ -138,7 +138,9 @@ struct cmder_config {
 	uint32_t tec_enable:1;
 	uint32_t cltest_enable:1;
 	uint32_t frtest_enable:1;
-	uint32_t rsv01:14;
+	uint32_t dpc_enable:1;
+	uint32_t psnu_enable:1;
+	uint32_t rsv01:12;
 
 	struct cmder_2dpoint crossview_point;
 	
