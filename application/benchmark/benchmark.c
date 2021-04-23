@@ -2121,13 +2121,13 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv)
 static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 {
 	int i, j, fd;
-	int sector_nr = 1280;
+	int sector_nr = 12;
 	int bytes = 0;
 	uint8_t buffer[4096];
 	uint32_t checksum = 0x0;
-	char *filename = "NUCParamters.bin";
+	char *filename = "nucparams.bin";
 
-	fd = open(filename, O_CREAT|O_RDWR, S_IREAD);
+	fd = open(filename, O_CREAT|O_RDWR, S_IRWXU);
 	if (fd < 0) {
 		bk_err("open %s error", filename);
 		return et_file_open;

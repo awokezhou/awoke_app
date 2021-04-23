@@ -876,22 +876,38 @@ static err_type litk_stream_write(struct uartcmder *uc, uint32_t addr,
 	return et_ok;
 }
 
-static err_type normal_checksum(uint8_t *buf, int len)
+static err_type normal_checksum(uint8_t *buf, int len, uint8_t mask)
 {
 	uint8_t *pos;
-	uint8_t checksum;
+	uint8_t checksum8;
 	uint32_t marker;
+	uint32_t checksum32, sum32;
 
 	pos = buf;
-	pkg_pull_dwrd(marker, pos);
-	if (marker != USER_MARK) {
-		cmder_err("marker error:0x%x", marker);
-		return err_param;
+
+	if (mask_exst(mask, CMDER_CHECKSUM_MARKER)) {
+		pkg_pull_dwrd(marker, pos);
+		if (marker != USER_MARK) {
+			cmder_err("marker error:0x%x", marker);
+			return err_param;
+		}
 	}
-	checksum = awoke_checksum_8(buf, len-1);
-	if (checksum != buf[len-1]) {
-		cmder_err("checksum error:0x%x 0x%x", buf[len-1], checksum);
-		return err_checksum;
+
+	if (mask_exst(mask, CMDER_CHECKSUM_NOR8)) {
+		checksum8 = awoke_checksum_8(buf, len-1);
+		if (checksum8 != buf[len-1]) {
+			cmder_err("checksum error:0x%x 0x%x", buf[len-1], checksum8);
+			return err_checksum;
+		}
+	} else if (mask_exst(mask, CMDER_CHECKSUM_NOR32)) {
+		checksum32 = awoke_checksum_32(buf, len-4);
+		pos = &(buf[len-4]);
+		pkg_pull_dwrd(sum32, pos);
+		sum32 = awoke_htonl(sum32);
+		if (checksum32 != sum32) {
+			cmder_err("checksum error:0x%x 0x%x", sum32, checksum32);
+			return err_checksum;
+		}
 	}
 
 	return et_ok;	
@@ -910,7 +926,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_DEFCONFIG:
 		cmder_info("media: defconfig");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -920,7 +937,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_USRCONFIG:
 		cmder_info("media: usrconfig");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -930,7 +948,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_SENSORCFG:
 		cmder_info("media: sensorcfg");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -940,6 +959,13 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_DPCPARAMS:
 		cmder_info("media: dpcparams");
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_NOR8);
+		if (ret != et_ok) {
+			cmder_err("checkerr:%d", ret);
+			break;
+		}
+		ret = litk_stream_write(uc, 0x00004000, (uint8_t *)merge->p, merge->length);
 		break;
 
 	case LITETALK_MEDIA_NUCPARAMS:
@@ -1010,8 +1036,18 @@ stream_transmit_start:
 	}
 
 
+	remain = pool->maxsize - pool->size;
+	if (remain < info->length) {
+		cmder_debug("pool not enough, merge");
+		if (!uc->nucaddr) {
+			uc->nucaddr = 0x00010000;
+		}
+		ret = litk_stream_merge(proto, priv);
+		uc->nucaddr += 0x1000;
+	}
+
 	/* chunk recv */
-	rbx = awoke_buffchunk_create(info->length);
+	rbx = awoke_buffchunk_create(info->length);	
 	awoke_buffchunk_write(rbx, in, info->length, TRUE);
 	awoke_buffchunk_pool_chunkadd(pool, rbx);
 	p->recvbytes += rbx->length;
@@ -1025,6 +1061,7 @@ stream_transmit_start:
 
 
 	/* if pool size not enough or receive finish, merge it */
+	/*
 	remain = pool->maxsize - pool->size;
 	if (remain < info->length) {
 		cmder_debug("pool not enough, merge");
@@ -1034,6 +1071,14 @@ stream_transmit_start:
 		ret = litk_stream_merge(proto, priv);
 		uc->nucaddr += 0x1000;
 	} else if (p->recvbytes == p->totalsize) {
+		cmder_debug("stream[%d] finish, merge", p->id);
+		ret = litk_stream_merge(proto, priv);
+		cmder_debug("stream[%d] clean", p->id);
+		memset(p, 0x0, sizeof(struct litk_streaminfo));
+		cmder_info("nuc checksum:0x%x", uc->nuc_checksum);
+	}*/
+
+	if (p->recvbytes == p->totalsize) {
 		cmder_debug("stream[%d] finish, merge", p->id);
 		ret = litk_stream_merge(proto, priv);
 		cmder_debug("stream[%d] clean", p->id);

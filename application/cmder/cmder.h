@@ -14,6 +14,11 @@
 #include "cmder_protocol.h"
 
 
+
+#define CMDER_CHECKSUM_NOR8		0x01
+#define CMDER_CHECKSUM_NOR32	0x02
+#define CMDER_CHECKSUM_MARKER	0x10
+
 struct command_table;
 
 
