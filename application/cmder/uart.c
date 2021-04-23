@@ -14,13 +14,13 @@
 
 
 int baudrate_arr[] = {
-	B38400, B19200, B9600, B4800, B2400, B1200, B300, 
-	B38400, B19200, B9600, B4800, B2400, B1200, B300,
+	B115200, B38400, B19200, B9600, B4800, B2400, B1200, B300, 
+	B115200, B38400, B19200, B9600, B4800, B2400, B1200, B300,
 };
 
 int baudrate_name_arr[] = { 
-	38400,  19200,  9600,  4800,  2400,  1200,  300, 
-	38400,  19200,  9600,  4800,  2400,  1200,  300,
+	115200, 38400,  19200,  9600,  4800,  2400,  1200,  300, 
+	115200, 38400,  19200,  9600,  4800,  2400,  1200,  300,
 };
 
 err_type uart_set_baudrate(int fd, int rate)
@@ -32,7 +32,6 @@ err_type uart_set_baudrate(int fd, int rate)
 
 	for (i=0; i<array_size(baudrate_arr); i++) {
 		if  (rate == baudrate_name_arr[i]) {
-			tcflush(fd, TCIOFLUSH);
 			cfsetispeed(&attr, baudrate_arr[i]);
 			cfsetospeed(&attr, baudrate_arr[i]);
 			status = tcsetattr(fd, TCSANOW, &attr);
@@ -40,9 +39,11 @@ err_type uart_set_baudrate(int fd, int rate)
 				cmder_err("set baudrate error:%d", status);
 				return err_param;
 			}
-			tcflush(fd, TCIOFLUSH);
+			return et_ok;
 		}
 	}
+
+	return et_ok;
 }
 
 err_type uart_set_parity(int fd, int databits, int stopbits, int parity)
@@ -54,6 +55,7 @@ err_type uart_set_parity(int fd, int databits, int stopbits, int parity)
 		return err_param;
 	}
 
+	options.c_cflag |= CLOCAL | CREAD;
 	options.c_cflag &= ~CSIZE;
 
 	switch (databits) {
@@ -76,7 +78,7 @@ err_type uart_set_parity(int fd, int databits, int stopbits, int parity)
 	case 'n':
 	case 'N':
 		options.c_cflag &= ~PARENB;   /* Clear parity enable */ 
-		options.c_iflag &= ~INPCK;     /* Enable parity checking */
+		//options.c_iflag &= ~INPCK;     /* Enable parity checking */
 		break;
 
 	case 'o':
@@ -118,20 +120,15 @@ err_type uart_set_parity(int fd, int databits, int stopbits, int parity)
 		return err_param;
 	}
 
-	/* Set input parity option */
-	if (parity != 'n') {
-		options.c_iflag |= INPCK;
-	}
-
-    options.c_iflag &=~(IXON | IXOFF | IXANY);
-	options.c_oflag &=~(ONLCR | OCRNL | ONOCR | ONLRET);
-	options.c_oflag &= ~OPOST;
-    options.c_iflag &=~(INLCR | IGNCR | ICRNL);
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    //options.c_iflag &=~(IXON | IXOFF | IXANY);
+	//options.c_oflag &=~(ONLCR | OCRNL | ONOCR | ONLRET);
+	//options.c_oflag &= ~OPOST;
+    //options.c_iflag &=~(INLCR | IGNCR | ICRNL);
+    //options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
 	
 	tcflush(fd,TCIFLUSH);
 
-	options.c_cc[VTIME] = 150;
+	options.c_cc[VTIME] = 0;
 	options.c_cc[VMIN] = 0; /* Update the options and do it NOW */
 
 	if (tcsetattr(fd, TCSANOW, &options) != 0) {

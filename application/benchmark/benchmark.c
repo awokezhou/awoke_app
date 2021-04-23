@@ -2118,6 +2118,39 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv)
 	return et_ok;
 }
 
+static err_type benchmark_nucparamsgen_test(int argc, char *argv)
+{
+	int i, j, fd;
+	int sector_nr = 1280;
+	int bytes = 0;
+	uint8_t buffer[4096];
+	uint32_t checksum = 0x0;
+	char *filename = "NUCParamters.bin";
+
+	fd = open(filename, O_CREAT|O_RDWR, S_IREAD);
+	if (fd < 0) {
+		bk_err("open %s error", filename);
+		return et_file_open;
+	}
+
+	for (i=0; i<sector_nr; i++) {
+		for (j=0; j<4096; j++) {
+			buffer[j] = i+j;
+			checksum += buffer[j];
+			bytes++;
+		}
+		write(fd, buffer, 4096);
+	}
+
+	bk_debug("checksum:0x%x", checksum);	/* 0x27d80000 */
+	bk_debug("bytes:%d", bytes+4);
+	write(fd, &checksum, 4);
+
+	close(fd);
+
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -2171,7 +2204,8 @@ int main(int argc, char *argv[])
 		{"sign-exten",			no_argument,		NULL,	arg_sign_exten},
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
-        {NULL, 0, NULL, 0}
+		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
+		{NULL, 0, NULL, 0}
     };	
 
 	while ((opt = getopt_long(argc, argv, "l:m:?h-", long_opts, NULL)) != -1)
@@ -2181,7 +2215,7 @@ int main(int argc, char *argv[])
         	case 'l':
 				loglevel = atoi(optarg);
 				break;
-			/*
+
             case arg_waitev_test:
                 bmfn = awoke_wait_test;
 				break;
@@ -2362,12 +2396,16 @@ int main(int argc, char *argv[])
 			case arg_sensorconfig_test:
 				bmfn = benchmark_sensorconfig_test;
 				break;
-*/
+
+			case arg_nucparamsgen_test:
+				bmfn = benchmark_nucparamsgen_test;
+				break;
+
             case '?':
             case 'h':
-	    	case '-':
             default:
-                usage(AWOKE_EXIT_SUCCESS);
+               	usage(AWOKE_EXIT_SUCCESS);
+				break;
         }
     }
 

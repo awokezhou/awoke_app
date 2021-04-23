@@ -4,9 +4,11 @@
 
 
 
-#define LITETALK_HEADERLEN	10
+#define LITETALK_HEADERLEN			10
+#define LITETALK_STREAM_HEADERLEN	9
 
-#define LITETALK_MARK		0xBBCCCCBB
+#define USER_MARK			0xBBCCCCBB
+#define LITETALK_MARK		0x13356789
 
 typedef enum {
 	LITETALK_CALLBACK_PROTOCOL_INIT = 0,
@@ -14,33 +16,46 @@ typedef enum {
 	LITETALK_CALLBACK_STREAM_DOWNLOAD,
 	LITETALK_CALLBACK_FILE_DOWNLOAD,
 	LITETALK_CALLBACK_FILE_DOWNLOAD_FINISH,
-};
+} litetalk_callback_reson;
 
 typedef enum {
 	LITETALK_CATEGORY_COMMAND = 0,
 	LITETALK_CATEGORY_STREAM,
 	LITETALK_CATEGORY_LOG,
 	LITETALK_CATEGORY_ALARM,
-};
+} litetalk_category;
 
 typedef enum {
 	LITETALK_CMD_SENSOR_REG = 5,
 	LITETALK_CMD_EXPOSURE = 6,
 	LITETALK_CMD_DISPLAY = 7,
-};
+} litetalk_cmd;
 
 typedef enum {
 	LITETALK_MEDIA_DEFCONFIG = 1,
 	LITETALK_MEDIA_USRCONFIG = 2,
 	LITETALK_MEDIA_SENSORCFG = 3,
+	LITETALK_MEDIA_DPCPARAMS = 4,
+	LITETALK_MEDIA_NUCPARAMS = 5,
 } litetalk_media;
 
-struct litetalk_streaminfo {
+typedef enum {
+	LITETALK_CODE_SUCCESS = 0,
+	LITETALK_CODE_ERROR,
+} litetalk_code;
+
+typedef enum {
+	LITETALK_STREAM_ST_DOWNLOAD = 0x01,
+	LITETALK_STREAM_ST_ACK = 0x02,
+} litetalk_stream_subtype;
+
+struct litk_streaminfo {
+	uint8_t id;
 	uint8_t media;
-	uint32_t totalsize;
-	uint8_t streamid;
-	uint8_t index;
+	uint16_t index;
 	uint16_t length;
+	uint32_t totalsize;
+	uint32_t recvbytes;
 };
 
 struct litetalk_cmd {
@@ -48,14 +63,16 @@ struct litetalk_cmd {
 	err_type (*set)();
 	err_type (*get)();
 	awoke_list _head;
-}; 
+};
 
-struct litetalk_private {
-	struct litetalk_cmd *cmdlist;
+struct litk_private {
+	int recvbyte;
 	int cmdlist_nr;
-	uint32_t streamid;
-	uint32_t streamidx;
-	awoke_buffchunk_pool *stream_dbpool;
+	uint32_t sector_addr;
+	struct litetalk_cmd *cmdlist;
+	awoke_buffchunk *bigdata;
+	awoke_buffchunk_pool streampool;
+	struct litk_streaminfo streaminfo;
 };
 
 struct litetalk_cmdinfo {
@@ -69,9 +86,9 @@ struct ltk_exposure {
 	uint16_t gain;
 	uint16_t gain_min;
 	uint16_t gain_max;
-	uint16_t expo;
-	uint16_t expo_min;
-	uint16_t expo_max;
+	uint32_t expo;
+	uint32_t expo_min;
+	uint32_t expo_max;
 	uint8_t ae_enable;
 	uint8_t goal_max;
 	uint8_t goal_min;
@@ -91,9 +108,8 @@ struct ltk_display {
 };
 
 extern struct cmder_protocol litetalk_protocol;
-awoke_buffchunk *litetalk_filedown_ack(uint8_t code);
 int litetalk_build_cmderr(void *buf, struct litetalk_cmdinfo *, 
 	uint8_t code);
 err_type litetalk_build_stream_ack(awoke_buffchunk *p, 
-	uint8_t streamid, uint8_t index, uint8_t code);
+	uint8_t streamid, uint16_t index, uint8_t code);
 #endif /* __PROTO_LITETALK_H__ */

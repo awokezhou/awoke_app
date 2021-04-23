@@ -46,7 +46,7 @@ typedef struct _awoke_buffchunk_pool {
 
 
 
-/* -- pubic interface -- { */
+/* -- public interface -- { */
 bool awoke_buffchunk_dynamic(struct _awoke_buffchunk *chunk);
 struct _awoke_buffchunk *awoke_buffchunk_create(int size);
 err_type awoke_buffchunk_init(struct _awoke_buffchunk *chunk);

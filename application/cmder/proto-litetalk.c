@@ -8,28 +8,25 @@
 static err_type litetalk_match(struct cmder_protocol *proto, void *buf, int len)
 {
 	uint8_t *pos = buf;
-	uint8_t flag;
-	uint8_t category;
 	uint32_t marker;
 	uint32_t content_length;
 
 	pkg_pull_dwrd(marker, pos);
 	marker = awoke_htonl(marker);
-	pkg_pull_byte(category, pos);
-	pkg_pull_byte(flag, pos);
+	pos += 2;
 	pkg_pull_dwrd(content_length, pos);
 	content_length = awoke_htonl(content_length);
 
-	cmder_trace("mark:0x%x", marker);
+	//cmder_trace("mark:0x%x", marker);
 	
-	if (marker != 0x13356789) {
+	if (marker != LITETALK_MARK) {
 		return err_match;
 	}
 
-	cmder_trace("len:%d content length:%d", len, content_length);
-	if (len == (content_length+10)) {
+	//cmder_trace("len:%d content length:%d", len, content_length);
+	if (len == (content_length+LITETALK_HEADERLEN)) {
 		return et_ok;
-	} else if (len < (content_length+10)) {
+	} else if (len < (content_length+LITETALK_HEADERLEN)) {
 		cmder_trace("rx not finish");
 		return err_unfinished;
 	}
@@ -41,21 +38,22 @@ static err_type litetalk_stream_download(struct cmder_protocol *proto,
 	uint8_t flag, uint8_t *buf, uint32_t length)
 {
 	uint8_t *pos = (uint8_t *)buf;
-	struct litetalk_streaminfo sinfo;
+	struct litk_streaminfo sinfo;
 
 	pkg_pull_byte(sinfo.media, pos);
 
 	pkg_pull_dwrd(sinfo.totalsize, pos);
-	sinfo.totalsize = htonl(sinfo.totalsize);
+	sinfo.totalsize = awoke_htonl(sinfo.totalsize);
 
-	pkg_pull_byte(sinfo.streamid, pos);
+	pkg_pull_byte(sinfo.id, pos);
 
-	pkg_pull_byte(sinfo.index, pos);
+	pkg_pull_word(sinfo.index, pos);
+	sinfo.index = awoke_htons(sinfo.index);
 
-	sinfo.length = length - 8;
+	sinfo.length = length - LITETALK_STREAM_HEADERLEN;
 
 	cmder_debug("media:%d", sinfo.media);
-	cmder_debug("streamid:%d", sinfo.streamid);
+	cmder_debug("streamid:%d", sinfo.id);
 	cmder_debug("index:%d", sinfo.index);
 	cmder_debug("totalsize:%d", sinfo.totalsize);
 	cmder_debug("length:%d", sinfo.length);
@@ -72,9 +70,9 @@ static err_type litetalk_stream_read(struct cmder_protocol *proto,
 	
 	pkg_pull_byte(subtype, pos);
 
-	if (subtype == 0x01) {
+	if (subtype == LITETALK_STREAM_ST_DOWNLOAD) {
 		litetalk_stream_download(proto, flag, pos, length);
-	} else if (subtype == 0x02) {
+	} else if (subtype == LITETALK_STREAM_ST_ACK) {
 		//litetalk_stream_ack(proto, flag, buf, length);
 	}
 	
@@ -84,7 +82,6 @@ static err_type litetalk_stream_read(struct cmder_protocol *proto,
 static err_type litetalk_command_read(struct cmder_protocol *proto, 
 	uint8_t flag, uint8_t *buf, uint32_t length)
 {
-	uint8_t subflag;
 	uint8_t *pos = (uint8_t *)buf;
 	struct litetalk_cmdinfo cinfo;
 
@@ -102,18 +99,16 @@ static err_type litetalk_read(struct cmder_protocol *proto, void *buf, int len)
 	uint8_t category;
 	uint32_t content_length;
 	uint8_t *pos = (uint8_t *)buf;
-
-	cmder_trace("litetalk read");
 	
 	pos += 4;
 	pkg_pull_byte(category, pos);
 	pkg_pull_byte(flag, pos);
 	pkg_pull_dwrd(content_length, pos);
-	content_length = htonl(content_length);
+	content_length = awoke_htonl(content_length);
 
-	cmder_trace("category:0x%x", category);
-	cmder_trace("flag:0x%x", flag);
-	cmder_trace("contentlength:%d 0x%x", content_length, content_length);
+	//cmder_trace("category:0x%x", category);
+	//cmder_trace("flag:0x%x", flag);
+	//cmder_trace("contentlength:%d 0x%x", content_length, content_length);
 	
 	switch (category) {
 
@@ -139,41 +134,20 @@ struct cmder_protocol litetalk_protocol = {
 	.read = litetalk_read,
 };
 
-awoke_buffchunk *litetalk_filedown_ack(uint8_t code)
-{
-	uint16_t mark;
-	uint8_t type;
-	uint8_t *pos, *head;
-	awoke_buffchunk *p = awoke_buffchunk_create(8);
-
-	pos = p->p;
-	head = p->p;
-
-	mark = 0x5656;
-	type = 0x02;
-
-	pkg_push_word(mark, pos);
-	pkg_push_byte(type, pos);
-	pkg_push_byte(code, pos);
-
-	p->length = pos-head;
-	return p;
-}
-
 err_type litetalk_pack_header(uint8_t *buf, uint8_t category, int length)
 {
 	uint8_t *pos = buf;
 	uint8_t flag = 0x0;
-	uint32_t marker = 0x13356789;
+	uint32_t marker = LITETALK_MARK;
 
-	marker = htonl(marker);
+	marker = awoke_htonl(marker);
 	pkg_push_dwrd(marker, pos);
 
 	pkg_push_byte(category, pos);
 
 	pkg_push_byte(flag, pos);
 
-	length = htonl(length);
+	length = awoke_htonl(length);
 	pkg_push_dwrd(length, pos);
 
 	return et_ok;
@@ -197,18 +171,19 @@ int litetalk_build_cmderr(void *buf, struct litetalk_cmdinfo *info,
 }
 
 err_type litetalk_build_stream_ack(awoke_buffchunk *p, 
-	uint8_t streamid, uint8_t index, uint8_t code)
+	uint8_t streamid, uint16_t index, uint8_t code)
 {
 	uint8_t *head = (uint8_t *)p->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
-	uint8_t subtype = 0x02;
+	uint8_t subtype = LITETALK_STREAM_ST_ACK;
 
 	pkg_push_byte(subtype, pos);
 	pkg_push_byte(streamid, pos);
-	pkg_push_byte(index, pos);
+	index = awoke_htons(index);
+	pkg_push_word(index, pos);
 	pkg_push_byte(code, pos);
 
-	litetalk_pack_header(p->p, LITETALK_CATEGORY_STREAM, pos-head);
+	litetalk_pack_header((uint8_t *)p->p, LITETALK_CATEGORY_STREAM, pos-head);
 
 	p->length = pos - head + LITETALK_HEADERLEN;
 	

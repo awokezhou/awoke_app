@@ -70,6 +70,7 @@ typedef enum {
     arg_sign_exten,
     arg_cameraconfig_test,
     arg_sensorconfig_test,
+    arg_nucparamsgen_test,
 } benchmark_args;
 
 typedef enum {

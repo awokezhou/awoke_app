@@ -71,6 +71,8 @@ struct command_table {
 struct command_transceiver {
 	char *port;
 	int fd;
+	int connfd;
+	uint16_t netport;
 	uint8_t id;
 
 	err_type (*rx)(struct command_transceiver *, void *);
@@ -93,9 +95,9 @@ struct cmder_config {
 	uint16_t goal_min;
 	uint16_t goal_max;
 	
-	uint16_t expo;
-	uint16_t expo_min;
-	uint16_t expo_max;
+	uint32_t expo;
+	uint32_t expo_min;
+	uint32_t expo_max;
 
 	uint16_t gain;
 	uint16_t gain_min;
@@ -155,6 +157,10 @@ struct cmder {
 
 struct uartcmder {
 	struct cmder base;
+
+	uint32_t nuc_checksum;
+	uint32_t nucaddr;
+	awoke_buffchunk *flashchunk;
 
 	awoke_minpq *rxqueue;
 	awoke_minpq *txqueue;

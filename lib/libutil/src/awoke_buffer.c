@@ -306,7 +306,7 @@ err_type awoke_buffchunk_pool_init(struct _awoke_buffchunk_pool *pool, int maxsi
 	pool->size = 0;
 	pool->length = 0;
 	pool->chunknr = 0;
-	pool->maxsize = min(AWOKE_BUFFCHUNK_POOL_LIMIT, maxsize);
+	pool->maxsize = maxsize;
 	list_init(&pool->chunklist);
 
 	return et_ok;

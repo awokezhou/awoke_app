@@ -100,6 +100,7 @@ typedef enum {
 #define LOG_M_SYS			LOG_M_OFFSET(0)
 #define LOG_M_DRV			LOG_M_OFFSET(1)
 #define LOG_M_PKT			LOG_M_OFFSET(2)
+#define LOG_M_LIB			LOG_M_OFFSET(3)
 
 #define LOG_M_BK			LOG_M_OFFSET(8)
 #define LOG_M_MK			LOG_M_OFFSET(9)

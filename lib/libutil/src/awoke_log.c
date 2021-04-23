@@ -43,7 +43,7 @@ static awoke_log_modulemap modulemap[] = {
 	{"sys",			LOG_M_SYS,	LOG_NONE},
 	{"drv",			LOG_M_DRV,	LOG_NONE},
 	{"pkt",			LOG_M_PKT,	LOG_NONE},
-
+	{"lib",			LOG_M_LIB,	LOG_NONE},
 	{"bk",			LOG_M_BK,		LOG_TRACE},
 	{"mk",			LOG_M_MK,		LOG_TRACE},
 	{"cmd",			LOG_M_CMDER,	LOG_TRACE},

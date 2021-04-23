@@ -77,6 +77,7 @@ typedef struct _pkg_header_example {
 uint16_t awoke_checksum_u16(void *data, int len);
 uint16_t awoke_crc16(uint8_t *data, int len);
 uint8_t awoke_checksum_8(uint8_t *buf, int len);
+uint32_t awoke_checksum_32(uint8_t *buf, int len);
 
 #define awoke_biglittle_swap16(a)	((((uint16_t)(a) & 0xff00) >> 8) | (((uint16_t)(a) & 0x00ff) << 8))
 

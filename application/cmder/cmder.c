@@ -5,29 +5,45 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include "proto-swift.h"
 #include "proto-litetalk.h"
 #include "awoke_package.h"
+#include "awoke_socket.h"
 #include "uart.h"
 
 
+#if defined(CMDER_TEST_STRING_COMMAND)
 static err_type hello_get(struct command *cmd);
 static err_type hello_set(struct command *cmd, void *buf, int len);
 static err_type hello_exec(struct command *cmd);
+#endif
+
+#if defined(CMDER_TEST_BYTE_COMMAND)
 static err_type world_exec(struct command *cmd);
 static err_type bytes1_exec(struct command *cmd);
 static err_type bytes2_exec(struct command *cmd);
+bool matcher_bytes(struct command_table *tab, void *buf, int len, struct command **cmd);
+#endif
+
+#if defined(CMDER_TEST_ECMD_COMMAND)
 static err_type ecmd_handler_dfg(struct command *cmd);
 static err_type ecmd_handler_zoom(struct command *cmd);
-static err_type switf_service_callback(void *context, uint8_t reasons, void *user, void *in, unsigned int length);
-uint8_t macher_string_dispatch(struct command *cmd, void *buf, int len);
-static err_type litetalk_service_callback(void *context, uint8_t reasons, void *user, void *in, unsigned int length);
-
-
-bool matcher_string(struct command_table *tab, void *buf, int len, struct command **cmd);
-bool matcher_bytes(struct command_table *tab, void *buf, int len, struct command **cmd);
 bool ecmd_format_check(void *buf, int len);
 bool ecmd_xmatch(struct command_table *tab, void *buf, int len, struct command **cmd);
+#endif
+
+#if defined(CMDER_TEST_STRING_COMMAND)
+uint8_t macher_string_dispatch(struct command *cmd, void *buf, int len);
+bool matcher_string(struct command_table *tab, void *buf, int len, struct command **cmd);
+
+#endif
+static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t reasons, 
+	void *user, void *in, unsigned int length);
+
+
+
+
+
+
 
 
 
@@ -36,12 +52,20 @@ bool ecmd_xmatch(struct command_table *tab, void *buf, int len, struct command *
 #define match_ecmd_make(e)			{MATCH_CUSTOM,	.length=1,					.val.struc=(void *)&e}
 
 
+#if defined(CMDER_TEST_STRING_COMMAND)
 static struct command test_string_commands[] = {
 	{match_string_make("hello"),	hello_get,	hello_set,	hello_exec},
 	{match_string_make("world"),	NULL,	NULL,	world_exec},
 };
 
+static struct command_matcher string_matcher = {
+	.match = matcher_string,
+	.dispatch = macher_string_dispatch,
+};
 
+#endif
+
+#if defined(CMDER_TEST_BYTE_COMMAND)
 static uint8_t testbytes[2][3] = {
 	{0x11, 0x22, 0x33},
 	{0x21, 0x22, 0x23},
@@ -52,6 +76,12 @@ static struct command test_bytes_commands[] = {
 	{match_bytes_make(testbytes[1]), NULL, NULL, bytes2_exec},
 };
 
+static struct command_matcher bytes_matcher = {
+	.match = matcher_bytes,
+};
+#endif
+
+#if defined(CMDER_TEST_ECMD)
 struct ecmd_match {
 	uint8_t code;
 	int need;
@@ -67,20 +97,15 @@ static struct command test_ecmds[] = {
 	{match_ecmd_make(ecmdsx[1]), NULL, NULL, ecmd_handler_zoom},
 };
 
-static struct command_matcher string_matcher = {
-	.match = matcher_string,
-	.dispatch = macher_string_dispatch,
-};
-
-static struct command_matcher bytes_matcher = {
-	.match = matcher_bytes,
-};
-
 static struct command_matcher ecmd_matcher = {
 	.format = ecmd_format_check,
 	.match = ecmd_xmatch,
 };
 
+#endif
+
+
+#if defined(CMDER_TEST_STRING_COMMAND)
 bool matcher_string(struct command_table *tab, void *buf, int len, struct command **cmd)
 {
 	bool find = FALSE;
@@ -133,7 +158,9 @@ uint8_t macher_string_dispatch(struct command *cmd, void *buf, int len)
 
 	return 99;
 }
+#endif
 
+#if defined(CMDER_TEST_BYTE_COMMAND)
 bool matcher_bytes(struct command_table *tab, void *buf, int len, struct command **cmd)
 {
 	int i;
@@ -163,7 +190,9 @@ bool matcher_bytes(struct command_table *tab, void *buf, int len, struct command
 
 	return find;
 }
+#endif
 
+#if defined(CMDER_TEST_ECMD_COMMAND)
 bool ecmd_format_check(void *buf, int len)
 {
 	int length;
@@ -224,7 +253,9 @@ bool ecmd_xmatch(struct command_table *tab, void *buf, int len, struct command *
 
 	return find;
 }
+#endif
 
+#if defined(CMDER_TEST_STRING_COMMAND)
 static err_type hello_exec(struct command *cmd)
 {
 	cmder_notice("hello exec");
@@ -241,7 +272,9 @@ static err_type hello_set(struct command *cmd, void *buf, int len)
 {
 	return et_ok;
 }
+#endif
 
+#if defined(CMDER_TEST_BYTE_COMMAND)
 static err_type world_exec(struct command *cmd)
 {
 	cmder_notice("world");
@@ -259,7 +292,9 @@ static err_type bytes2_exec(struct command *cmd)
 	cmder_notice("bytes2");
 	return et_ok;
 }
+#endif
 
+#if defined(CMDER_TEST_ECMD_COMMAND)
 static err_type ecmd_handler_dfg(struct command *cmd)
 {
 	cmder_notice("dfg");
@@ -271,21 +306,26 @@ static err_type ecmd_handler_zoom(struct command *cmd)
 	cmder_notice("zoom");
 	return et_ok;
 }
+#endif
 
+#if defined(CMDER_TEST_STRING_COMMAND)
 static err_type test_string_tx(struct cmder *c)
 {
 	return et_ok;	
 }
+#endif
 
+#if defined(CMDER_TEST_BYTE_COMMAND)
 static err_type test_bytes_tx(struct cmder *c)
 {
 	return et_ok;	
 }
+#endif
 
 static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 {
 	err_type ret;
-	int readsize, c;
+	int c;
 	awoke_buffchunk *chunk, *buffer;
 	struct cmder_protocol *proto;
 	struct uartcmder *uc = (struct uartcmder *)data;
@@ -294,8 +334,10 @@ static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 
 	c = read(tcvr->fd, buffer->p+buffer->length, buffer->size);
 	if (c > 0) {
+		awoke_hexdump_trace(buffer->p+buffer->length, c);
 		buffer->length += c;
 		cmder_trace("read %d total:%d", c, buffer->length);
+		
 		if (uc->base.nr_protocols) {
 			list_foreach(proto, &uc->base.protocols, _head) {
 				ret = proto->match(proto, buffer->p, buffer->length);
@@ -337,6 +379,94 @@ static err_type uart_tx(struct command_transceiver *tcvr, void *buf, int len)
 	return et_ok;
 }
 
+static err_type tcp_rx(struct command_transceiver *tcvr, void *data)
+{
+	int n, maxfd;
+	err_type ret = et_ok;
+	int c;
+	awoke_buffchunk *chunk, *buffer;
+	struct timeval tv;
+	fd_set readfds;
+	struct cmder_protocol *proto;
+	struct uartcmder *uc = (struct uartcmder *)data;
+
+	buffer = tcvr->rxbuffer;
+
+	FD_ZERO(&readfds);
+
+	FD_SET(tcvr->fd, &readfds);
+	if (tcvr->connfd > 0) {
+		FD_SET(tcvr->connfd, &readfds);
+		maxfd = tcvr->connfd + 1;
+	} else {
+		maxfd = tcvr->fd + 1;
+	}
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 1000;
+
+	n = select(maxfd, &readfds, NULL, NULL, &tv);
+	//cmder_debug("select n:%d", n);
+	if (n <= 0) {
+		return et_ok;
+	}
+
+	if ((tcvr->connfd > 0) && (FD_ISSET(tcvr->connfd, &readfds))) {
+		c = recv(tcvr->connfd, buffer->p+buffer->length, buffer->size, 0);
+		if (c > 0) {
+			//awoke_hexdump_trace(buffer->p+buffer->length, c);
+			buffer->length += c;
+			cmder_trace("read %d total:%d", c, buffer->length);
+
+			if (uc->base.nr_protocols) {
+				list_foreach(proto, &uc->base.protocols, _head) {
+					ret = proto->match(proto, buffer->p, buffer->length);
+					if (ret == err_unfinished) {
+						return et_ok;
+					}
+				}
+			}
+			if (ret != et_ok) {
+				return et_ok;
+			}
+	
+			chunk = awoke_buffchunk_create(buffer->length);
+			if (!chunk) {
+				cmder_err("buffer create error");
+				return err_oom;
+			}
+			chunk->id = tcvr->id;
+			awoke_buffchunk_copy(chunk, buffer);
+			awoke_buffchunk_clear(tcvr->rxbuffer);
+			awoke_minpq_insert(uc->rxqueue, &chunk, tcvr->id);
+		}
+	} else if (FD_ISSET(tcvr->fd, &readfds)) {
+		if (tcvr->connfd > 0) {
+			cmder_warn("shutdown old:%d", tcvr->connfd);
+			close(tcvr->connfd);
+		}
+		tcvr->connfd = awoke_socket_accpet(tcvr->fd);
+		cmder_debug("new accept:%d", tcvr->connfd);
+	}
+
+	return et_ok;
+}
+
+static err_type tcp_tx(struct command_transceiver *tcvr, void *buf, int len)
+{
+	int c;
+
+	//awoke_hexdump_trace(buf, len);
+
+	c = send(tcvr->connfd, buf, len, 0);
+	if (c <= 0) {
+		cmder_err("tx error");
+		return err_send;
+	}
+
+	return et_ok;
+}
+
 struct command_transceiver *cmder_find_tcvr_byid(struct cmder *c, uint8_t id)
 {
 	struct command_transceiver *p;
@@ -350,7 +480,7 @@ struct command_transceiver *cmder_find_tcvr_byid(struct cmder *c, uint8_t id)
 	return NULL;
 }
 
-static err_type cmder_tcvr_claim(struct cmder *c, uint8_t id)
+static err_type cmder_uart_tcvr_claim(struct cmder *c, uint8_t id)
 {
 	int fd;
 	bool find = FALSE;
@@ -373,7 +503,7 @@ static err_type cmder_tcvr_claim(struct cmder *c, uint8_t id)
 		return et_noeed;
 	}
 
-	fd = uart_claim(p->port, 9600, 8, 1, 'N');
+	fd = uart_claim(p->port, 115200, 8, 1, 'N');
 	if (fd < 0) {
 		cmder_err("tcvr[%d] open error", id);
 		return err_open;
@@ -382,6 +512,31 @@ static err_type cmder_tcvr_claim(struct cmder *c, uint8_t id)
 	p->fd = fd;
 
 	cmder_debug("tcvr[%d] claim ok", id);
+	return et_ok;
+}
+
+static err_type cmder_tcp_tcvr_claim(struct cmder *c, uint8_t id)
+{
+	int fd;
+	struct command_transceiver *p;
+	
+	list_foreach(p, &c->transceiver_list, _head) {
+		if (p->id == id) {
+			break;
+		}
+	}
+
+	fd = awoke_socket_server(SOCK_INTERNET_TCP, "localhost", 5567, FALSE);
+	if (fd < 0) {
+		cmder_err("socket create error");
+		return et_sock_creat;
+	}
+	
+ 	p->fd = fd;
+	p->connfd = -1;
+
+	cmder_debug("tcvr[%d:%d] claim ok", id, fd);
+	
 	return et_ok;
 }
 
@@ -466,14 +621,14 @@ static void cmder_static_init(struct uartcmder *c)
 	cfg->gain_min = 0;
 	cfg->gain_max = 500;
 	cfg->expo = 1600;
-	cfg->expo_min = 15;
-	cfg->expo_max = 40000;
 	cfg->goal_max = 85;
 	cfg->goal_min = 65;
 	cfg->ae_frame = 4;
 
 	cfg->fps = 100;
-	cfg->fps_min = 0;
+	cfg->expo_min = 936/cfg->fps + 7;
+	cfg->expo_max = 936*1053/cfg->fps + 7;
+	cfg->fps_min = 1;
 	cfg->fps_max = 125;
 	cfg->cltest_enable = 0;
 	cfg->frtest_enable = 0;
@@ -497,17 +652,26 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 	list_init(&c->base.transceiver_list);
 	c->base.nr_transceivers = 0;
 
+#if defined(CMDER_TEST_STRING_COMMAND)
 	cmder_tab_register(&c->base, "string-tab", test_string_commands,
 		array_size(test_string_commands), &string_matcher);
+#endif
 
-	/*
+#if defined(CMDER_TEST_BYTE_COMMAND)
 	cmder_tab_register(&c->base, "bytes-tab", test_bytes_commands,
 		array_size(test_bytes_commands), &bytes_matcher);
+#endif
 
+#if defined(CMDER_TEST_ECMD_COMMAND)
 	cmder_tab_register(&c->base, "ecmds", test_ecmds,
 		array_size(test_ecmds), &ecmd_matcher);*/
+#endif
 
+#if defined(CMDER_TCVR_UART)
 	cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
+#endif
+
+	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 1024);
 
 	/*
 	swift_protocol.callback = switf_service_callback;
@@ -527,8 +691,19 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 	cmder_static_init(c);
 
-	cmder_tcvr_claim(&c->base, 0);
+#if defined(CMDER_TCVR_UART)
+	cmder_uart_tcvr_claim(&c->base, 0);
+#endif
 
+	cmder_tcp_tcvr_claim(&c->base, 0);
+
+	c->flashchunk = awoke_buffchunk_create(1024*64);
+	if (!c->flashchunk) {
+		cmder_err("alloc flashbuff error");
+	} else {
+		cmder_debug("flash space: %d bytes", c->flashchunk->size);
+	}
+	
 	return et_ok;
 }
 
@@ -664,146 +839,215 @@ static err_type cmder_command_send(struct uartcmder *uc)
 	awoke_minpq_delmin(uc->txqueue, &chunk, &nouse);
 	tcvr = cmder_find_tcvr_byid(&uc->base, chunk->id);
 
-	cmder_trace("data(%d) need send", chunk->length);
+	//cmder_trace("data(%d) need send", chunk->length);
 	ret = tcvr->tx(tcvr, chunk->p, chunk->length);
 	if (ret != et_ok) {
 		cmder_err("send error:%d", ret);
 		awoke_buffchunk_free(&chunk);
 		return ret;
 	}
-	cmder_trace("data(%d) send ok", chunk->length);
+	//cmder_trace("data(%d) send ok", chunk->length);
 
 	awoke_buffchunk_free(&chunk);
 
 	return et_ok;
 }
 
-static err_type litk_stream_write(awoke_buffchunk *chunk, uint8_t media)
+static err_type litk_stream_write_file(const char *filename, const *mode, void *buf, int length)
 {
-	err_type ret;
+	FILE *fp;
+	
+	fp = fopen(filename, mode);
+	if (!fp) {
+		cmder_err("open file error");
+		return err_fail;
+	}
+
+	fwrite(buf, length, 1, fp);
+
+	fclose(fp);
+
+	return et_ok;
+}
+
+static err_type litk_stream_write(struct uartcmder *uc, uint32_t addr,
+	uint8_t *buf, int len)
+{
+	return et_ok;
+}
+
+static err_type normal_checksum(uint8_t *buf, int len)
+{
 	uint8_t *pos;
 	uint8_t checksum;
-	uint32_t mark;
-	struct cmder_config *cfg;
+	uint32_t marker;
+
+	pos = buf;
+	pkg_pull_dwrd(marker, pos);
+	if (marker != USER_MARK) {
+		cmder_err("marker error:0x%x", marker);
+		return err_param;
+	}
+	checksum = awoke_checksum_8(buf, len-1);
+	if (checksum != buf[len-1]) {
+		cmder_err("checksum error:0x%x 0x%x", buf[len-1], checksum);
+		return err_checksum;
+	}
+
+	return et_ok;	
+}
+
+static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_private *priv)
+{
+	err_type ret;
+	awoke_buffchunk *merge;
+	struct uartcmder *uc = proto->context;
+	struct _awoke_buffchunk_pool *pool = &priv->streampool;
+
+	merge = awoke_buffchunk_pool2chunk(pool);
 	
-	switch (media) {
+	switch (priv->streaminfo.media) {
 
 	case LITETALK_MEDIA_DEFCONFIG:
 		cmder_info("media: defconfig");
-		cfg = (struct cmder_config *)chunk->p;
-		if (cfg->mark != LITETALK_MARK) {
-			cmder_err("mark error:0x%x", cfg->mark);
-			return err_param;
+		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		if (ret != et_ok) {
+			cmder_err("checkerr:%d", ret);
+			break;
 		}
-		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
-		if (checksum != cfg->checksum) {
-			cmder_err("checksum error:0x%x", cfg->checksum);
-			return err_checksum;
-		}
+		ret = litk_stream_write(uc, 0x00001000, (uint8_t *)merge->p, merge->length);
 		break;
 
 	case LITETALK_MEDIA_USRCONFIG:
 		cmder_info("media: usrconfig");
-		cfg = (struct cmder_config *)chunk->p;
-		//mbp_trace("mark:0x%x", cfg->mark);
-		//mbp_trace("goal:%d min:%d max:%d", cfg->goal, cfg->goal_min, cfg->goal_max);
-		//mbp_trace("expo:%d min:%d max:%d", cfg->expo, cfg->expo_min, cfg->expo_max);
-		//mbp_trace("checksum:0x%x 0x%x", cfg->checksum, chunk->p[chunk->length-1]);
-		if (cfg->mark != LITETALK_MARK) {
-			cmder_err("mark error:0x%x", cfg->mark);
-			return err_param;
+		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		if (ret != et_ok) {
+			cmder_err("checkerr:%d", ret);
+			break;
 		}
-		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
-		if (checksum != cfg->checksum) {
-			cmder_err("checksum error:0x%x 0x%x", cfg->checksum, checksum);
-			return err_checksum;
-		}
+		ret = litk_stream_write(uc, 0x00002000, (uint8_t *)merge->p, merge->length);
 		break;
 
 	case LITETALK_MEDIA_SENSORCFG:
 		cmder_info("media: sensorcfg");
-		pos = (uint8_t *)chunk->p;
-		pkg_pull_dwrd(mark, pos);
-		if (mark != LITETALK_MARK) {
-			cmder_err("mark error:0x%x", mark);
-			return err_param;
+		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		if (ret != et_ok) {
+			cmder_err("checkerr:%d", ret);
+			break;
 		}
-		checksum = awoke_checksum_8((uint8_t *)chunk->p, chunk->length-1);
-		if (checksum != chunk->p[chunk->length-1]) {
-			cmder_err("checksum error");
-			return err_checksum;
+		ret = litk_stream_write(uc, 0x00003000, (uint8_t *)merge->p, merge->length);
+		break;
+
+	case LITETALK_MEDIA_DPCPARAMS:
+		cmder_info("media: dpcparams");
+		break;
+
+	case LITETALK_MEDIA_NUCPARAMS:
+
+		/*
+		 * start: 0x00010000
+		 * sectors: 1280 4096
+		 * end: 0x0050F000
+		 */
+		
+		cmder_info("media: nucparams");
+		cmder_info("addr:0x%x size:0x%x", uc->nucaddr, merge->length);
+		if (merge->length == 0x1000) {
+			uc->nuc_checksum += awoke_checksum_32((uint8_t *)merge->p, merge->length);
+		} else {
+			uc->nuc_checksum += awoke_checksum_32((uint8_t *)merge->p, merge->length-4);
 		}
 		break;
 
 	default:
-		cmder_err("unknown media:%d", media);
+		cmder_err("unknown media:%d", priv->streaminfo.media);
 		break;
 	}
 
-	return ret;
+	awoke_buffchunk_pool_clean(pool);
+	
+	return et_ok;
 }
 
 static err_type litetalk_stream_process(struct cmder_protocol *proto, 
 	void *user, void *in, int length)
 {
-	awoke_buffchunk *chunk, *txpkt;
-	struct litetalk_streaminfo *sinfo;
+	int remain;
+	uint8_t code = 0;
+	err_type ret = et_ok;
+	awoke_buffchunk *rbx, *rsp;
+	struct litk_streaminfo *info, *p;
 	struct uartcmder *uc = proto->context;
-	struct litetalk_private *priv = proto->private;
+	struct litk_private *priv = proto->private;
+	struct _awoke_buffchunk_pool *pool = &priv->streampool;
 
-	sinfo = (struct litetalk_streaminfo *)user;
+	p = &priv->streaminfo;
+	info = (struct litk_streaminfo *)user;
 
-create_pool:
-	if (!priv->stream_dbpool) {
-		priv->stream_dbpool = awoke_buffchunk_pool_create(sinfo->totalsize);
-		if (!priv->stream_dbpool) {
-			cmder_err("download pool create error");
-			return err_oom;
-		}
-		priv->streamid = sinfo->streamid;
-		priv->streamidx = 0;
-		cmder_info("download[%d] create, totalsize:%d", 
-			priv->streamid, sinfo->totalsize);
-	} else {
-		if (priv->streamid != sinfo->streamid) {
-			cmder_warn("previous download[%d] break");
-			awoke_buffchunk_pool_free(&priv->stream_dbpool);
-			priv->stream_dbpool = NULL;
-			goto create_pool;
-		}
+stream_transmit_start:
+	if (!p->id) {
+		/* streaminfo init */
+		cmder_debug("stream[%d] init: media:%d totalsize:%d", 
+			info->id, info->media, info->totalsize);
+		memcpy(p, info, sizeof(struct litk_streaminfo));
+		p->recvbytes = 0;
+		uc->nucaddr = 0x0;
+		uc->nuc_checksum = 0x0;
+	} else if ((p->id != info->id) || (p->media != info->media)) {
+		cmder_warn("stream[%d] break", p->id);
+		awoke_buffchunk_pool_clean(pool);
+		goto stream_transmit_start;
 	}
 
-	if ((priv->streamidx != 0) && (priv->streamidx != (sinfo->index-1))) {
-		cmder_err("need:%d but give:%d", priv->streamidx, sinfo->index);
+
+	/* if recv old index, drop */
+	if ((p->index) && (p->index != (info->index-1))) {
+		cmder_err("recv old index");
+		code = LITETALK_CODE_ERROR;
+		goto  stream_transmit_ack;
 	} else {
-		priv->streamidx = sinfo->index;
+		p->index = info->index;
 	}
 
-	chunk = awoke_buffchunk_create(sinfo->length);
-	awoke_buffchunk_write(chunk, in, sinfo->length, TRUE);
-	awoke_buffchunk_pool_chunkadd(priv->stream_dbpool, chunk);
-	
-	cmder_debug("download[%d-%d] length:%d %d/%d",
-		priv->streamid,
-		priv->streamidx, 
+
+	/* chunk recv */
+	rbx = awoke_buffchunk_create(info->length);
+	awoke_buffchunk_write(rbx, in, info->length, TRUE);
+	awoke_buffchunk_pool_chunkadd(pool, rbx);
+	p->recvbytes += rbx->length;
+		
+	cmder_info("stream[%d:%d] length:%d %d/%d",
+		p->id,
+		p->index, 
 		length,
-		priv->stream_dbpool->length,
-		priv->stream_dbpool->maxsize);
+		p->recvbytes,
+		p->totalsize);
 
-	if (priv->stream_dbpool->length == priv->stream_dbpool->maxsize) {
-		cmder_info("download[%d] finish, merge...", priv->streamid);
-		awoke_buffchunk *merge = awoke_buffchunk_pool2chunk(priv->stream_dbpool);
-		awoke_buffchunk_pool_free(&priv->stream_dbpool);
-		priv->stream_dbpool = NULL;
-		awoke_hexdump_trace(merge->p, merge->length);
-		litk_stream_write(merge, sinfo->media);
-		awoke_buffchunk_free(&merge);
+
+	/* if pool size not enough or receive finish, merge it */
+	remain = pool->maxsize - pool->size;
+	if (remain < info->length) {
+		cmder_debug("pool not enough, merge");
+		if (!uc->nucaddr) {
+			uc->nucaddr = 0x00010000;
+		}
+		ret = litk_stream_merge(proto, priv);
+		uc->nucaddr += 0x1000;
+	} else if (p->recvbytes == p->totalsize) {
+		cmder_debug("stream[%d] finish, merge", p->id);
+		ret = litk_stream_merge(proto, priv);
+		cmder_debug("stream[%d] clean", p->id);
+		memset(p, 0x0, sizeof(struct litk_streaminfo));
+		cmder_info("nuc checksum:0x%x", uc->nuc_checksum);
 	}
+	code = (uint8_t)ret;
 
-	txpkt = awoke_buffchunk_create(32);
-	litetalk_build_stream_ack(txpkt, priv->streamid, priv->streamidx, 0);
-	txpkt->id = 0;
-	awoke_minpq_insert(uc->txqueue, &txpkt, 0);
+
+stream_transmit_ack:
+	rsp = awoke_buffchunk_create(32);
+	litetalk_build_stream_ack(rsp, info->id, info->index, code);
+	rsp->id = 0;
+	awoke_minpq_insert(uc->txqueue, &rsp, 0);
 	
 	return et_ok;
 }
@@ -844,11 +1088,10 @@ static err_type litetalk_command_process(struct cmder_protocol *proto,
 	void *user, void *in, int length)
 {
 	err_type ret;
-	uint32_t value;
 	awoke_buffchunk *txpkt;
 	struct litetalk_cmd *p;
 	struct litetalk_cmdinfo *info;
-	struct litetalk_private *pri = proto->private;
+	struct litk_private *pri = proto->private;
 	struct uartcmder *uc = proto->context;
 
 	info = (struct litetalk_cmdinfo *)user;
@@ -898,7 +1141,7 @@ static err_type ltk_sensor_reg_get(struct cmder_protocol *proto,
 	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
 {
 	uint8_t code = 0;
-	uint8_t *head = chunk->p + LITETALK_HEADERLEN;
+	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
 	uint16_t addr;
 	struct uartcmder *uc = proto->context;
@@ -925,12 +1168,14 @@ static err_type ltk_exposure_set(struct cmder_protocol *proto,
 	struct cmder_config *cfg = &uc->config;
 	struct ltk_exposure exposure;
 
+	memset(&exposure, 0x0, sizeof(exposure));
+
 	pkg_pull_word(exposure.gain, pos);
 	exposure.gain = awoke_htons(exposure.gain);
 	pos += 4;	// skip gain min/max
-	pkg_pull_word(exposure.expo, pos);
-	exposure.expo = awoke_htons(exposure.expo);
-	pos += 4; 	// skip expo min/max	
+	pkg_pull_dwrd(exposure.expo, pos);
+	exposure.expo = awoke_htonl(exposure.expo);
+	pos += 8; 	// skip expo min/max
 	pkg_pull_byte(exposure.ae_enable, pos);
 	pkg_pull_byte(exposure.goal_max, pos);
 	pkg_pull_byte(exposure.goal_min, pos);
@@ -968,9 +1213,8 @@ static err_type ltk_exposure_set(struct cmder_protocol *proto,
 static err_type ltk_exposure_get(struct cmder_protocol *proto, 
 	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
 {
-	int length;
-	uint8_t code = 0;
-	uint8_t *head = chunk->p + LITETALK_HEADERLEN;
+ 	uint8_t code = 0;
+	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
 	struct ltk_exposure exposure;
 	struct uartcmder *uc = proto->context;
@@ -979,9 +1223,9 @@ static err_type ltk_exposure_get(struct cmder_protocol *proto,
 	exposure.gain = awoke_htons(cfg->gain);
 	exposure.gain_min = awoke_htons(cfg->gain_min);
 	exposure.gain_max = awoke_htons(cfg->gain_max);
-	exposure.expo = awoke_htons(cfg->expo);
-	exposure.expo_min = awoke_htons(cfg->expo_min);
-	exposure.expo_max = awoke_htons(cfg->expo_max);
+	exposure.expo = awoke_htonl(cfg->expo);
+	exposure.expo_min = awoke_htonl(cfg->expo_min);
+	exposure.expo_max = awoke_htonl(cfg->expo_max);
 	exposure.ae_enable = cfg->ae_enable;
 	exposure.goal_max = cfg->goal_max;
 	exposure.goal_min = cfg->goal_min;
@@ -1003,9 +1247,9 @@ static err_type ltk_exposure_get(struct cmder_protocol *proto,
 	pkg_push_word(exposure.gain, pos);
 	pkg_push_word(exposure.gain_min, pos);
 	pkg_push_word(exposure.gain_max, pos);
-	pkg_push_word(exposure.expo, pos);
-	pkg_push_word(exposure.expo_min, pos);
-	pkg_push_word(exposure.expo_max, pos);
+	pkg_push_dwrd(exposure.expo, pos);
+	pkg_push_dwrd(exposure.expo_min, pos);
+	pkg_push_dwrd(exposure.expo_max, pos);
 	pkg_push_byte(exposure.ae_enable, pos);
 	pkg_push_byte(exposure.goal_max, pos);
 	pkg_push_byte(exposure.goal_min, pos);
@@ -1027,6 +1271,7 @@ static err_type ltk_display_set(struct cmder_protocol *proto,
 	uint8_t *pos = (uint8_t *)in;
 	struct uartcmder *uc = proto->context;
 	struct ltk_display display;
+	struct cmder_config *cfg = &uc->config;
 
 	cmder_info("display set");
 
@@ -1041,22 +1286,29 @@ static err_type ltk_display_set(struct cmder_protocol *proto,
 	pkg_pull_byte(display.vinvs, pos);
 	pkg_pull_byte(display.hinvs, pos);
 
-	cmder_debug("fps:%d", display.fps);
-	cmder_debug("fpsmin:%d", display.fps_min);
-	cmder_debug("fpsmax:%d", display.fps_max);
-	cmder_debug("CL test:%d", display.cl_test);
-	cmder_debug("Front test:%d", display.front_test);
-	cmder_debug("cross en:%d", display.cross_en);
-	cmder_debug("cross(%d,%d):%d", display.cross_cp>>16, display.cross_cp&0xffff);
-	cmder_debug("invs:%d %d", display.vinvs, display.hinvs);
+	//cmder_debug("fps:%d", display.fps);
+	//cmder_debug("fpsmin:%d", display.fps_min);
+	//cmder_debug("fpsmax:%d", display.fps_max);
+	//cmder_debug("CL test:%d", display.cl_test);
+	//cmder_debug("Front test:%d", display.front_test);
+	//cmder_debug("cross en:%d", display.cross_en);
+	//cmder_debug("cross(%d,%d):%d", display.cross_cp>>16, display.cross_cp&0xffff);
+	//cmder_debug("invs:%d %d", display.vinvs, display.hinvs);
 
-	uc->fps = display.fps;
-	uc->cl_test = display.cl_test;
-	uc->front_test = display.front_test;
-	uc->cross_en = display.cross_en;
-	uc->cross_cp = display.cross_cp;
-	uc->vinvs = display.vinvs;
-	uc->hinvs = display.hinvs;
+	if (cfg->fps != display.fps) {
+		cfg->fps = display.fps;
+		cfg->expo_min = 936/display.fps + 7;
+		cfg->expo_max = 936*1053/display.fps + 7;
+		cmder_debug("fps:%d expo min:%d max:%d", display.fps, cfg->expo_min, cfg->expo_max);
+	}
+	
+	cfg->cltest_enable = display.cl_test;
+	cfg->frtest_enable = display.front_test;
+	cfg->crossview_enable= display.cross_en;
+	cfg->crossview_point.x = display.cross_cp>>16;
+	cfg->crossview_point.y = display.cross_cp & 0xffff;
+	cfg->vinvs = display.vinvs;
+	cfg->hinvs = display.hinvs;
 
 	return et_ok;
 }
@@ -1068,24 +1320,31 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	uint8_t code = 0;
 	uint8_t *head = chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
+	uint8_t cltest_enable;
+	uint8_t frtest_enable;
+	uint8_t cross_en;
 	uint32_t cross_cp;
 	struct uartcmder *uc = proto->context;
+	struct cmder_config *cfg = &uc->config;
 
 	cmder_info("display get");
 
 	pkg_push_byte(info->cmdtype, pos);
 	pkg_push_byte(code, pos);
 
-	pkg_push_byte(uc->fps, pos);
-	pkg_push_byte(uc->fps_min, pos);
-	pkg_push_byte(uc->fps_max, pos);
-	pkg_push_byte(uc->cl_test, pos);
-	pkg_push_byte(uc->front_test, pos);
-	pkg_push_byte(uc->cross_en, pos);
-	cross_cp = htonl(uc->cross_cp);
+	pkg_push_byte(cfg->fps, pos);
+	pkg_push_byte(cfg->fps_min, pos);
+	pkg_push_byte(cfg->fps_max, pos);
+	cltest_enable = cfg->cltest_enable;
+	pkg_push_byte(cltest_enable, pos);
+	frtest_enable = cfg->frtest_enable;
+	pkg_push_byte(frtest_enable, pos);
+	cross_en = cfg->crossview_enable;
+	pkg_push_byte(cross_en, pos);
+	cross_cp = cfg->crossview_point.x << 16 | cfg->crossview_point.y;
 	pkg_push_dwrd(cross_cp, pos);
-	pkg_push_byte(uc->vinvs, pos);
-	pkg_push_byte(uc->hinvs, pos);
+	pkg_push_byte(cfg->vinvs, pos);
+	pkg_push_byte(cfg->hinvs, pos);
 
 	litetalk_pack_header(chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
@@ -1102,33 +1361,33 @@ static struct litetalk_cmd litetalk_cmd_array[] = {
 	{LITETALK_CMD_DISPLAY, ltk_display_set, ltk_display_get},
 };
 
-static err_type litetalk_service_callback(void *context, uint8_t reasons, 
+static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t reasons, 
 	void *user, void *in, unsigned int length)
 {
-	struct cmder_protocol *proto = context;
-	struct litetalk_private *priv;
+	struct litk_private *priv;
 	
 	switch (reasons) {
 
 	case LITETALK_CALLBACK_PROTOCOL_INIT:
-		priv = mem_alloc_z(sizeof(struct litetalk_private));
+		priv = mem_alloc_z(sizeof(struct litk_private));
 		priv->cmdlist = litetalk_cmd_array;
 		priv->cmdlist_nr = array_size(litetalk_cmd_array);
 		proto->private = priv;
+		awoke_buffchunk_pool_init(&priv->streampool, 4096);
 		break;
 
 	case LITETALK_CALLBACK_COMMAND:
-		cmder_info("COMMAND");
+		//cmder_info("COMMAND");
 		litetalk_command_process(proto, user, in, length);
 		break;
 
 	case LITETALK_CALLBACK_STREAM_DOWNLOAD:
-		cmder_info("filedown");
+		//cmder_info("filedown");
 		litetalk_stream_process(proto, user, in, length);
 		break;
 
 	case LITETALK_CALLBACK_FILE_DOWNLOAD_FINISH:
-		cmder_info("filedown FIN");
+		//cmder_info("filedown FIN");
 		litetalk_filedown_finish_process(proto, user, in, length);
 		break;
 		
@@ -1160,7 +1419,7 @@ static err_type cmder_protocol_poll(struct uartcmder *uc)
 	}
 
 	//cmder_debug("chunk length:%d", chunk->length);
-	awoke_hexdump_trace(chunk->p, chunk->length);
+	//awoke_hexdump_trace(chunk->p, chunk->length);
 
 	list_foreach(proto, &c->protocols, _head) {
 		//cmder_debug("protocol:%s", proto->name);
@@ -1177,74 +1436,7 @@ static err_type cmder_protocol_poll(struct uartcmder *uc)
 	return et_ok;
 }
 
-struct cmder_swift_testmap {
-	int count;
-	void (*handle)(void *buf);
-};
-
-static void cmder_swift_test_build_connect_package(void *buffer)
-{
-	uint8_t *pos = buffer;
-	uint32_t marker = 0x12345678;
-	uint8_t byte = 0x00;
-
-	pkg_push_dwrd(marker, pos);
-	pkg_push_byte(byte, pos);
-}
-
-static void cmder_swift_test_build_command_package(void *buffer)
-{
-	uint8_t *pos = buffer;
-	uint32_t marker = 0x12345678;
-	uint8_t byte = 0x01;
-
-	pkg_push_dwrd(marker, pos);
-	pkg_push_byte(byte, pos);
-}
-
-static void cmder_swift_test_build_filestm_package(void *buffer)
-{
-	uint8_t *pos = buffer;
-	uint32_t marker = 0x12345678;
-	uint8_t byte = 0x02;
-
-	pkg_push_dwrd(marker, pos);
-	pkg_push_byte(byte, pos);
-}
-
-static void cmder_swift_test_build_disconnect_package(void *buffer)
-{
-	uint8_t *pos = buffer;
-	uint32_t marker = 0x12345678;
-	uint8_t byte = 0x03;
-
-	pkg_push_dwrd(marker, pos);
-	pkg_push_byte(byte, pos);
-}
-
-static err_type cmder_swift_test_run(struct uartcmder *uc)
-{
-	static int count = 0;
-	awoke_buffchunk *chunk;
-	
-	struct cmder_swift_testmap testmap[] = {
-		{0, cmder_swift_test_build_connect_package},
-		{1, cmder_swift_test_build_command_package},
-		{2, cmder_swift_test_build_filestm_package},
-		{3, cmder_swift_test_build_disconnect_package},
-	};
-
-	if (count > 3) {
-		count = 0;
-	}
-
-	chunk = awoke_buffchunk_create(256);
-	
-	testmap[count++].handle(chunk->p);
-
-	return et_ok;
-}
-
+#if defined(CMDER_TEST_STRING_COMMAND)
 static int ascii_to_integer(char *string)
 {
 	int value = 0;
@@ -1277,7 +1469,9 @@ static void string_parse(char *str, int type, void *pval)
 	memcpy(pval, &value, 1);
 	//cmder_debug("value:%d", value);
 }
+#endif
 
+#if defined(CMDER_TEST_BYTE_COMMAND)
 static void testbuf_tx(struct uartcmder *uc, uint8_t *buf, int len)
 {
 	int c;
@@ -1289,13 +1483,15 @@ static void testbuf_tx(struct uartcmder *uc, uint8_t *buf, int len)
 	c = write(tcvr->fd, buf, len);
 	cmder_debug("c:%d", c);
 }
+#endif
 
 int main (int argc, char *argv[])
 {
 	err_type ret;
-	uint8_t type, level;
 	struct uartcmder *cmder;
 	const char *serialport = "/dev/ttyS11";
+
+	awoke_log_init(LOG_TRACE, LOG_M_ALL);
 	
 	cmder = mem_alloc_z(sizeof(struct uartcmder));
 	if (!cmder) {

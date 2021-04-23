@@ -88,6 +88,18 @@ uint8_t awoke_checksum_8(uint8_t *buf, int len)
 	return sum;
 }
 
+uint32_t awoke_checksum_32(uint8_t *buf, int len)
+{
+	int i;
+	uint32_t sum = 0x0;
+
+	for (i=0; i<len; i++) {
+		sum += buf[i];
+	}
+
+	return sum;
+}
+
 int awoke_cpu_endian(void)
 {
 	union {

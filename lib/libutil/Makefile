@@ -44,7 +44,7 @@ $(OBJ_FILES): $(LIB_OBJ_PATH)/%.o : $(LIB_SRC_PATH)/%.c
 build:$(LIB)
 $(LIB): $(OBJ_FILES)
 	@echo "-------------build--------------"
-	$(CC) -shared -fPIC -Wl,--whole-archive,-soname,$@ $(CFLAGS) -o $@ $(OBJ_FILES) -Wl,--no-whole-archive -L/usr/lib/x86_64-linux-gnu $(LIBS)
+	$(CC) -shared -fPIC -Wl,--whole-archive,-soname,$@ $(CFLAGS) -o $@ $(OBJ_FILES) -Wl,--no-whole-archive -L$(LIBS)
 	
 
 .PHONY: install
