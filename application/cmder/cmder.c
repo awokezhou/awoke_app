@@ -322,6 +322,8 @@ static err_type test_bytes_tx(struct cmder *c)
 }
 #endif
 
+
+#if defined(CMDER_TCVR_UART)
 static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 {
 	err_type ret;
@@ -378,6 +380,7 @@ static err_type uart_tx(struct command_transceiver *tcvr, void *buf, int len)
 
 	return et_ok;
 }
+#endif
 
 static err_type tcp_rx(struct command_transceiver *tcvr, void *data)
 {
@@ -480,6 +483,7 @@ struct command_transceiver *cmder_find_tcvr_byid(struct cmder *c, uint8_t id)
 	return NULL;
 }
 
+#if defined(CMDER_TCVR_UART)
 static err_type cmder_uart_tcvr_claim(struct cmder *c, uint8_t id)
 {
 	int fd;
@@ -514,6 +518,7 @@ static err_type cmder_uart_tcvr_claim(struct cmder *c, uint8_t id)
 	cmder_debug("tcvr[%d] claim ok", id);
 	return et_ok;
 }
+#endif
 
 static err_type cmder_tcp_tcvr_claim(struct cmder *c, uint8_t id)
 {
@@ -582,7 +587,7 @@ static err_type cmder_tcvr_register(struct cmder *c, uint8_t id, const char *por
 	return et_ok;
 }
 
-static err_type cmder_tab_register(struct cmder *c, const char *name, struct command *commands, 
+err_type cmder_tab_register(struct cmder *c, const char *name, struct command *commands, 
 	int size, struct command_matcher *matcher)
 {
 	struct command_table *p, *n;
@@ -641,8 +646,6 @@ static void cmder_static_init(struct uartcmder *c)
 
 static err_type cmder_init(struct uartcmder *c, const char *port)
 {
-	struct command_transceiver *transceiver;
-
 	list_init(&c->base.tabs);
 	c->base.nr_tabs = 0;
 
@@ -762,7 +765,7 @@ static struct command *command_get(struct uartcmder *uc, awoke_buffchunk *chunk,
 	return NULL;
 }
 
-static err_type cmder_command_exec(struct uartcmder *uc)
+err_type cmder_command_exec(struct uartcmder *uc)
 {
 	err_type ret;
 	int prior_nouse;
@@ -782,7 +785,7 @@ static err_type cmder_command_exec(struct uartcmder *uc)
 		return et_ok;
 	}
 		
-	cmd = command_get(c, chunk, &operation);
+	cmd = command_get(uc, chunk, &operation);
 	if (!cmd) {
 		cmder_trace("command not find");
 		awoke_minpq_insert(uc->rxqueue, &chunk, 0);
@@ -853,7 +856,7 @@ static err_type cmder_command_send(struct uartcmder *uc)
 	return et_ok;
 }
 
-static err_type litk_stream_write_file(const char *filename, const *mode, void *buf, int length)
+err_type litk_stream_write_file(const char *filename, char *mode, void *buf, int length)
 {
 	FILE *fp;
 	
@@ -1055,7 +1058,6 @@ stream_transmit_ack:
 static err_type litetalk_filedown_finish_process(struct cmder_protocol *proto, 
 	void *user, void *in, int length)
 {
-	int c;
 	FILE *fp;
 	awoke_buffchunk *chunk, *fc;
 	struct uartcmder *uc = proto->context;
@@ -1077,7 +1079,7 @@ static err_type litetalk_filedown_finish_process(struct cmder_protocol *proto,
 		return err_fail;
 	}
 
-	c = fwrite(fc->p, fc->length, 1, fp);
+	fwrite(fc->p, fc->length, 1, fp);
 
 	fclose(fp);
 
@@ -1153,7 +1155,7 @@ static err_type ltk_sensor_reg_get(struct cmder_protocol *proto,
 	pkg_push_word(addr, pos);
 	pkg_push_byte(uc->regvalue, pos);
 
-	litetalk_pack_header(chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
+	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
 	chunk->length = pos-head+LITETALK_HEADERLEN;
 
@@ -1256,7 +1258,7 @@ static err_type ltk_exposure_get(struct cmder_protocol *proto,
 	pkg_push_byte(exposure.ae_frame, pos);
 
 
-	litetalk_pack_header(chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
+	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
 	chunk->length = pos-head+LITETALK_HEADERLEN;
 
@@ -1316,9 +1318,8 @@ static err_type ltk_display_set(struct cmder_protocol *proto,
 static err_type ltk_display_get(struct cmder_protocol *proto, 
 	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
 {
-	int length;
 	uint8_t code = 0;
-	uint8_t *head = chunk->p + LITETALK_HEADERLEN;
+	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
 	uint8_t cltest_enable;
 	uint8_t frtest_enable;
@@ -1346,7 +1347,7 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	pkg_push_byte(cfg->vinvs, pos);
 	pkg_push_byte(cfg->hinvs, pos);
 
-	litetalk_pack_header(chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
+	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
 	chunk->length = pos-head+LITETALK_HEADERLEN;
 

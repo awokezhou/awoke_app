@@ -32,6 +32,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "awoke_printf.h"
 

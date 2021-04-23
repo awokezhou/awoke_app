@@ -115,9 +115,10 @@ static const char *module_string_get(uint32_t module)
 	return modulemap[LOG_M_NONE].string;
 }
 
-void awoke_log_init(uint8_t level, uint16_t mmask)
+void awoke_log_init(uint8_t level, uint32_t mmask)
 {
 	logctx.level = level;
+	logctx.mmask = mmask;
 }
 
 static bool log_file_exist(const char *filepath)

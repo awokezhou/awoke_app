@@ -110,6 +110,7 @@ struct ltk_display {
 extern struct cmder_protocol litetalk_protocol;
 int litetalk_build_cmderr(void *buf, struct litetalk_cmdinfo *, 
 	uint8_t code);
+err_type litetalk_pack_header(uint8_t *buf, uint8_t category, int length);
 err_type litetalk_build_stream_ack(awoke_buffchunk *p, 
 	uint8_t streamid, uint16_t index, uint8_t code);
 #endif /* __PROTO_LITETALK_H__ */

@@ -22,7 +22,7 @@
 
 void awoke_log(int level, const char *func, int line, const char *format, ...);
 void awoke_logm(int level, uint32_t module, const char *func, int line, const char *format, ...);
-void awoke_log_init(uint8_t level, uint16_t mmask);
+void awoke_log_init(uint8_t level, uint32_t mmask);
 void awoke_log_set_module(uint32_t mmask);
 void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, size_t len);
 
@@ -105,7 +105,7 @@ typedef enum {
 #define LOG_M_BK			LOG_M_OFFSET(8)
 #define LOG_M_MK			LOG_M_OFFSET(9)
 #define LOG_M_CMDER			LOG_M_OFFSET(10)
-#define LOG_M_ALL			0xFFFFFFFF
+#define LOG_M_ALL			0xFFFFFFFFU
 
 
 typedef struct _awoke_log_modulemap {
@@ -190,7 +190,14 @@ typedef struct _awoke_log_context {
 #define awoke_bitdump_warn(...)		awoke_bitdump(LOG_WARN, 	__func__, __LINE__, __VA_ARGS__)
 #define awoke_bitdump_bug(...)		awoke_bitdump(LOG_BUG, 		__func__, __LINE__, __VA_ARGS__)
 
-
+#define lib_burst(...)				awoke_logm(LOG_BURST, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_trace(...)				awoke_logm(LOG_TRACE, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_debug(...)				awoke_logm(LOG_DBG, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_info(...)				awoke_logm(LOG_INFO, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_notice(...)				awoke_logm(LOG_NOTICE, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_err(...)				awoke_logm(LOG_ERR, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_warn(...)				awoke_logm(LOG_WARN, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
+#define lib_bug(...)				awoke_logm(LOG_BUG, 	LOG_M_LIB, __func__, __LINE__, __VA_ARGS__)
 
 
 
