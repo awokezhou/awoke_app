@@ -1353,6 +1353,61 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 
 	awoke_hexdump_trace(chunk->p, chunk->length);
 
+	return et_ok;
+}
+
+static err_type ltk_isp_set(struct cmder_protocol *proto, 
+	struct litetalk_cmdinfo *info, void *in, int length)
+{
+	uint8_t *pos = (uint8_t *)in;
+	uint8_t dpc_en, psnu_en;
+	struct uartcmder *uc = proto->context;
+	struct cmder_config *cfg = &uc->config;
+
+	cmder_info("display set");
+
+	pkg_pull_byte(dpc_en, pos);
+	pkg_pull_byte(psnu_en, pos);
+
+	if (cfg->dpc_enable!= dpc_en) {
+		cfg->dpc_enable = (dpc_en == 1) ? 1 : 0;
+		cmder_debug("dpc:%d", cfg->dpc_enable);
+	}
+	
+	if (cfg->psnu_enable != psnu_en) {
+		cfg->psnu_enable = (psnu_en == 1) ? 1 : 0;
+		cmder_debug("psnu:%d", cfg->psnu_enable);		
+	}
+
+	return et_ok;	
+}
+
+static err_type ltk_isp_get(struct cmder_protocol *proto, 
+	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
+{
+	uint8_t code = 0;
+	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
+	uint8_t *pos = head;
+	uint8_t dpc_en, psnu_en;
+	struct uartcmder *uc = proto->context;
+	struct cmder_config *cfg = &uc->config;
+
+	cmder_info("ISP get");
+
+	pkg_push_byte(info->cmdtype, pos);
+	pkg_push_byte(code, pos);
+
+	dpc_en = cfg->dpc_enable;
+	psnu_en = cfg->psnu_enable;
+	pkg_push_byte(dpc_en, pos);
+	pkg_push_byte(psnu_en, pos);
+
+	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
+
+	chunk->length = pos-head+LITETALK_HEADERLEN;
+
+	awoke_hexdump_trace(chunk->p, chunk->length);
+
 	return et_ok;	
 }
 
@@ -1360,6 +1415,7 @@ static struct litetalk_cmd litetalk_cmd_array[] = {
 	{LITETALK_CMD_SENSOR_REG, ltk_sensor_reg_set, ltk_sensor_reg_get},
 	{LITETALK_CMD_EXPOSURE, ltk_exposure_set, ltk_exposure_get},
 	{LITETALK_CMD_DISPLAY, ltk_display_set, ltk_display_get},
+	{LITETALK_CMD_ISP,	ltk_isp_set, ltk_isp_get},
 };
 
 static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t reasons, 

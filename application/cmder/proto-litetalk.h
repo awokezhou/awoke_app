@@ -29,6 +29,7 @@ typedef enum {
 	LITETALK_CMD_SENSOR_REG = 5,
 	LITETALK_CMD_EXPOSURE = 6,
 	LITETALK_CMD_DISPLAY = 7,
+	LITETALK_CMD_ISP = 8,
 } litetalk_cmd;
 
 typedef enum {
