@@ -62,6 +62,32 @@ static err_type litetalk_stream_download(struct cmder_protocol *proto,
 		&sinfo, pos, sinfo.length);
 }
 
+#if (LITETALK_CONFIG_CMI)
+static err_type litetalk_cmdi_read(struct cmder_protocol *proto, 
+	uint8_t flag, uint8_t *buf, uint32_t length)
+{
+	struct litetalk_cmdireq creq;
+	uint8_t *pos = (uint8_t *)buf;
+
+	pkg_pull_byte(creq.subtype, pos);
+	pkg_pull_byte(creq.requestid, pos);
+	
+	pkg_pull_dwrd(creq.address[0], pos);
+	pkg_pull_dwrd(creq.address[1], pos);
+	creq.address[0] = awoke_htonl(creq.address[0]);
+	creq.address[1] = awoke_htonl(creq.address[1]);
+	
+	if (creq.subtype == LITETALK_CMDI_SET_REQUEST) {
+		pkg_pull_byte(creq.dtype, pos);
+		pkg_pull_word(creq.datalen, pos);
+		creq.datalen = awoke_htons(creq.datalen);
+	}
+
+	return proto->callback(proto, LITETALK_CALLBACK_CMDI_REQUEST, 
+		&creq, pos, creq.datalen);
+}
+#endif
+
 static err_type litetalk_stream_read(struct cmder_protocol *proto, 
 	uint8_t flag, uint8_t *buf, uint32_t length)
 {
@@ -119,6 +145,12 @@ static err_type litetalk_read(struct cmder_protocol *proto, void *buf, int len)
 	case LITETALK_CATEGORY_STREAM:
 		litetalk_stream_read(proto, flag, pos, content_length);
 		break;
+
+#if (LITETLAK_CONFIG_CMI)
+	case LITETALK_CATEGORY_CMDI:
+		litetalk_cmdi_read(proto, flag, pos, content_length);
+		break;
+#endif
 
 	default:
 		cmder_err("unknown category %d", category);

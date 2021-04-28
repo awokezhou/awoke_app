@@ -679,6 +679,32 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
     data = htons(volt/10);
     log_debug("data:%d", data);
 
+	uint8_t buffer[32];
+	uint8_t bufferout[32];
+	char string1[32] = "K172";
+	uint8_t *pos = buffer;
+
+	log_debug("strlen:%d", strlen(string1));
+
+	memset(buffer, 0x0, 32);
+	
+	awoke_hexdump_trace(buffer, 32);
+	pkg_push_stris(string1, pos, strlen(string1));
+	awoke_hexdump_trace(buffer, 32);
+	pos = buffer;
+	pkg_pull_stris(bufferout, pos, strlen(string1));
+	awoke_hexdump_trace(bufferout, 32);
+	log_debug("string:%s", bufferout);
+	
+
+	/*
+	pkg_push_stris(string1, pos, strlen(string1));
+	log_debug("buffer:%s", buffer);
+	awoke_hexdump_trace(buffer, 32);
+	pos = buffer;
+	pkg_pull_stris(bufferout, pos, strlen(string1));
+	log_debug("bufferout:%s", bufferout);
+	*/
 	return et_ok;
 }
 
@@ -2118,14 +2144,13 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv)
 	return et_ok;
 }
 
-static err_type benchmark_nucparamsgen_test(int argc, char *argv)
+static err_type nucparam_generate(char *filename)
 {
 	int i, j, fd;
-	int sector_nr = 1280;
 	int bytes = 0;
+	int sector_nr = 1280;
 	uint8_t buffer[4096];
 	uint32_t checksum = 0x0;
-	char *filename = "NUCParamters.bin";
 
 	fd = open(filename, O_CREAT|O_RDWR, S_IREAD);
 	if (fd < 0) {
@@ -2147,6 +2172,59 @@ static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 	write(fd, &checksum, 4);
 
 	close(fd);
+
+	return et_ok;
+}
+
+static err_type nucparam_checksum(char *filename)
+{
+	int i, c, fd;
+	int sector_nr = 1280;
+	uint8_t buffer[4096];
+	uint8_t checksum = 0x0;
+
+	memset(buffer, 0x0, 4096);
+
+	fd = open(filename, O_RDWR);
+	if (fd < 0) {
+		bk_err("open %s error", filename);
+		return et_file_open;
+	}
+
+	for (i=0; i<sector_nr; i++) {
+		c = read(fd, buffer, 4096);
+		if (c != 4096) {
+			bk_err("read error");
+			close(fd);
+			return et_file_read;
+		}
+		if (i<32) {
+			//awoke_hexdump_trace(buffer, 16);
+		}
+		checksum += awoke_checksum_8(buffer, 4096);
+	}
+
+	close(fd);
+	
+	bk_debug("checksum:0x%x", checksum);
+
+	fd = open(filename, O_RDWR|O_APPEND);
+	if (fd < 0) {
+		bk_err("open %s error", filename);
+		return et_file_open;
+	}
+
+	write(fd, &checksum, 1);
+	close(fd);
+	
+	return et_ok;
+}
+
+static err_type benchmark_nucparamsgen_test(int argc, char *argv)
+{
+	//nucparam_generate("NUCParamters.bin");
+
+	nucparam_checksum("GO_125ms_LG.raw");
 
 	return et_ok;
 }
@@ -2410,7 +2488,7 @@ int main(int argc, char *argv[])
     }
 
 run:
-	awoke_log_init(loglevel, 0);
+	awoke_log_init(loglevel, LOG_M_ALL);
 	bmfn(argc, argv);
 
 	return 0;
