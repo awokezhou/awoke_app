@@ -221,3 +221,35 @@ err_type litetalk_build_stream_ack(awoke_buffchunk *p,
 	
 	return et_ok;
 }
+
+err_type litetalk_build_log(awoke_buffchunk *p, uint8_t level, uint32_t src, uint8_t *context, int length)
+{
+	uint8_t *head = (uint8_t *)p->p + LITETALK_HEADERLEN;
+	uint8_t *pos = head;
+	uint32_t time;
+
+	uint8_t data = context[0];
+	
+	time = 0;
+
+	awoke_hexdump_info(p->p, p->size);
+
+	time = awoke_htonl(time);
+	pkg_push_dwrd(time, pos);
+	pkg_push_byte(level, pos);
+	src = awoke_htonl(src);
+	pkg_push_dwrd(src, pos);
+	
+	memcpy(pos, context, length);
+	pos += length;
+
+	litetalk_pack_header((uint8_t *)p->p, LITETALK_CATEGORY_LOG, pos-head);
+
+	p->length = pos-head + LITETALK_HEADERLEN;
+
+	awoke_hexdump_info(p->p, p->size);
+
+	awoke_hexdump_info(context, length);
+
+	return et_ok;
+}

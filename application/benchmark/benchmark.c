@@ -679,24 +679,33 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
     data = htons(volt/10);
     log_debug("data:%d", data);
 
-	uint8_t buffer[32];
+	uint8_t mark1, mark2;
+	awoke_buffchunk *buffer;
 	uint8_t bufferout[32];
 	char string1[32] = "K172";
-	uint8_t *pos = buffer;
+	uint8_t *pos;
 
 	log_debug("strlen:%d", strlen(string1));
 
-	memset(buffer, 0x0, 32);
-	
-	awoke_hexdump_trace(buffer, 32);
+	buffer = awoke_buffchunk_create(32);
+	pos = (uint8_t *)buffer->p;
+
+	memset(buffer->p, 0x0, buffer->size);
+	mark1 = 0x24;
+	mark2 = 0x25;
+	awoke_hexdump_trace(buffer->p, buffer->size);
+	awoke_hexdump_trace(string1, strlen(string1));
+	pkg_push_byte(mark1, pos);
+	pkg_push_byte(mark2, pos);
 	pkg_push_stris(string1, pos, strlen(string1));
-	awoke_hexdump_trace(buffer, 32);
-	pos = buffer;
+	awoke_hexdump_trace(buffer->p, buffer->size);
+	
+	pos = buffer->p;
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	awoke_hexdump_trace(bufferout, 32);
 	log_debug("string:%s", bufferout);
 	
-
+	awoke_buffchunk_free(&buffer);
 	/*
 	pkg_push_stris(string1, pos, strlen(string1));
 	log_debug("buffer:%s", buffer);
@@ -2229,6 +2238,20 @@ static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 	return et_ok;
 }
 
+static err_type benchmark_memmove_test(int argc, char *argv)
+{
+	uint8_t buffer[16] = {
+		0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x08,
+		0x08, 0x07, 0x06, 0x05, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	awoke_hexdump_trace(buffer, 16);
+	memmove(buffer, buffer+7, 16);
+	awoke_hexdump_trace(buffer, 16);
+
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -2283,6 +2306,7 @@ int main(int argc, char *argv[])
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
 		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
+		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2477,6 +2501,10 @@ int main(int argc, char *argv[])
 
 			case arg_nucparamsgen_test:
 				bmfn = benchmark_nucparamsgen_test;
+				break;
+
+			case arg_memmove_test:
+				bmfn = benchmark_memmove_test;
 				break;
 
             case '?':

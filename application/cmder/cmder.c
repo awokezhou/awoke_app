@@ -107,6 +107,7 @@ static struct command_matcher ecmd_matcher = {
 #endif
 
 
+
 #if defined(CMDER_TEST_STRING_COMMAND)
 bool matcher_string(struct command_table *tab, void *buf, int len, struct command **cmd)
 {
@@ -975,7 +976,7 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 		 * end: 0x0050F000
 		 */
 		
-		cmder_info("media: nucparams");
+		//cmder_info("media: nucparams");
 		cmder_info("addr:0x%x size:0x%x", uc->nucaddr, merge->length);
 		if (merge->length == 0x2000) {
 			uc->nuc_checksum += awoke_checksum_8((uint8_t *)merge->p, merge->length);
@@ -1016,7 +1017,13 @@ stream_transmit_start:
 			info->id, info->media, info->totalsize);
 		memcpy(p, info, sizeof(struct litk_streaminfo));
 		p->recvbytes = 0;
-		uc->nucaddr = 0x0;
+		if (uc->nucaddr >= (0x0000C000 + 4096*1280*4)) {
+			uc->nucaddr = 0x0000C000;
+		} else if (uc->nucaddr) {
+			uc->nucaddr += 0x1000;
+		} else if (!uc->nucaddr) {
+			uc->nucaddr = 0x0000C000;
+		}
 		uc->nuc_checksum = 0x0;
 	} else if ((p->id != info->id) || (p->media != info->media)) {
 		cmder_warn("stream[%d] break", p->id);
@@ -1034,6 +1041,17 @@ stream_transmit_start:
 		p->index = info->index;
 	}
 
+	/* if pool size not enough or receive finish, merge it */
+	remain = pool->maxsize - pool->size;
+	if (remain < info->length) {
+		cmder_debug("pool not enough, merge");
+		if (!uc->nucaddr) {
+			uc->nucaddr = 0x0000C000;
+		}
+		ret = litk_stream_merge(proto, priv);
+		uc->nucaddr += 0x1000;
+	}
+
 
 	/* chunk recv */
 	rbx = awoke_buffchunk_create(info->length);
@@ -1041,7 +1059,7 @@ stream_transmit_start:
 	awoke_buffchunk_pool_chunkadd(pool, rbx);
 	p->recvbytes += rbx->length;
 		
-	cmder_info("stream[%d:%d] length:%d %d/%d",
+	cmder_debug("stream[%d:%d] length:%d %d/%d",
 		p->id,
 		p->index, 
 		length,
@@ -1049,16 +1067,7 @@ stream_transmit_start:
 		p->totalsize);
 
 
-	/* if pool size not enough or receive finish, merge it */
-	remain = pool->maxsize - pool->size;
-	if (remain < info->length) {
-		cmder_debug("pool not enough, merge");
-		if (!uc->nucaddr) {
-			uc->nucaddr = 0x00010000;
-		}
-		ret = litk_stream_merge(proto, priv);
-		uc->nucaddr += 0x1000;
-	} else if (p->recvbytes == p->totalsize) {
+	if (p->recvbytes == p->totalsize) {
 		cmder_debug("stream[%d] finish, merge", p->id);
 		ret = litk_stream_merge(proto, priv);
 		cmder_debug("stream[%d] clean", p->id);
@@ -1185,6 +1194,25 @@ static err_type litetalk_cmdi_process(struct cmder_protocol *proto,
 	return et_ok;
 }
 #endif
+
+static void litk_log_output(uint8_t level, uint32_t src, char *string, int length)
+{
+	awoke_buffchunk *chunk;
+	chunk = awoke_buffchunk_create(LITETALK_HEADERLEN + 6 + length);
+	litetalk_build_log(chunk, LOG_DBG, LOG_M_CMDER, (uint8_t *)string, length);
+	chunk->id = 0;
+	awoke_minpq_insert(uc->txqueue, &chunk, 0);
+}
+
+static void ltk_debug(struct cmder_protocol *proto, char *string)
+{
+	awoke_buffchunk *chunk;	
+	struct uartcmder *uc = proto->context;
+	char string2[32] = "ltk debug";
+
+	chunk->id = 0;
+	awoke_minpq_insert(uc->txqueue, &chunk, 0);
+}
 
 static err_type ltk_sensor_reg_set(struct cmder_protocol *proto, 
 	struct litetalk_cmdinfo *info, void *in, int length)
@@ -1391,6 +1419,8 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	struct cmder_config *cfg = &uc->config;
 
 	cmder_info("display get");
+
+	ltk_debug(proto, "display get");
 
 	pkg_push_byte(info->cmdtype, pos);
 	pkg_push_byte(code, pos);
@@ -1621,7 +1651,7 @@ static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t 
 		priv->cmdlist = litetalk_cmd_array;
 		priv->cmdlist_nr = array_size(litetalk_cmd_array);
 		proto->private = priv;
-		awoke_buffchunk_pool_init(&priv->streampool, 8192);
+		awoke_buffchunk_pool_init(&priv->streampool, 4096);
 		break;
 
 	case LITETALK_CALLBACK_COMMAND:
@@ -1797,6 +1827,7 @@ int main (int argc, char *argv[])
 	const char *serialport = "/dev/ttyS11";
 
 	awoke_log_init(LOG_INFO, LOG_M_ALL);
+	awoke_log_external_interface(litk_log_output);
 	
 	cmder = mem_alloc_z(sizeof(struct uartcmder));
 	if (!cmder) {
