@@ -189,3 +189,8 @@ err_type litetalk_build_stream_ack(awoke_buffchunk *p,
 	
 	return et_ok;
 }
+
+err_type litetalk_build_log()
+{
+	
+}

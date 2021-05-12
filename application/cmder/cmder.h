@@ -140,9 +140,13 @@ struct cmder_config {
 	uint32_t frtest_enable:1;
 	uint32_t dpc_enable:1;
 	uint32_t psnu_enable:1;
-	uint32_t rsv01:12;
+	uint32_t iff_enable:1;
+	uint32_t gamm_en:1;
+	uint32_t rsv01:10;
 
 	struct cmder_2dpoint crossview_point;
+
+	uint32_t iffparam;
 	
 	uint8_t checksum;
 }PACKED_ALIGN_BYTE;

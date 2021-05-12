@@ -2124,7 +2124,7 @@ static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 	int sector_nr = 12;
 	int bytes = 0;
 	uint8_t buffer[4096];
-	uint32_t checksum = 0x0;
+	uint8_t checksum[0] = {0x0};
 	char *filename = "nucparams.bin";
 
 	fd = open(filename, O_CREAT|O_RDWR, S_IRWXU);
@@ -2135,16 +2135,17 @@ static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 
 	for (i=0; i<sector_nr; i++) {
 		for (j=0; j<4096; j++) {
-			buffer[j] = i+j;
-			checksum += buffer[j];
+			buffer[j] = i+j+3;
+			checksum[0] += buffer[j];
+			//bk_debug("checksum:0x%x", checksum);
 			bytes++;
 		}
 		write(fd, buffer, 4096);
 	}
 
-	bk_debug("checksum:0x%x", checksum);	/* 0x27d80000 */
-	bk_debug("bytes:%d", bytes+4);
-	write(fd, &checksum, 4);
+	bk_debug("checksum:0x%x", checksum[0]);	/* 0x27d80000 */
+	bk_debug("bytes:%d", bytes+1);
+	write(fd, checksum, 1);
 
 	close(fd);
 
@@ -2410,7 +2411,7 @@ int main(int argc, char *argv[])
     }
 
 run:
-	awoke_log_init(loglevel, 0);
+	awoke_log_init(loglevel, LOG_M_ALL);
 	bmfn(argc, argv);
 
 	return 0;

@@ -11,6 +11,9 @@
 #include "uart.h"
 
 
+//#define CMDER_TCVR_UART
+
+
 #if defined(CMDER_TEST_STRING_COMMAND)
 static err_type hello_get(struct command *cmd);
 static err_type hello_set(struct command *cmd, void *buf, int len);
@@ -334,6 +337,7 @@ static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 
 	buffer = tcvr->rxbuffer;
 
+	cmder_trace("read");
 	c = read(tcvr->fd, buffer->p+buffer->length, buffer->size);
 	if (c > 0) {
 		awoke_hexdump_trace(buffer->p+buffer->length, c);
@@ -672,9 +676,9 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 #if defined(CMDER_TCVR_UART)
 	cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
-#endif
-
+#else
 	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 1024);
+#endif
 
 	/*
 	swift_protocol.callback = switf_service_callback;
@@ -696,9 +700,9 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 #if defined(CMDER_TCVR_UART)
 	cmder_uart_tcvr_claim(&c->base, 0);
-#endif
-
+#else
 	cmder_tcp_tcvr_claim(&c->base, 0);
+#endif
 
 	c->flashchunk = awoke_buffchunk_create(1024*64);
 	if (!c->flashchunk) {
@@ -1062,25 +1066,6 @@ stream_transmit_start:
 		p->recvbytes,
 		p->totalsize);
 
-
-	/* if pool size not enough or receive finish, merge it */
-	/*
-	remain = pool->maxsize - pool->size;
-	if (remain < info->length) {
-		cmder_debug("pool not enough, merge");
-		if (!uc->nucaddr) {
-			uc->nucaddr = 0x00010000;
-		}
-		ret = litk_stream_merge(proto, priv);
-		uc->nucaddr += 0x1000;
-	} else if (p->recvbytes == p->totalsize) {
-		cmder_debug("stream[%d] finish, merge", p->id);
-		ret = litk_stream_merge(proto, priv);
-		cmder_debug("stream[%d] clean", p->id);
-		memset(p, 0x0, sizeof(struct litk_streaminfo));
-		cmder_info("nuc checksum:0x%x", uc->nuc_checksum);
-	}*/
-
 	if (p->recvbytes == p->totalsize) {
 		cmder_debug("stream[%d] finish, merge", p->id);
 		ret = litk_stream_merge(proto, priv);
@@ -1096,7 +1081,7 @@ stream_transmit_ack:
 	litetalk_build_stream_ack(rsp, info->id, info->index, code);
 	rsp->id = 0;
 	awoke_minpq_insert(uc->txqueue, &rsp, 0);
-	
+		
 	return et_ok;
 }
 
@@ -1354,6 +1339,7 @@ static err_type ltk_display_set(struct cmder_protocol *proto,
 	cfg->crossview_enable= display.cross_en;
 	cfg->crossview_point.x = display.cross_cp>>16;
 	cfg->crossview_point.y = display.cross_cp & 0xffff;
+	cmder_debug("cross(%d,%d)", cfg->crossview_point.x, cfg->crossview_point.y);
 	cfg->vinvs = display.vinvs;
 	cfg->hinvs = display.hinvs;
 
@@ -1388,6 +1374,11 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	cross_en = cfg->crossview_enable;
 	pkg_push_byte(cross_en, pos);
 	cross_cp = cfg->crossview_point.x << 16 | cfg->crossview_point.y;
+	cmder_debug("cross(%d,%d) 0x%x", 
+		cfg->crossview_point.x, 
+		cfg->crossview_point.y,
+		cross_cp);
+	cross_cp = awoke_htonl(cross_cp);
 	pkg_push_dwrd(cross_cp, pos);
 	pkg_push_byte(cfg->vinvs, pos);
 	pkg_push_byte(cfg->hinvs, pos);
@@ -1405,7 +1396,8 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 	struct litetalk_cmdinfo *info, void *in, int length)
 {
 	uint8_t *pos = (uint8_t *)in;
-	uint8_t dpc_en, psnu_en;
+	uint8_t dpc_en, psnu_en, iff_en, gamm_en;
+	uint16_t iffth, iffdiv;
 	struct uartcmder *uc = proto->context;
 	struct cmder_config *cfg = &uc->config;
 
@@ -1413,6 +1405,13 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 
 	pkg_pull_byte(dpc_en, pos);
 	pkg_pull_byte(psnu_en, pos);
+	pkg_pull_byte(iff_en, pos);
+	pkg_pull_word(iffth, pos);
+	pkg_pull_word(iffdiv, pos);
+	pkg_pull_byte(gamm_en, pos);
+
+	iffth = awoke_htons(iffth);
+	iffdiv = awoke_htons(iffdiv);
 
 	if (cfg->dpc_enable!= dpc_en) {
 		cfg->dpc_enable = (dpc_en == 1) ? 1 : 0;
@@ -1424,6 +1423,11 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 		cmder_debug("psnu:%d", cfg->psnu_enable);		
 	}
 
+	if (cfg->gamm_en != gamm_en) {
+		cfg->gamm_en = (gamm_en == 1) ? 1 : 0;
+		cmder_debug("gamma:%d", cfg->gamm_en);
+	}
+
 	return et_ok;	
 }
 
@@ -1433,7 +1437,8 @@ static err_type ltk_isp_get(struct cmder_protocol *proto,
 	uint8_t code = 0;
 	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
-	uint8_t dpc_en, psnu_en;
+	uint8_t dpc_en, nuc_en, iff_en, gamm_en;
+	uint16_t iffth, iffdiv;
 	struct uartcmder *uc = proto->context;
 	struct cmder_config *cfg = &uc->config;
 
@@ -1443,9 +1448,18 @@ static err_type ltk_isp_get(struct cmder_protocol *proto,
 	pkg_push_byte(code, pos);
 
 	dpc_en = cfg->dpc_enable;
-	psnu_en = cfg->psnu_enable;
+	nuc_en = cfg->psnu_enable;
+	iff_en = cfg->iff_enable;
+	iffth = (cfg->iffparam>>16) & 0xffff;
+	iffdiv = cfg->iffparam & 0xffff;
+	gamm_en = cfg->gamm_en;
+	
 	pkg_push_byte(dpc_en, pos);
-	pkg_push_byte(psnu_en, pos);
+	pkg_push_byte(nuc_en, pos);
+	pkg_push_byte(iff_en, pos);
+	pkg_push_word(iffth, pos);
+	pkg_push_word(iffdiv, pos);
+	pkg_push_byte(gamm_en, pos);
 
 	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
