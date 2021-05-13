@@ -685,19 +685,28 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
     data = htons(volt/10);
     log_debug("data:%d", data);
 
-	uint8_t buffer[32];
+	uint8_t mark1, mark2;
+	awoke_buffchunk *buffer;
 	uint8_t bufferout[32];
 	char string1[32] = "K172";
-	uint8_t *pos = buffer;
+	uint8_t *pos;
 
 	log_debug("strlen:%d", strlen(string1));
 
-	memset(buffer, 0x0, 32);
-	
-	awoke_hexdump_trace(buffer, 32);
+	buffer = awoke_buffchunk_create(32);
+	pos = (uint8_t *)buffer->p;
+
+	memset(buffer->p, 0x0, buffer->size);
+	mark1 = 0x24;
+	mark2 = 0x25;
+	awoke_hexdump_trace(buffer->p, buffer->size);
+	awoke_hexdump_trace(string1, strlen(string1));
+	pkg_push_byte(mark1, pos);
+	pkg_push_byte(mark2, pos);
 	pkg_push_stris(string1, pos, strlen(string1));
-	awoke_hexdump_trace(buffer, 32);
-	pos = buffer;
+	awoke_hexdump_trace(buffer->p, buffer->size);
+	
+	pos = buffer->p;
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	awoke_hexdump_trace(bufferout, 32);
 	log_debug("string:%s", bufferout);
@@ -705,7 +714,8 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	memset(buffer, 0x0, 32);
 	bk_string_pack_test(buffer, string1, strlen(string1));
 	awoke_hexdump_trace(buffer, 32);
-
+	
+	awoke_buffchunk_free(&buffer);
 	/*
 	pkg_push_stris(string1, pos, strlen(string1));
 	log_debug("buffer:%s", buffer);
@@ -2309,7 +2319,18 @@ static err_type benchmark_buildmacros_test(int argc, char *argv)
 
 	bk_debug("hwversion:%s", hwversion);
 	bk_debug("serialnum:%s", serialnum);
-	return et_ok;
+}
+
+static err_type benchmark_memmove_test(int argc, char *argv)
+{
+	uint8_t buffer[16] = {
+		0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x08,
+		0x08, 0x07, 0x06, 0x05, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	awoke_hexdump_trace(buffer, 16);
+	memmove(buffer, buffer+7, 16);
+	awoke_hexdump_trace(buffer, 16);
 }
 
 int main(int argc, char *argv[])
@@ -2367,6 +2388,7 @@ int main(int argc, char *argv[])
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
 		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
 		{"buildmacros-test",	no_argument,        NULL,   arg_buildmacros_test},
+		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2567,6 +2589,10 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_buildmacros_test;
 				break;
 				
+			case arg_memmove_test:
+				bmfn = benchmark_memmove_test;
+				break;
+
             case '?':
             case 'h':
             default:

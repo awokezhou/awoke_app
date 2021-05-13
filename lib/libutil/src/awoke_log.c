@@ -121,6 +121,11 @@ void awoke_log_init(uint8_t level, uint32_t mmask)
 	logctx.mmask = mmask;
 }
 
+void awoke_log_external_interface(void (*handle)(uint8_t, uint32_t, char *, int))
+{
+	logctx.external_interface = handle;
+}
+
 static bool log_file_exist(const char *filepath)
 {
 	FILE *fp;
@@ -258,7 +263,7 @@ static void awoke_log_file_write(log_filecache *fc, char *message, int length)
 
 #define extern_print(fmt, args...)	printf(fmt, ##args)
 
-void awoke_log(int level, const char *func, int line, const char *format, ...)
+void awoke_log(uint8_t level, const char *func, int line, const char *format, ...)
 {
 	int n;
 	va_list args;
@@ -329,7 +334,7 @@ void awoke_log(int level, const char *func, int line, const char *format, ...)
 	}
 }
 
-void awoke_logm(int level, uint32_t module, const char *func, int line, const char *format, ...)
+void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, const char *format, ...)
 {
 	int n;
     va_list args;
@@ -411,12 +416,16 @@ void awoke_logm(int level, uint32_t module, const char *func, int line, const ch
 		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
+	case LOG_D_EXTERNAL_INTERFACE:
+		logctx.external_interface(level, module, bp.head, bp.len);
+		break;
+		
 	default:
 		break;
 	}
 }
 
-void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, size_t len)
+void awoke_hexdump(uint8_t level, const char *func, int linenr, const void *vbuf, size_t len)
 {
 	unsigned int n;
 	unsigned char *buf = (unsigned char *)vbuf;
@@ -460,7 +469,7 @@ void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, si
 	awoke_log(level, func, linenr, "");
 }
 
-void awoke_bitdump(int level, const char *func, int linenr, const void *vbuf, size_t len)
+void awoke_bitdump(uint8_t level, const char *func, int linenr, const void *vbuf, size_t len)
 {
 	unsigned int n;
 	uint32_t *buf = (uint32_t *)vbuf;

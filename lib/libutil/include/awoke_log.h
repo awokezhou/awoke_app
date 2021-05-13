@@ -20,11 +20,11 @@
 
 
 
-void awoke_log(int level, const char *func, int line, const char *format, ...);
-void awoke_logm(int level, uint32_t module, const char *func, int line, const char *format, ...);
+void awoke_log(uint8_t level, const char *func, int line, const char *format, ...);
+void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, const char *format, ...);
 void awoke_log_init(uint8_t level, uint32_t mmask);
 void awoke_log_set_module(uint32_t mmask);
-void awoke_hexdump(int level, const char *func, int linenr, const void *vbuf, size_t len);
+void awoke_hexdump(uint8_t level, const char *func, int linenr, const void *vbuf, size_t len);
 
 
 
@@ -121,6 +121,7 @@ typedef enum {
 	LOG_D_STDOUT = 1,
 	LOG_D_FILE,
 	LOG_D_UART,
+	LOG_D_EXTERNAL_INTERFACE,
 } awoke_log_direction;
 /*}-- Log Direction -- */
 
@@ -144,6 +145,7 @@ typedef struct _awoke_log_context {
 	uint8_t level;
 	uint8_t direction;
 	uint32_t mmask;
+	void (*external_interface)(uint8_t, uint32_t, char *, int );
 	log_filecache fc;
 } awoke_log_context;
 /*}-- Log Context -- */

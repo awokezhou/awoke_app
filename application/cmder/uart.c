@@ -120,11 +120,11 @@ err_type uart_set_parity(int fd, int databits, int stopbits, int parity)
 		return err_param;
 	}
 
-    //options.c_iflag &=~(IXON | IXOFF | IXANY);
-	//options.c_oflag &=~(ONLCR | OCRNL | ONOCR | ONLRET);
-	//options.c_oflag &= ~OPOST;
-    //options.c_iflag &=~(INLCR | IGNCR | ICRNL);
-    //options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    options.c_iflag &=~(IXON | IXOFF | IXANY);
+	options.c_oflag &=~(ONLCR | OCRNL | ONOCR | ONLRET);
+	options.c_oflag &= ~OPOST;
+    options.c_iflag &=~(INLCR | IGNCR | ICRNL);
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
 	
 	tcflush(fd,TCIFLUSH);
 
