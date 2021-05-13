@@ -1201,7 +1201,7 @@ static void litk_log_output(uint8_t level, uint32_t src, char *string, int lengt
 	chunk = awoke_buffchunk_create(LITETALK_HEADERLEN + 6 + length);
 	litetalk_build_log(chunk, LOG_DBG, LOG_M_CMDER, (uint8_t *)string, length);
 	chunk->id = 0;
-	awoke_minpq_insert(uc->txqueue, &chunk, 0);
+	//awoke_minpq_insert(uc->txqueue, &chunk, 0);
 }
 
 static void ltk_debug(struct cmder_protocol *proto, char *string)
