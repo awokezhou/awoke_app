@@ -14,6 +14,11 @@
 #include "cmder_protocol.h"
 
 
+
+#define CMDER_CHECKSUM_NOR8		0x01
+#define CMDER_CHECKSUM_NOR32	0x02
+#define CMDER_CHECKSUM_MARKER	0x10
+
 struct command_table;
 
 
@@ -115,8 +120,8 @@ struct cmder_config {
 	int32_t tec_target;
 	uint32_t tecwork_freq;
 
-	uint16_t iffr_th;
-	uint16_t iffr_div;
+	uint16_t iff_th;
+	uint16_t iff_div;
 
 	uint32_t ae_enable:1;
 	uint32_t ae_expo_enable:1;
@@ -138,10 +143,13 @@ struct cmder_config {
 	uint32_t frtest_enable:1;
 	uint32_t dpc_enable:1;
 	uint32_t psnu_enable:1;
-	uint32_t iffr_enable:1;
-	uint32_t rsv01:11;
+	uint32_t iff_enable:1;
+	uint32_t gamm_en:1;
+	uint32_t rsv01:10;
 
 	struct cmder_2dpoint crossview_point;
+
+	uint32_t iffparam;
 	
 	uint8_t checksum;
 }PACKED_ALIGN_BYTE;

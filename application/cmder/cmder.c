@@ -9,6 +9,10 @@
 #include "awoke_package.h"
 #include "awoke_socket.h"
 #include "uart.h"
+#include <sys/time.h>
+
+
+//#define CMDER_TCVR_UART
 
 
 #if defined(CMDER_TEST_STRING_COMMAND)
@@ -337,6 +341,7 @@ static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 
 	buffer = tcvr->rxbuffer;
 
+	cmder_trace("read");
 	c = read(tcvr->fd, buffer->p+buffer->length, buffer->size);
 	if (c > 0) {
 		awoke_hexdump_trace(buffer->p+buffer->length, c);
@@ -646,9 +651,9 @@ static void cmder_static_init(struct uartcmder *c)
 	cfg->vinvs = 0;
 	cfg->hinvs = 0;
 
-	cfg->iffr_enable = 0;
-	cfg->iffr_th = 16;
-	cfg->iffr_div = 0;
+	cfg->iff_enable = 0;
+	cfg->iff_th = 16;
+	cfg->iff_div = 0;
 }
 
 static bool work_ms_comparator(void *d1, void *d2)
@@ -687,10 +692,10 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 #endif
 
 #if defined(CMDER_TCVR_UART)
-	cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 4096);
+	cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
+#else
+	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 1024);
 #endif
-
-	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 4096);
 
 	/*
 	swift_protocol.callback = switf_service_callback;
@@ -712,9 +717,9 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 #if defined(CMDER_TCVR_UART)
 	cmder_uart_tcvr_claim(&c->base, 0);
-#endif
-
+#else
 	cmder_tcp_tcvr_claim(&c->base, 0);
+#endif
 
 	c->flashchunk = awoke_buffchunk_create(1024*64);
 	if (!c->flashchunk) {
@@ -902,22 +907,38 @@ static err_type litk_stream_write(struct uartcmder *uc, uint32_t addr,
 	return et_ok;
 }
 
-static err_type normal_checksum(uint8_t *buf, int len)
+static err_type normal_checksum(uint8_t *buf, int len, uint8_t mask)
 {
 	uint8_t *pos;
-	uint8_t checksum;
+	uint8_t checksum8;
 	uint32_t marker;
+	uint32_t checksum32, sum32;
 
 	pos = buf;
-	pkg_pull_dwrd(marker, pos);
-	if (marker != USER_MARK) {
-		cmder_err("marker error:0x%x", marker);
-		return err_param;
+
+	if (mask_exst(mask, CMDER_CHECKSUM_MARKER)) {
+		pkg_pull_dwrd(marker, pos);
+		if (marker != USER_MARK) {
+			cmder_err("marker error:0x%x", marker);
+			return err_param;
+		}
 	}
-	checksum = awoke_checksum_8(buf, len-1);
-	if (checksum != buf[len-1]) {
-		cmder_err("checksum error:0x%x 0x%x", buf[len-1], checksum);
-		return err_checksum;
+
+	if (mask_exst(mask, CMDER_CHECKSUM_NOR8)) {
+		checksum8 = awoke_checksum_8(buf, len-1);
+		if (checksum8 != buf[len-1]) {
+			cmder_err("checksum error:0x%x 0x%x", buf[len-1], checksum8);
+			return err_checksum;
+		}
+	} else if (mask_exst(mask, CMDER_CHECKSUM_NOR32)) {
+		checksum32 = awoke_checksum_32(buf, len-4);
+		pos = &(buf[len-4]);
+		pkg_pull_dwrd(sum32, pos);
+		sum32 = awoke_htonl(sum32);
+		if (checksum32 != sum32) {
+			cmder_err("checksum error:0x%x 0x%x", sum32, checksum32);
+			return err_checksum;
+		}
 	}
 
 	return et_ok;	
@@ -936,7 +957,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_DEFCONFIG:
 		cmder_info("media: defconfig");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -946,7 +968,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_USRCONFIG:
 		cmder_info("media: usrconfig");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -956,7 +979,8 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_SENSORCFG:
 		cmder_info("media: sensorcfg");
-		ret = normal_checksum((uint8_t *)merge->p, merge->length);
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_MARKER|CMDER_CHECKSUM_NOR8);
 		if (ret != et_ok) {
 			cmder_err("checkerr:%d", ret);
 			break;
@@ -966,6 +990,13 @@ static err_type litk_stream_merge(struct cmder_protocol *proto, struct litk_priv
 
 	case LITETALK_MEDIA_DPCPARAMS:
 		cmder_info("media: dpcparams");
+		ret = normal_checksum((uint8_t *)merge->p, merge->length, 
+			CMDER_CHECKSUM_NOR8);
+		if (ret != et_ok) {
+			cmder_err("checkerr:%d", ret);
+			break;
+		}
+		ret = litk_stream_write(uc, 0x00004000, (uint8_t *)merge->p, merge->length);
 		break;
 
 	case LITETALK_MEDIA_NUCPARAMS:
@@ -1052,9 +1083,8 @@ stream_transmit_start:
 		uc->nucaddr += 0x1000;
 	}
 
-
 	/* chunk recv */
-	rbx = awoke_buffchunk_create(info->length);
+	rbx = awoke_buffchunk_create(info->length);	
 	awoke_buffchunk_write(rbx, in, info->length, TRUE);
 	awoke_buffchunk_pool_chunkadd(pool, rbx);
 	p->recvbytes += rbx->length;
@@ -1082,7 +1112,7 @@ stream_transmit_ack:
 	litetalk_build_stream_ack(rsp, info->id, info->index, code);
 	rsp->id = 0;
 	awoke_minpq_insert(uc->txqueue, &rsp, 0);
-	
+		
 	return et_ok;
 }
 
@@ -1399,6 +1429,7 @@ static err_type ltk_display_set(struct cmder_protocol *proto,
 	cfg->crossview_enable= display.cross_en;
 	cfg->crossview_point.x = display.cross_cp>>16;
 	cfg->crossview_point.y = display.cross_cp & 0xffff;
+	cmder_debug("cross(%d,%d)", cfg->crossview_point.x, cfg->crossview_point.y);
 	cfg->vinvs = display.vinvs;
 	cfg->hinvs = display.hinvs;
 
@@ -1435,6 +1466,11 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	cross_en = cfg->crossview_enable;
 	pkg_push_byte(cross_en, pos);
 	cross_cp = cfg->crossview_point.x << 16 | cfg->crossview_point.y;
+	cmder_debug("cross(%d,%d) 0x%x", 
+		cfg->crossview_point.x, 
+		cfg->crossview_point.y,
+		cross_cp);
+	cross_cp = awoke_htonl(cross_cp);
 	pkg_push_dwrd(cross_cp, pos);
 	pkg_push_byte(cfg->vinvs, pos);
 	pkg_push_byte(cfg->hinvs, pos);
@@ -1452,8 +1488,8 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 	struct litetalk_cmdinfo *info, void *in, int length)
 {
 	uint8_t *pos = (uint8_t *)in;
-	uint8_t dpc_en, psnu_en, iffr_en;
-	uint16_t iffr_th, iffr_div;
+	uint8_t dpc_en, psnu_en, iff_en;
+	uint16_t iffth, iffdiv;
 	struct uartcmder *uc = proto->context;
 	struct cmder_config *cfg = &uc->config;
 
@@ -1461,12 +1497,13 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 
 	pkg_pull_byte(dpc_en, pos);
 	pkg_pull_byte(psnu_en, pos);
-	pkg_pull_byte(iffr_en, pos);
-	pkg_pull_word(iffr_th, pos);
-	pkg_pull_word(iffr_div, pos);
 
-	iffr_th = awoke_htons(iffr_th);
-	iffr_div = awoke_htons(iffr_div);
+	pkg_pull_byte(iff_en, pos);
+	pkg_pull_word(iffth, pos);
+	pkg_pull_word(iffdiv, pos);
+
+	iffth = awoke_htons(iffth);
+	iffdiv = awoke_htons(iffdiv);
 
 	if (cfg->dpc_enable!= dpc_en) {
 		cfg->dpc_enable = (dpc_en == 1) ? 1 : 0;
@@ -1478,19 +1515,19 @@ static err_type ltk_isp_set(struct cmder_protocol *proto,
 		cmder_debug("psnu:%d", cfg->psnu_enable);		
 	}
 
-	if (cfg->iffr_enable != iffr_en) {
-		cfg->iffr_enable = (iffr_en == 1) ? 1 : 0;
-		cmder_debug("iffr:%d", cfg->iffr_enable);
+	if (cfg->iff_enable != iff_en) {
+		cfg->iff_enable = (iff_en == 1) ? 1 : 0;
+		cmder_debug("iff:%d", cfg->iff_enable);
 	}
 
-	if (cfg->iffr_th != iffr_th) {
-		cfg->iffr_th = iffr_th;
-		cmder_debug("iffr th:%d", cfg->iffr_th);
+	if (cfg->iff_th != iffth) {
+		cfg->iff_th = iffth;
+		cmder_debug("iff th:%d", cfg->iff_th);
 	}
 
-	if (cfg->iffr_div != iffr_div) {
-		cfg->iffr_div = iffr_div;
-		cmder_debug("iffr div:%d", cfg->iffr_div);
+	if (cfg->iff_div != iffdiv) {
+		cfg->iff_div = iffdiv;
+		cmder_debug("iff div:%d", cfg->iff_div);
 	}
 
 	return et_ok;	
@@ -1502,8 +1539,8 @@ static err_type ltk_isp_get(struct cmder_protocol *proto,
 	uint8_t code = 0;
 	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
-	uint8_t dpc_en, psnu_en, iffr_en;
-	uint16_t iffr_th, iffr_div;
+	uint8_t dpc_en, nuc_en, iff_en, gamm_en;
+	uint16_t iffth, iffdiv;
 	struct uartcmder *uc = proto->context;
 	struct cmder_config *cfg = &uc->config;
 
@@ -1513,16 +1550,18 @@ static err_type ltk_isp_get(struct cmder_protocol *proto,
 	pkg_push_byte(code, pos);
 
 	dpc_en = cfg->dpc_enable;
-	psnu_en = cfg->psnu_enable;
-	iffr_en = cfg->iffr_enable;
-	iffr_th = awoke_htons(cfg->iffr_th);
-	iffr_div = awoke_htons(cfg->iffr_div);
-
+	nuc_en = cfg->psnu_enable;
+	iff_en = cfg->iff_enable;
+	iffth = (cfg->iffparam>>16) & 0xffff;
+	iffdiv = cfg->iffparam & 0xffff;
+	gamm_en = cfg->gamm_en;
+	
 	pkg_push_byte(dpc_en, pos);
-	pkg_push_byte(psnu_en, pos);
-	pkg_push_byte(iffr_en, pos);
-	pkg_push_word(iffr_th, pos);
-	pkg_push_word(iffr_div, pos);
+	pkg_push_byte(nuc_en, pos);
+	pkg_push_byte(iff_en, pos);
+	pkg_push_word(iffth, pos);
+	pkg_push_word(iffdiv, pos);
+	pkg_push_byte(gamm_en, pos);
 	
 	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
@@ -1788,7 +1827,7 @@ static uint32_t cmder_workqueue_service(struct uartcmder *uc)
 	int prior_nouse;
 	struct timeval tv;
 	struct cmder_work work;
-	struct awoke_minpq *wq = &uc->workqueue;
+	awoke_minpq *wq = &uc->workqueue;
 
 	if (!wq || awoke_minpq_empty(wq))
 		return 0;
@@ -1799,11 +1838,11 @@ static uint32_t cmder_workqueue_service(struct uartcmder *uc)
 
 	do {
 
-		awoke_minpq_get(wq, &work, &prior_nouse, 1);
+		awoke_minpq_get(wq, (void *)&work, &prior_nouse, 1);
 		if (work.ms > nowms) {
 			return (work.ms - nowms);
 		} else {
-			awoke_minpq_delmin(wq, &work, &prior_nouse);
+			awoke_minpq_delmin(wq, (void *)&work, &prior_nouse);
 			work.handle(uc, &work);
 			return 0;
 		}
@@ -1848,7 +1887,8 @@ int main (int argc, char *argv[])
 
 	//testbuf_tx(cmder, testbuf, 7);
 
-	//cmder_work_schedule(cmder, work_test, 1000);
+	if (0)
+		cmder_work_schedule(cmder, work_test, 1000);
 
 	while (1) {
 		

@@ -660,6 +660,12 @@ static err_type benchmark_http_request_test(int argc, char *argv[])
 	return et_ok;
 }
 
+static void bk_string_pack_test(uint8_t *buffer, char *string, int length)
+{
+	pkg_push_stris(string,buffer,length);
+}
+
+
 static err_type benchmark_sscanf_test(int argc, char *argv[])
 {
     /*
@@ -704,6 +710,10 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	awoke_hexdump_trace(bufferout, 32);
 	log_debug("string:%s", bufferout);
+
+	memset(buffer, 0x0, 32);
+	bk_string_pack_test(buffer, string1, strlen(string1));
+	awoke_hexdump_trace(buffer, 32);
 	
 	awoke_buffchunk_free(&buffer);
 	/*
@@ -2159,9 +2169,9 @@ static err_type nucparam_generate(char *filename)
 	int bytes = 0;
 	int sector_nr = 1280;
 	uint8_t buffer[4096];
-	uint32_t checksum = 0x0;
+	uint8_t checksum[0] = {0x0};
 
-	fd = open(filename, O_CREAT|O_RDWR, S_IREAD);
+	fd = open(filename, O_CREAT|O_RDWR, S_IRWXU);
 	if (fd < 0) {
 		bk_err("open %s error", filename);
 		return et_file_open;
@@ -2169,16 +2179,17 @@ static err_type nucparam_generate(char *filename)
 
 	for (i=0; i<sector_nr; i++) {
 		for (j=0; j<4096; j++) {
-			buffer[j] = i+j;
-			checksum += buffer[j];
+			buffer[j] = i+j+3;
+			checksum[0] += buffer[j];
+			//bk_debug("checksum:0x%x", checksum);
 			bytes++;
 		}
 		write(fd, buffer, 4096);
 	}
 
-	bk_debug("checksum:0x%x", checksum);	/* 0x27d80000 */
-	bk_debug("bytes:%d", bytes+4);
-	write(fd, &checksum, 4);
+	bk_debug("checksum:0x%x", checksum[0]);	/* 0x27d80000 */
+	bk_debug("bytes:%d", bytes+1);
+	write(fd, checksum, 1);
 
 	close(fd);
 
@@ -2238,6 +2249,78 @@ static err_type benchmark_nucparamsgen_test(int argc, char *argv)
 	return et_ok;
 }
 
+static char *build_date = __DATE__;
+static char *build_time = __TIME__;
+
+struct bk_version {
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
+	char string[16];
+	char date[16];
+	char time[16];
+};
+
+#define MAJOR	1
+#define MINOR	2
+#define PATCH   3
+
+
+#define STR_FIX(x,y,z) #x"."#y"."#z
+#define VERSTR(x,y,z) STR_FIX(x,y,z)
+
+static struct bk_version version = {
+	.major = MAJOR,
+	.minor = MINOR,
+	.patch = PATCH,
+	.string = {VERSTR(MAJOR,MINOR,PATCH)},
+	.date = {__DATE__},
+	.time = {__TIME__},
+};
+
+static err_type bk_get_buildinfo(void)
+{
+	char date[20];
+	char time[20];
+	
+	sprintf(date, "%s", __DATE__);
+	sprintf(time, "%s", __TIME__);
+
+	mem_ptr_t ptr = mem_mk_ptr(version.string);
+
+	bk_debug("major:%d minor:%d patch:%d", version.major, version.minor, version.patch);
+	bk_debug("version:%s", version.string);
+	bk_debug("date:%s", version.date);
+	bk_debug("time:%s", version.time);
+	bk_debug("ptr:%.*s %d", ptr.len, ptr.p, ptr.len);
+	return et_ok;
+}
+
+static err_type benchmark_buildmacros_test(int argc, char *argv)
+{
+	char hwversion[16];
+	char serialnum[16];
+
+	build_ptr bpr;
+	
+	mem_ptr_t ptr = mem_mk_ptr(version.string);
+	bk_debug("build date:%s", __DATE__);
+	bk_debug("build time:%s", __TIME__);
+	bk_debug("major:%d minor:%d patch:%d", version.major, version.minor, version.patch);
+	bk_debug("version:%s", version.string);
+	bk_debug("date:%s", version.date);
+	bk_debug("time:%s", version.time);
+	bk_debug("ptr:%s %d", ptr.p, ptr.len);
+
+	bpr = build_ptr_make(hwversion, 16);
+	build_ptr_string(bpr, "1.0");
+	bpr = build_ptr_make(serialnum, 16);
+	build_ptr_string(bpr, "12456");
+
+	bk_debug("hwversion:%s", hwversion);
+	bk_debug("serialnum:%s", serialnum);
+}
+
 static err_type benchmark_memmove_test(int argc, char *argv)
 {
 	uint8_t buffer[16] = {
@@ -2248,8 +2331,6 @@ static err_type benchmark_memmove_test(int argc, char *argv)
 	awoke_hexdump_trace(buffer, 16);
 	memmove(buffer, buffer+7, 16);
 	awoke_hexdump_trace(buffer, 16);
-
-	return et_ok;
 }
 
 int main(int argc, char *argv[])
@@ -2306,6 +2387,7 @@ int main(int argc, char *argv[])
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
 		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
+		{"buildmacros-test",	no_argument,        NULL,   arg_buildmacros_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
 		{NULL, 0, NULL, 0}
     };	
@@ -2503,6 +2585,10 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_nucparamsgen_test;
 				break;
 
+			case arg_buildmacros_test:
+				bmfn = benchmark_buildmacros_test;
+				break;
+				
 			case arg_memmove_test:
 				bmfn = benchmark_memmove_test;
 				break;

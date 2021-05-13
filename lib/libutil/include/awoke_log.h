@@ -145,7 +145,7 @@ typedef struct _awoke_log_context {
 	uint8_t level;
 	uint8_t direction;
 	uint32_t mmask;
-	void (*external_interface)(char *, int );
+	void (*external_interface)(uint8_t, uint32_t, char *, int );
 	log_filecache fc;
 } awoke_log_context;
 /*}-- Log Context -- */

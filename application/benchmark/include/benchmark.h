@@ -71,6 +71,7 @@ typedef enum {
     arg_cameraconfig_test,
     arg_sensorconfig_test,
     arg_nucparamsgen_test,
+    arg_buildmacros_test,
     arg_memmove_test,
 } benchmark_args;
 

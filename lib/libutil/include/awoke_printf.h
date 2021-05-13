@@ -81,7 +81,7 @@ int awoke_sprintf(char* buffer, const char* format, ...);
  *         is non-negative and less than count, the string has been completely written.
  */
 int awoke_snprintf(char* buffer, size_t count, const char* format, ...);
-int awoek_vsnprintf(char* buffer, size_t count, const char* format, va_list va);
+int awoke_vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 
 /**
