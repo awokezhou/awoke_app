@@ -31,7 +31,7 @@ typedef struct _pkg_header_example {
 					p+= bytes;\
 				}while(0)
 #define _pkg_push_stris(data, p, bytes) do {\
-					strncpy(p, (char *)&data, bytes);\
+					strncpy(p, (char *)data, bytes);\
 					p+= bytes;\
 				}while(0)
 #define pkg_push_byte(data, p) 		_pkg_push_bytes(data, p, 1)

@@ -16,6 +16,7 @@ typedef enum {
 	LITETALK_CALLBACK_STREAM_DOWNLOAD,
 	LITETALK_CALLBACK_FILE_DOWNLOAD,
 	LITETALK_CALLBACK_FILE_DOWNLOAD_FINISH,
+	LITETALK_CALLBACK_CMDI_REQUEST,
 } litetalk_callback_reson;
 
 typedef enum {
@@ -23,6 +24,7 @@ typedef enum {
 	LITETALK_CATEGORY_STREAM,
 	LITETALK_CATEGORY_LOG,
 	LITETALK_CATEGORY_ALARM,
+	LITETALK_CATEGORY_CMDI = 8,
 } litetalk_category;
 
 typedef enum {
@@ -30,7 +32,9 @@ typedef enum {
 	LITETALK_CMD_EXPOSURE = 6,
 	LITETALK_CMD_DISPLAY = 7,
 	LITETALK_CMD_ISP = 8,
-} litetalk_cmd;
+	LITETALK_CMD_TEMPCTL = 9,
+	LITETALK_CMD_TEMP_CAP = 10,
+} litetalk_cmd_t;
 
 typedef enum {
 	LITETALK_MEDIA_DEFCONFIG = 1,
@@ -39,6 +43,13 @@ typedef enum {
 	LITETALK_MEDIA_DPCPARAMS = 4,
 	LITETALK_MEDIA_NUCPARAMS = 5,
 } litetalk_media;
+
+typedef enum {
+	LITETALK_CMDI_GET_REQUEST = 0x0,
+	LITETALK_CMDI_GET_RESPONSE,
+	LITETALK_CMDI_SET_REQUEST,
+	LITETALK_CMDI_SET_RESPONSE,
+} litetalk_cmdi_type;
 
 typedef enum {
 	LITETALK_CODE_SUCCESS = 0,
@@ -66,11 +77,20 @@ struct litetalk_cmd {
 	awoke_list _head;
 };
 
+struct litetalk_cmdi_item {
+	uint32_t address;
+	err_type (*set)();
+	err_type (*get)();
+	awoke_list _head;
+};
+
 struct litk_private {
 	int recvbyte;
 	int cmdlist_nr;
+	int cmdilist_nr;
 	uint32_t sector_addr;
 	struct litetalk_cmd *cmdlist;
+	struct litetalk_cmdi_item *cmdilist;
 	awoke_buffchunk *bigdata;
 	awoke_buffchunk_pool streampool;
 	struct litk_streaminfo streaminfo;
@@ -81,6 +101,14 @@ struct litetalk_cmdinfo {
 #define LITETALK_CMD_F_WRITE	0x01
 	uint8_t flag;
 	uint32_t value;
+};
+
+struct litetalk_cmdireq {
+	uint8_t dtype;
+	uint8_t subtype;
+	uint8_t requestid;
+	uint16_t datalen;
+	uint32_t address[2];
 };
 
 struct ltk_exposure {

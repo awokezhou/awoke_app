@@ -120,6 +120,9 @@ struct cmder_config {
 	int32_t tec_target;
 	uint32_t tecwork_freq;
 
+	uint16_t iff_th;
+	uint16_t iff_div;
+
 	uint32_t ae_enable:1;
 	uint32_t ae_expo_enable:1;
 	uint32_t ae_gain_enable:1;
@@ -169,42 +172,30 @@ struct cmder {
 struct uartcmder {
 	struct cmder base;
 
-	uint32_t nuc_checksum;
+	uint8_t nuc_checksum;
 	uint32_t nucaddr;
 	awoke_buffchunk *flashchunk;
 
 	awoke_minpq *rxqueue;
 	awoke_minpq *txqueue;
 
-	uint16_t gain;
-	uint16_t gain_min;
-	uint16_t gain_max;
-	uint16_t expo;
-	uint16_t expo_min;
-	uint16_t expo_max;
-	uint8_t ae_enable;
-	uint8_t ae_expo_en;
-	uint8_t ae_gain_en;
-	uint8_t goal_max;
-	uint8_t goal_min;
-	uint8_t ae_frame;
-
-	uint8_t fps;
-	uint8_t fps_min;
-	uint8_t fps_max;
-	uint8_t cl_test;
-	uint8_t front_test;
-	uint8_t cross_en;
-	uint32_t cross_cp;
-	uint8_t vinvs;
-	uint8_t hinvs;
-
 	uint16_t regaddr;
 	uint8_t regvalue;
 
 	struct cmder_config config;
 
+	awoke_minpq workqueue;
+
+	uint8_t temp_cap_en;
+
 	awoke_buffchunk_pool *bpool_filechunk;
+};
+
+struct cmder_work {
+	err_type (*handle)(struct uartcmder *, struct cmder_work *);
+	uint32_t ms;
+	void *data;
+	uint8_t flags;
 };
 
 #define cmder_to_uartcmder(p)	container_of(p, struct uartcmder, cmder)

@@ -105,7 +105,7 @@ typedef enum {
 #define LOG_M_BK			LOG_M_OFFSET(8)
 #define LOG_M_MK			LOG_M_OFFSET(9)
 #define LOG_M_CMDER			LOG_M_OFFSET(10)
-#define LOG_M_ALL			0xFFFFFFFFU
+#define LOG_M_ALL			0xFFFFFFFF
 
 
 typedef struct _awoke_log_modulemap {
