@@ -17,13 +17,16 @@ struct cmder_protocol {
 		void *user, void *in, unsigned int len);
 
 	err_type (*connect)(void);
-	err_type (*match)(struct cmder_protocol *, void *, int);
+	err_type (*match)(struct cmder_protocol *, void *, int, int *);
+	err_type (*scan)(struct cmder_protocol *, void *, int, int *);
 	err_type (*read)(struct cmder_protocol *, void *, int);
 	err_type (*write)(struct cmder_protocol *, void *, int);
 	err_type (*close)(struct cmder_protocol *, void *);
 	
 	void *private;
 	void *context;
+
+	uint8_t initialized:1;
 	
 	awoke_list _head;
 };

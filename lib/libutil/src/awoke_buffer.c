@@ -119,6 +119,12 @@ void awoke_buffchunk_clean(struct _awoke_buffchunk *chunk)
 	buffchunk_init(chunk);
 }
 
+void awoke_buffchunk_backoff(struct _awoke_buffchunk *chunk, int back)
+{
+	memmove(chunk->p, chunk->p+back, chunk->size);
+	chunk->length -= back;
+}
+
 void awoke_buffchunk_clear(struct _awoke_buffchunk *chunk)
 {
 	memset(chunk->p, 0x0, chunk->size);

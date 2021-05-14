@@ -5,30 +5,66 @@
 #include "awoke_package.h"
 
 
-static err_type litetalk_match(struct cmder_protocol *proto, void *buf, int len)
+static err_type litetalk_scan(struct cmder_protocol *proto, void *buf, int len, int *rlen)
+{
+	uint32_t marker;
+	uint8_t *p;
+	uint8_t *head = (uint8_t *)buf;
+	uint8_t *pos = head;
+	uint8_t *end = buf+len-1;
+
+	if (len < 4) {
+		*rlen = 0;
+		return et_notfind;
+	}
+
+	while (pos != end) {
+		p = pos;
+		pkg_pull_dwrd(marker, p);
+		marker = awoke_htonl(marker);
+		if (marker == LITETALK_MARK) {
+			lib_debug("find mark");
+			break;
+		}
+		pos++;
+	}
+
+	*rlen = ((pos==end) ? len : (pos-head));
+	return et_ok;
+}
+
+static err_type litetalk_match(struct cmder_protocol *proto, void *buf, int len, int *rlen)
 {
 	uint8_t *pos = buf;
 	uint32_t marker;
 	uint32_t content_length;
 
+	if (len < 4) {
+		return err_unfinished;
+	} 
+
 	pkg_pull_dwrd(marker, pos);
 	marker = awoke_htonl(marker);
+	if (marker != LITETALK_MARK) {
+		return err_match;
+	} else if (len < LITETALK_HEADERLEN) {
+		return err_unfinished;
+	}
+	
 	pos += 2;
 	pkg_pull_dwrd(content_length, pos);
 	content_length = awoke_htonl(content_length);
 
 	//cmder_trace("mark:0x%x", marker);
-	
-	if (marker != LITETALK_MARK) {
-		return err_match;
-	}
 
-	//cmder_trace("len:%d content length:%d", len, content_length);
+	cmder_trace("len:%d content length:%d", len, content_length);
 	if (len == (content_length+LITETALK_HEADERLEN)) {
-		return et_ok;
+		*rlen = len;
 	} else if (len < (content_length+LITETALK_HEADERLEN)) {
 		cmder_trace("rx not finish");
 		return err_unfinished;
+	} else {
+		*rlen = content_length+LITETALK_HEADERLEN;
 	}
 
 	return et_ok;
@@ -125,6 +161,11 @@ static err_type litetalk_read(struct cmder_protocol *proto, void *buf, int len)
 	uint8_t category;
 	uint32_t content_length;
 	uint8_t *pos = (uint8_t *)buf;
+
+	if (!proto->initialized) {
+		proto->callback(proto, LITETALK_CALLBACK_PROTOCOL_INIT, NULL, NULL, 0x0);
+		proto->initialized = 1;
+	}
 	
 	pos += 4;
 	pkg_pull_byte(category, pos);
@@ -163,6 +204,7 @@ static err_type litetalk_read(struct cmder_protocol *proto, void *buf, int len)
 struct cmder_protocol litetalk_protocol = {
 	.name = "LiteTalk",
 	.match = litetalk_match,
+	.scan = litetalk_scan,
 	.read = litetalk_read,
 };
 
@@ -227,12 +269,8 @@ err_type litetalk_build_log(awoke_buffchunk *p, uint8_t level, uint32_t src, uin
 	uint8_t *head = (uint8_t *)p->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
 	uint32_t time;
-
-	uint8_t data = context[0];
 	
 	time = 0;
-
-	awoke_hexdump_info(p->p, p->size);
 
 	time = awoke_htonl(time);
 	pkg_push_dwrd(time, pos);
@@ -247,9 +285,7 @@ err_type litetalk_build_log(awoke_buffchunk *p, uint8_t level, uint32_t src, uin
 
 	p->length = pos-head + LITETALK_HEADERLEN;
 
-	awoke_hexdump_info(p->p, p->size);
-
-	awoke_hexdump_info(context, length);
+	awoke_hexdump_info(p->p, p->length);
 
 	return et_ok;
 }

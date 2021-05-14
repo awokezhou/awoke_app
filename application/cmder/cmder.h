@@ -162,6 +162,8 @@ struct cmder {
 	int nr_protocols;
 	awoke_list protocols;
 
+	struct cmder_protocol *proto;
+
 	int nr_transceivers;
 	awoke_list transceiver_list;
 	

@@ -142,4 +142,5 @@ int litetalk_build_cmderr(void *buf, struct litetalk_cmdinfo *,
 err_type litetalk_pack_header(uint8_t *buf, uint8_t category, int length);
 err_type litetalk_build_stream_ack(awoke_buffchunk *p, 
 	uint8_t streamid, uint16_t index, uint8_t code);
+err_type litetalk_build_log(awoke_buffchunk *p, uint8_t level, uint32_t src, uint8_t *context, int length);
 #endif /* __PROTO_LITETALK_H__ */

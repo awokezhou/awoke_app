@@ -115,15 +115,17 @@ static const char *module_string_get(uint32_t module)
 	return modulemap[LOG_M_NONE].string;
 }
 
-void awoke_log_init(uint8_t level, uint32_t mmask)
+void awoke_log_init(uint8_t level, uint32_t mmask, uint8_t direct)
 {
 	logctx.level = level;
 	logctx.mmask = mmask;
+	logctx.direction = direct;
 }
 
-void awoke_log_external_interface(void (*handle)(uint8_t, uint32_t, char *, int))
+void awoke_log_external_interface(void (*handle)(uint8_t, uint32_t, char *, int, void*), void *data)
 {
 	logctx.external_interface = handle;
+	logctx.external_data = data;
 }
 
 static bool log_file_exist(const char *filepath)
@@ -269,6 +271,8 @@ void awoke_log(uint8_t level, const char *func, int line, const char *format, ..
 	va_list args;
 	time_t now;
 	struct tm date;
+	char *logcontext;
+	int logcontext_length;
 	char buff[AWOKE_LOG_BUFF_MAXLEN] = {'\0'};
 
 	if (!level_visible(level))
@@ -298,6 +302,8 @@ void awoke_log(uint8_t level, const char *func, int line, const char *format, ..
 		date.tm_sec);
 #endif
 
+	logcontext = bp.p;
+
 	build_ptr_format(bp, "[%s] [%s:%d] ", map->string, func, line);
 
 	va_start(args, format);
@@ -308,7 +314,8 @@ void awoke_log(uint8_t level, const char *func, int line, const char *format, ..
 	bp.p += n;
 	bp.max -= n;
 	bp.len += n;
-
+	logcontext_length = n;
+	
 #if defined(AWOKE_CONFIG_LOG_COLOR)
 	/* color end */
 	if (map->use_color) {
@@ -329,6 +336,10 @@ void awoke_log(uint8_t level, const char *func, int line, const char *format, ..
 		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
+	case LOG_D_STDOUT_EX:
+		awoke_printf("%.*s", (int)bp.len, (char *)bp.head);
+		break;
+
 	default:
 		break;
 	}
@@ -340,7 +351,9 @@ void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, cons
     va_list args;
 	time_t now;
     struct tm date;
+	char *logcontext;
 	const char *mstring;
+	int logcontext_length;
 	char buff[AWOKE_LOG_BUFF_MAXLEN] = {'\0'};
 
 	awoke_log_modulemap *mmap = module_get(module);
@@ -383,9 +396,12 @@ void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, cons
 		date.tm_sec);
 #endif
 
-	build_ptr_format(bp, "[%s] [%s] [%s:%d] ",
-		mstring, lmap->string, func, line);
+	build_ptr_format(bp, "[%s] [%s] ", mstring, lmap->string);
 
+	logcontext = bp.p;
+
+	build_ptr_format(bp, "[%s:%d] ", func, line);
+	
 	va_start(args, format);
 	//n = vsnprintf(bp.p, bp.max, format, args);
 	n = awoke_vsnprintf(bp.p, bp.max, format, args);
@@ -394,6 +410,8 @@ void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, cons
 	bp.p += n;
 	bp.max -= n;
 	bp.len += n;
+
+	logcontext_length = bp.p - logcontext;
 
 #if defined(AWOKE_CONFIG_LOG_COLOR)
 	/* color end */
@@ -409,7 +427,6 @@ void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, cons
 	case LOG_D_STDOUT:
 		//printf("%.*s", (int)bp.len, (char *)bp.head);
 		awoke_printf("%.*s", (int)bp.len, (char *)bp.head);
-		awoke_log_file_write(&logctx.fc, (char *)bp.head, (int)bp.len);
 		break;
 
 	case LOG_D_FILE:
@@ -417,7 +434,12 @@ void awoke_logm(uint8_t level, uint32_t module, const char *func, int line, cons
 		break;
 
 	case LOG_D_EXTERNAL_INTERFACE:
-		logctx.external_interface(level, module, bp.head, bp.len);
+		logctx.external_interface(level, module, bp.head, bp.len, logctx.external_data);
+		break;
+
+	case LOG_D_STDOUT_EX:
+		awoke_printf("%.*s", (int)bp.len, (char *)bp.head);
+		logctx.external_interface(level, module, logcontext, logcontext_length, logctx.external_data);
 		break;
 		
 	default:

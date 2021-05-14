@@ -10,7 +10,6 @@ static err_type awoke_socket_bind(int fd, const struct sockaddr *addr,
                    socklen_t addrlen, int backlog);
 
 
-#if 0
 static awoke_network_io g_sk_io = {
 	.accept = accept,
 	.bind = awoke_socket_bind,
@@ -21,7 +20,6 @@ static awoke_network_io g_sk_io = {
 	.socket_create = awoke_socket_create,
 	.socket_close = close,
 };
-#endif
  
 static sock_map sk_map[] = 
 {
@@ -32,12 +30,10 @@ static sock_map sk_map[] =
 };
 static const int sk_map_size = array_size(sk_map);
 
-#if 0
 awoke_network_io *awoke_network_io_get()
 {
 	return &g_sk_io;
 }
-#endif
 
 static inline sock_map *get_sock_proto(uint8_t type)
 {

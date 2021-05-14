@@ -53,6 +53,7 @@ err_type awoke_buffchunk_init(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_clean(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_clear(struct _awoke_buffchunk *chunk);
 void awoke_buffchunk_free(struct _awoke_buffchunk **p_chunk);
+void awoke_buffchunk_backoff(struct _awoke_buffchunk *chunk, int back);
 err_type awoke_buffchunk_write(struct _awoke_buffchunk *chunk, const char *data, 
 	int length, bool trybest);
 err_type awoke_buffchunk_resize(struct _awoke_buffchunk *chunk, 

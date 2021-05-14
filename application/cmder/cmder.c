@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 
-//#define CMDER_TCVR_UART
+#define CMDER_TCVR_UART
 
 
 #if defined(CMDER_TEST_STRING_COMMAND)
@@ -330,45 +330,65 @@ static err_type test_bytes_tx(struct cmder *c)
 #endif
 
 
+static err_type tcvr_buffer_submit(struct uartcmder *uc, struct command_transceiver *tcvr, 
+	int length)
+{
+	awoke_buffchunk *chunk;
+	chunk = awoke_buffchunk_create(tcvr->rxbuffer->length);
+	if (!chunk) {
+		cmder_err("buffer create error");
+		return err_oom;
+	}
+	chunk->id = tcvr->id;
+	awoke_buffchunk_write(chunk, tcvr->rxbuffer->p, length, FALSE);
+	return awoke_minpq_insert(uc->rxqueue, &chunk, tcvr->id);
+}
+
 #if defined(CMDER_TCVR_UART)
 static err_type uart_rx(struct command_transceiver *tcvr, void *data)
 {
 	err_type ret;
-	int c;
-	awoke_buffchunk *chunk, *buffer;
+	int c, rlen;
+	bool find = FALSE;
+	awoke_buffchunk *buffer;
 	struct cmder_protocol *proto;
 	struct uartcmder *uc = (struct uartcmder *)data;
 
 	buffer = tcvr->rxbuffer;
 
-	cmder_trace("read");
+	//cmder_trace("read");
 	c = read(tcvr->fd, buffer->p+buffer->length, buffer->size);
-	if (c > 0) {
-		awoke_hexdump_trace(buffer->p+buffer->length, c);
-		buffer->length += c;
-		cmder_trace("read %d total:%d", c, buffer->length);
+	if ((c > 0) || (buffer->length)) {
+		if (c > 0) {
+			awoke_hexdump_trace(buffer->p+buffer->length, c);
+			buffer->length += c;
+		} else {
+			awoke_hexdump_trace(buffer->p, buffer->length);
+		}
 		
-		if (uc->base.nr_protocols) {
-			list_foreach(proto, &uc->base.protocols, _head) {
-				ret = proto->match(proto, buffer->p, buffer->length);
-				if (ret == err_unfinished) {
-					return et_ok;
+		cmder_trace("read %d total:%d", c, buffer->length);
+
+		if (uc->base.proto) {
+			proto = uc->base.proto;
+			ret = proto->match(proto, buffer->p, buffer->length, &rlen);
+			if (ret == et_ok) {
+				tcvr_buffer_submit(uc, tcvr, rlen);
+				cmder_debug("submit:%d", rlen);
+				awoke_buffchunk_backoff(buffer, rlen);
+				cmder_debug("backoff:%d remain:%d", rlen, buffer->length);
+				return et_ok;
+			} else if (ret == err_unfinished) {
+				return et_ok;
+			} else {
+				proto->scan(proto, buffer->p, buffer->length, &rlen);
+				cmder_debug("scan:%d", rlen);
+				if (rlen) {
+					awoke_buffchunk_backoff(buffer, rlen);
 				}
 			}
+		} else {
+			awoke_buffchunk_clear(buffer);
 		}
-		if (et_ok != ret) {
-			return et_ok;
-		}
-
-		chunk = awoke_buffchunk_create(buffer->length);
-		if (!chunk) {
-			cmder_err("buffer create error");
-			return err_oom;
-		}
-		chunk->id = tcvr->id;
-		awoke_buffchunk_copy(chunk, buffer);
-		awoke_buffchunk_clear(tcvr->rxbuffer);
-		awoke_minpq_insert(uc->rxqueue, &chunk, tcvr->id);
 	}
 
 	return et_ok;
@@ -394,7 +414,7 @@ static err_type tcp_rx(struct command_transceiver *tcvr, void *data)
 {
 	int n, maxfd;
 	err_type ret = et_ok;
-	int c;
+	int c, rlen;
 	awoke_buffchunk *chunk, *buffer;
 	struct timeval tv;
 	fd_set readfds;
@@ -431,7 +451,7 @@ static err_type tcp_rx(struct command_transceiver *tcvr, void *data)
 
 			if (uc->base.nr_protocols) {
 				list_foreach(proto, &uc->base.protocols, _head) {
-					ret = proto->match(proto, buffer->p, buffer->length);
+					ret = proto->match(proto, buffer->p, buffer->length, &rlen);
 					if (ret == err_unfinished) {
 						return et_ok;
 					}
@@ -704,14 +724,11 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 	*/
 
 	litetalk_protocol.callback = litetalk_service_callback;
-	list_append(&litetalk_protocol._head, &c->base.protocols);
-	c->base.nr_protocols++;
 	litetalk_protocol.context = c;
-	litetalk_protocol.callback(&litetalk_protocol, 
-		LITETALK_CALLBACK_PROTOCOL_INIT, NULL, NULL, 0x0);
+	c->base.proto = &litetalk_protocol;
 	
 	c->rxqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 8, NULL, 0x0);
-	c->txqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 8, NULL, 0x0);
+	c->txqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 16, NULL, 0x0);
 
 	cmder_static_init(c);
 
@@ -1225,22 +1242,17 @@ static err_type litetalk_cmdi_process(struct cmder_protocol *proto,
 }
 #endif
 
-static void litk_log_output(uint8_t level, uint32_t src, char *string, int length)
+static void litk_log_output(uint8_t level, uint32_t src, char *string, int length, void *data)
 {
+	struct cmder_protocol *proto = (struct cmder_protocol *)data;
+	struct uartcmder *uc = proto->context;
+
+	//printf("[%d] %.*s\n", length, length, string);
 	awoke_buffchunk *chunk;
 	chunk = awoke_buffchunk_create(LITETALK_HEADERLEN + 6 + length);
 	litetalk_build_log(chunk, LOG_DBG, LOG_M_CMDER, (uint8_t *)string, length);
 	chunk->id = 0;
-	//awoke_minpq_insert(uc->txqueue, &chunk, 0);
-}
-
-static void ltk_debug(struct cmder_protocol *proto, char *string)
-{
-	awoke_buffchunk *chunk;	
-	struct uartcmder *uc = proto->context;
-	char string2[32] = "ltk debug";
-
-	chunk->id = 0;
+	//awoke_hexdump_info(chunk->p, chunk->length);
 	awoke_minpq_insert(uc->txqueue, &chunk, 0);
 }
 
@@ -1450,8 +1462,6 @@ static err_type ltk_display_get(struct cmder_protocol *proto,
 	struct cmder_config *cfg = &uc->config;
 
 	cmder_info("display get");
-
-	ltk_debug(proto, "display get");
 
 	pkg_push_byte(info->cmdtype, pos);
 	pkg_push_byte(code, pos);
@@ -1691,6 +1701,9 @@ static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t 
 		priv->cmdlist_nr = array_size(litetalk_cmd_array);
 		proto->private = priv;
 		awoke_buffchunk_pool_init(&priv->streampool, 4096);
+		//awoke_log_external_interface(litk_log_output, proto);
+		//awoke_log_init(LOG_DBG, LOG_M_ALL, LOG_D_STDOUT_EX);
+		//cmder_debug("log add external interface");
 		break;
 
 	case LITETALK_CALLBACK_COMMAND:
@@ -1723,10 +1736,10 @@ static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t 
 
 static err_type cmder_protocol_poll(struct uartcmder *uc)
 {
-	int prior;
+	int prior, rlen;
 	err_type ret;
 	struct cmder *c = &uc->base;
-	struct cmder_protocol *proto;
+	struct cmder_protocol *proto = c->proto;
 	awoke_buffchunk *chunk;
 	
 	if (awoke_minpq_empty(uc->rxqueue)) {
@@ -1735,24 +1748,16 @@ static err_type cmder_protocol_poll(struct uartcmder *uc)
 
 	awoke_minpq_delmin(uc->rxqueue, &chunk, &prior);
 
-	if (!c->nr_protocols) {
-		cmder_debug("no protocols");
-		awoke_buffchunk_free(&chunk);
-		return et_ok;
-	}
-
 	//cmder_debug("chunk length:%d", chunk->length);
 	//awoke_hexdump_trace(chunk->p, chunk->length);
 
-	list_foreach(proto, &c->protocols, _head) {
-		//cmder_debug("protocol:%s", proto->name);
-		ret = proto->match(proto, chunk->p, chunk->length);
-		if (ret != et_ok) {
-			break;
-		}
-		proto->read(proto, chunk->p, chunk->length);
-		break;
+	c->proto->match(proto, chunk->p, chunk->length, &rlen);
+	if (ret != et_ok) {
+		awoke_buffchunk_free(&chunk);
+		return ret;
 	}
+	
+	c->proto->read(proto, chunk->p, chunk->length);
 
 	awoke_buffchunk_free(&chunk);
 
@@ -1865,8 +1870,7 @@ int main (int argc, char *argv[])
 	struct uartcmder *cmder;
 	const char *serialport = "/dev/ttyS11";
 
-	awoke_log_init(LOG_INFO, LOG_M_ALL);
-	awoke_log_external_interface(litk_log_output);
+	awoke_log_init(LOG_TRACE, LOG_M_ALL, LOG_D_STDOUT);
 	
 	cmder = mem_alloc_z(sizeof(struct uartcmder));
 	if (!cmder) {
