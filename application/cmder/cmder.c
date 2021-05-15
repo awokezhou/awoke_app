@@ -10,9 +10,14 @@
 #include "awoke_socket.h"
 #include "uart.h"
 #include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <execinfo.h>
+#include <signal.h>
 
 
-#define CMDER_TCVR_UART
+#define CMDER_TCVR_UART	1
 
 
 #if defined(CMDER_TEST_STRING_COMMAND)
@@ -711,7 +716,7 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 		array_size(test_ecmds), &ecmd_matcher);*/
 #endif
 
-#if defined(CMDER_TCVR_UART)
+#if (CMDER_TCVR_UART == 1)
 	cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
 #else
 	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 1024);
@@ -732,7 +737,7 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 	cmder_static_init(c);
 
-#if defined(CMDER_TCVR_UART)
+#if (CMDER_TCVR_UART == 1)
 	cmder_uart_tcvr_claim(&c->base, 0);
 #else
 	cmder_tcp_tcvr_claim(&c->base, 0);
@@ -1244,12 +1249,11 @@ static err_type litetalk_cmdi_process(struct cmder_protocol *proto,
 
 static void litk_log_output(uint8_t level, uint32_t src, char *string, int length, void *data)
 {
-	struct cmder_protocol *proto = (struct cmder_protocol *)data;
-	struct uartcmder *uc = proto->context;
+	struct uartcmder *uc = (struct uartcmder *)data;
 
 	//printf("[%d] %.*s\n", length, length, string);
 	awoke_buffchunk *chunk;
-	chunk = awoke_buffchunk_create(LITETALK_HEADERLEN + 6 + length);
+	chunk = awoke_buffchunk_create(LITETALK_HEADERLEN + 9 + length);
 	litetalk_build_log(chunk, LOG_DBG, LOG_M_CMDER, (uint8_t *)string, length);
 	chunk->id = 0;
 	//awoke_hexdump_info(chunk->p, chunk->length);
@@ -1701,8 +1705,10 @@ static err_type litetalk_service_callback(struct cmder_protocol *proto, uint8_t 
 		priv->cmdlist_nr = array_size(litetalk_cmd_array);
 		proto->private = priv;
 		awoke_buffchunk_pool_init(&priv->streampool, 4096);
-		//awoke_log_external_interface(litk_log_output, proto);
-		//awoke_log_init(LOG_DBG, LOG_M_ALL, LOG_D_STDOUT_EX);
+#if (CMDER_TCVR_UART == 0)
+		awoke_log_external_interface(litk_log_output, proto->context);
+		awoke_log_init(LOG_DBG, LOG_M_ALL, LOG_D_STDOUT_EX);
+#endif
 		//cmder_debug("log add external interface");
 		break;
 
@@ -1864,6 +1870,33 @@ static err_type work_test(struct uartcmder *uc, struct cmder_work *wk)
 	return cmder_work_schedule(uc, work_test, 1000);
 }
 
+void dumptrace(int signo)
+{
+	void *buffer[30] = {0};
+	size_t size;
+	char **strings = NULL;
+	size_t i = 0;
+
+	log_debug("dumptrace");
+
+	size = backtrace(buffer, 30);
+	fprintf(stdout, "Obtained %zd stack frames.nm\n", size);
+	strings = backtrace_symbols(buffer, size);
+	if (strings == NULL)
+	{
+		perror("backtrace_symbols.");
+		exit(EXIT_FAILURE);
+	}
+
+	for (i = 0; i < size; i++)
+	{
+		fprintf(stdout, "%s\n", strings[i]);
+	}
+	free(strings);
+	strings = NULL;
+	exit(0);
+}
+
 int main (int argc, char *argv[])
 {
 	err_type ret;
@@ -1880,19 +1913,25 @@ int main (int argc, char *argv[])
 
 	cmder_trace("cmder alloc ok");
 
+	signal(SIGSEGV, dumptrace);
+
 	ret = cmder_init(cmder, serialport);
 	if (ret != et_ok) {
 		cmder_err("cmder init error");
 		return -1;
 	}
 
+#if (CMDER_TCVR_UART == 1)
+	awoke_log_external_interface(litk_log_output, cmder);
+	awoke_log_init(LOG_TRACE, LOG_M_ALL, LOG_D_STDOUT_EX);
+#endif
+
 	//uint8_t testbuf[7] = {0x56, 0x56, 0x2, 0x1, 0x1, 0x0, 0x5};
 	cmder_trace("cmder init ok");
 
 	//testbuf_tx(cmder, testbuf, 7);
 
-	if (0)
-		cmder_work_schedule(cmder, work_test, 1000);
+	cmder_work_schedule(cmder, work_test, 1000);
 
 	while (1) {
 		

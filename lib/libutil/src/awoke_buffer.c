@@ -20,7 +20,7 @@ uint16_t buffchunk_id(struct _awoke_buffchunk *chunk)
 	uint32_t addr2 = (uint32_t)(&chunk->id);
 	id = ((addr1>>23)^magic) + ((magic>>5)^addr2);*/
 	static uint16_t id = 0;
-	lib_trace("id:%d", id);
+	//lib_trace("id:%d", id);
 	return id++;
 }
 

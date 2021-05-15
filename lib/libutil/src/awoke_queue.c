@@ -342,6 +342,7 @@ static void minpq_swap(struct _awoke_minpq *q, int i, int j)
     memcpy(tempu, addr1, q->nodesize);
     memcpy(addr1, addr2, q->nodesize);
     memcpy(addr2, tempu, q->nodesize);
+	mem_free(tempu);
 }
 
 static void minpq_sink(struct _awoke_minpq *q, int k)
@@ -392,7 +393,7 @@ err_type awoke_minpq_insert(struct _awoke_minpq *q, void *u, int p)
             if (!q->capacity) q->capacity = 1;
             awoke_minpq_resize(q, q->capacity*2);
         } else {
-            log_err("MinPQ full");
+            //log_err("MinPQ full");
             return et_full;
         }
     }

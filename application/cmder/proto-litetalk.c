@@ -285,7 +285,7 @@ err_type litetalk_build_log(awoke_buffchunk *p, uint8_t level, uint32_t src, uin
 
 	p->length = pos-head + LITETALK_HEADERLEN;
 
-	awoke_hexdump_info(p->p, p->length);
+	//awoke_hexdump_info(p->p, p->length);
 
 	return et_ok;
 }
