@@ -118,6 +118,8 @@ struct cmder_config {
 	uint8_t ae_frame;
 
 	int32_t tec_target;
+	uint32_t tec_target_min;
+	uint32_t tec_target_max;
 	uint32_t tecwork_freq;
 
 	uint16_t iff_th;

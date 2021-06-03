@@ -35,6 +35,7 @@
 #include "bk_nvm.h"
 #include "bk_epc.h"
 #include "md5.h"
+#include "bk_strucp.h"
 
 
 static void usage(int ex)
@@ -1798,46 +1799,6 @@ static err_type benchmark_fibonacci_test(int argc, char *argv[])
 	return et_ok;
 }
 
-typedef struct _bk_version {
-	int major;
-	int monir;
-} bk_version;
-
-#define BK_VERSION_MAJOR	0
-#define BK_VERSION_MINOR	1
-#define BK_VERSION_STRING	"0.1"
-
-#define BK_VERSION_FORMAT	"%d.%d"
-
-#define bk_version_make(m1, m2)		{m1, m2}
-
-#define bk_version_encode(m1, m2)	((m1<<8)|m2)
-
-static char *version_str(void)
-{
-	return BK_VERSION_STRING;
-}
-
-static uint32_t bk_version_code(void)
-{
-	return bk_version_encode(0,1);
-}
-
-static struct _bk_version version_get(void)
-{
-	bk_version ver = bk_version_make(BK_VERSION_MAJOR, BK_VERSION_MINOR);
-	return ver;
-}
-
-static err_type benchmark_version_test(int argc, char *argv[])
-{
-	bk_debug("version str:%s", version_str());
-	bk_debug("version:"BK_VERSION_FORMAT, version_get());
-	bk_debug("version code:0x%x", bk_version_code());
-	
-	return et_ok;
-}
-
 static err_type benchmark_kalman_test(int argc, char *argv[])
 {
 	int i;
@@ -2321,7 +2282,7 @@ static err_type benchmark_buildmacros_test(int argc, char *argv)
 	bk_debug("serialnum:%s", serialnum);
 }
 
-static err_type benchmark_memmove_test(int argc, char *argv)
+static err_type benchmark_memmove_test(int argc, char *argv[])
 {
 	uint8_t buffer[16] = {
 		0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x08,
@@ -2389,6 +2350,7 @@ int main(int argc, char *argv[])
 		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
 		{"buildmacros-test",	no_argument,        NULL,   arg_buildmacros_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
+		{"strucp-test",         no_argument,        NULL,   arg_strucp_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2535,10 +2497,6 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_fibonacci_test;
 				break;
 
-			case arg_version_test:
-				bmfn = benchmark_version_test;
-				break;
-
 			case arg_mblock_test:
 				bmfn = benchmark_mblock_test;
 				//bmfn = benchmark_version_test;
@@ -2593,6 +2551,10 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_memmove_test;
 				break;
 
+            case arg_strucp_test:
+                bmfn = benchmark_strucp_test;
+                break;
+
             case '?':
             case 'h':
             default:
@@ -2602,7 +2564,7 @@ int main(int argc, char *argv[])
     }
 
 run:
-	awoke_log_init(loglevel, LOG_M_ALL);
+	awoke_log_init(loglevel, LOG_M_ALL, LOG_D_STDOUT);
 	bmfn(argc, argv);
 
 	return 0;

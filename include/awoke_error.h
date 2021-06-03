@@ -5,6 +5,7 @@
 typedef enum 
 {
     et_ok = 0,
+    et_unfinished,
 	et_noeed,
     et_fail,
     et_param,
@@ -59,6 +60,7 @@ typedef enum
 	err_match,
 	err_unfinished,
 	err_checksum,
+	err_incomplete,
 } err_type;
 
 

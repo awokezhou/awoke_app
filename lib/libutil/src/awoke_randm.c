@@ -6,5 +6,5 @@
 int awoke_random_int(int max, int min)
 {
 	srand((unsigned)time(NULL));
-	return rand()%max+1+min;
+	return ((rand()%(max-min))+min);
 }
