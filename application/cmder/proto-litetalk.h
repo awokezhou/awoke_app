@@ -36,6 +36,7 @@ typedef enum {
 	LITETALK_CMD_TEMPCTL = 9,
 	LITETALK_CMD_TEMP_CAP = 10,
 	LITETALK_CMD_CFG = 11,
+	LITETALK_CMD_ROI0 = 12,
 } litetalk_cmd_t;
 
 typedef enum {

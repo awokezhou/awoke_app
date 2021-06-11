@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include "proto-litetalk.h"
+#include "proto-xfer.h"
 #include "awoke_package.h"
 #include "awoke_socket.h"
 #include "uart.h"
@@ -19,7 +20,8 @@
 
 
 
-#define CMDER_TCVR_UART	1
+#define CMDER_TCVR_UART	0
+static struct uartcmder *cmder_ctx = NULL;
 
 
 #if defined(CMDER_TEST_STRING_COMMAND)
@@ -477,7 +479,7 @@ static err_type uart_tx(struct command_transceiver *tcvr, void *buf, int len)
 {
 	int c;
 
-	//awoke_hexdump_trace(buf, len);
+	awoke_hexdump_trace(buf, len);
 
 	c = write(tcvr->fd, buf, len);
 	if (c <= 0) {
@@ -488,6 +490,113 @@ static err_type uart_tx(struct command_transceiver *tcvr, void *buf, int len)
 	return et_ok;
 }
 #endif
+
+static err_type tcp_rxpoll(struct command_transceiver *tcvr, void *data)
+{
+
+	int n, maxfd;
+	err_type ret = et_ok;
+	int c=0, rlen;
+	awoke_buffchunk *chunk, *buffer;
+	struct timeval tv;
+	fd_set readfds;
+	struct cmder_protocol *proto;
+	struct uartcmder *uc = (struct uartcmder *)data;
+
+	buffer = tcvr->rxbuffer;
+
+	FD_ZERO(&readfds);
+
+	FD_SET(tcvr->fd, &readfds);
+	if (tcvr->connfd > 0) {
+		FD_SET(tcvr->connfd, &readfds);
+		maxfd = tcvr->connfd + 1;
+	} else {
+		maxfd = tcvr->fd + 1;
+	}
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 1000;
+
+	n = select(maxfd, &readfds, NULL, NULL, &tv);
+	//cmder_debug("select n:%d", n);
+	if (n <= 0) {
+		return et_ok;
+	}    
+
+    if ((tcvr->connfd > 0) && (FD_ISSET(tcvr->connfd, &readfds))) {
+		c = recv(tcvr->connfd, buffer->p+buffer->length, buffer->size, 0);
+    } else if (FD_ISSET(tcvr->fd, &readfds)) {
+		if (tcvr->connfd > 0) {
+			cmder_warn("shutdown old:%d", tcvr->connfd);
+			close(tcvr->connfd);
+		}
+		tcvr->connfd = awoke_socket_accpet(tcvr->fd);
+		cmder_debug("new accept:%d", tcvr->connfd);
+        return et_ok;
+	}
+
+poll_repeat:
+    if ((c > 0) || (buffer->length)) {
+        if (c > 0) {
+            awoke_hexdump_trace(buffer->p+buffer->length, c);
+            buffer->length += c;
+        } else {
+            awoke_hexdump_trace(buffer->p, buffer->length);
+        }
+
+        cmder_trace("read %d total:%d", c, buffer->length);
+
+        list_foreach(proto, &uc->base.protocols, _head) {
+            ret = proto->match(proto, buffer->p, buffer->length, &rlen);
+            if ((ret == et_ok) && (rlen)) {
+                cmder_debug("proto %s matched %d", proto->name, rlen);
+                ret = proto->read(proto, buffer->p, rlen);
+                if (ret != et_ok) {
+                    cmder_err("proto %s read error:%d", ret);
+                }
+                awoke_buffchunk_backoff(buffer, rlen);
+                if (buffer->length) {
+                    cmder_debug("remain %d", buffer->length);
+                    goto poll_repeat;
+                }
+                return et_ok;
+            } else if (ret == err_incomplete) {
+                cmder_debug("proto %s incomplete", proto->name);
+                return ret;
+            } else if ((ret == err_param) && (rlen)) {
+                cmder_debug("proto %s param error, backoff:%d", proto->name, rlen);
+                awoke_buffchunk_backoff(buffer, rlen);
+                return et_ok;
+            } else {
+                continue;   /* next proto match */
+            }
+        }
+
+        cmder_debug("no proto matched");
+
+        list_foreach(proto, &uc->base.protocols, _head) {
+            ret = proto->scan(proto, buffer->p, buffer->length, &rlen);
+            if (ret == err_match) {
+                continue;
+            } else if (rlen) {
+                cmder_debug("proto %s scan %d", proto->name, rlen);
+                awoke_buffchunk_backoff(buffer, rlen);
+                if (buffer->length) {
+                    cmder_debug("remain %d", buffer->length);
+                    return et_unfinished;
+                }
+                cmder_notice("poll repeat");
+                goto poll_repeat;
+            }
+        }
+
+        cmder_debug("no proto scaned");
+        awoke_buffchunk_clear(buffer);
+    }
+
+    return et_ok;
+}
 
 static err_type tcp_rx(struct command_transceiver *tcvr, void *data)
 {
@@ -566,11 +675,11 @@ static err_type tcp_tx(struct command_transceiver *tcvr, void *buf, int len)
 {
 	int c;
 
-	//awoke_hexdump_trace(buf, len);
+	awoke_hexdump_trace(buf, len);
 
 	c = send(tcvr->connfd, buf, len, 0);
-	if (c <= 0) {
-		cmder_err("tx error");
+	if (c < 0) {
+		cmder_err("tx error:%d", c);
 		return err_send;
 	}
 
@@ -799,7 +908,7 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 	//cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
 	cmder_tcvr_register(&c->base, 0, port, uart_rxpoll, uart_tx, 1024);
 #else
-	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rx, tcp_tx, 1024);
+	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rxpoll, tcp_tx, 1024);
 #endif
 
 	/*
@@ -811,8 +920,14 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
     /*
 	litetalk_protocol.callback = litetalk_service_callback;
 	litetalk_protocol.context = c;
-	c->base.proto = &litetalk_protocol;*/
+    list_append(&litetalk_protocol._head, &c->base.protocols);
+    c->base.nr_protocols++;
+    */
+    xfer_protocol.context = c;
+    list_append(&xfer_protocol._head, &c->base.protocols);
+    c->base.nr_protocols++;
 
+    /*
     ecmd_protocol.context = c;
     list_append(&ecmd_protocol._head, &c->base.protocols);
     c->base.nr_protocols++;
@@ -820,6 +935,7 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
     ecmd2_protocol.context = c;
     list_append(&ecmd2_protocol._head, &c->base.protocols);
     c->base.nr_protocols++;
+    */
     
 	c->rxqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 8, NULL, 0x0);
 	c->txqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 16, NULL, 0x0);
@@ -845,7 +961,9 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 		cmder_err("workqueue init error:%d", ret);
 		return err_param;
 	}	
-	
+
+    
+    
 	return et_ok;
 }
 
@@ -1366,11 +1484,15 @@ static err_type ltk_sensor_reg_set(struct cmder_protocol *proto,
 	return et_ok;
 }
 
+#define swver_build(x,y,z)  x<<16|y<<8|z
+#define hwver_build(x,y)    x<<16|y
+#define fpver_build(a,b,y,m,d)  a<<28|b<<24|y<<16|m<<8|d
+
 static err_type ltk_devinfo_get(struct cmder_protocol *proto, 
 	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
 {
 	uint8_t code = 0;
-	uint8_t strlen;
+	uint8_t strlen, modellen, maunlen, snamelen, datelen, timelen;
 	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
 	uint8_t *pos = head;
 	uint16_t addr;
@@ -1378,85 +1500,66 @@ static err_type ltk_devinfo_get(struct cmder_protocol *proto,
 
 	cmder_info("devinfo");
 
-
 	build_ptr bpr;
 	
 	char pdtmodel[16] = {'\0'};
 	char manufactor[16] = {'\0'};
-	char serialnum[16] = {'\0'};
-	char cameraid[16] = {'\0'};
 	char isensor[16] = {'\0'};
 	char swversion[16] = {'\0'};
-	char hwversion[16] = {'\0'};
-	char fpversion[16] = {'\0'};
 	char builddate[16] = {'\0'};
 	char buildtime[16] = {'\0'};
+    uint32_t serialnum = 0x00000000;
+    uint32_t cameraid = 0x00000000;
+    uint32_t vcode = swver_build(1, 0, 0);
+    uint32_t hwversion = hwver_build(1,0);
+    uint32_t fpversion = fpver_build(1,0,0x21,0x6,0x4);
 
 	pkg_push_byte(info->cmdtype, pos);
 	pkg_push_byte(code, pos);
 
+    /* model len */
 	bpr = build_ptr_make(pdtmodel, 16);
 	cmder_debug("len:%d", bpr.len);
 	build_ptr_string(bpr, "Cobra2000");
 	cmder_debug("len:%d", bpr.len);
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
+	modellen = bpr.len;
+	pkg_push_byte(modellen, pos);
 
+    /* manufactor len */
 	bpr = build_ptr_make(manufactor, 16);
 	build_ptr_string(bpr, "Luster");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
+	maunlen = bpr.len;
+	pkg_push_byte(maunlen, pos);
 
-	bpr = build_ptr_make(serialnum, 16);
-	build_ptr_string(bpr, "123456789");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
-
-	bpr = build_ptr_make(cameraid, 16);
-	build_ptr_string(bpr, "2000");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
-
+    /* isensor len */
 	bpr = build_ptr_make(isensor, 16);
-	build_ptr_string(bpr, "SONY-IMX990-AABA-C");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
+	build_ptr_string(bpr, "SONY-IMX990");
+	snamelen = bpr.len;
+	pkg_push_byte(snamelen, pos);
 
-	bpr = build_ptr_make(swversion, 16);
-	build_ptr_string(bpr, "0.1.1");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
-
-	bpr = build_ptr_make(hwversion, 16);
-	build_ptr_string(bpr, "1.0");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
-
-	bpr = build_ptr_make(fpversion, 16);
-	build_ptr_string(bpr, "1.5");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
-
+    /* date len */
 	bpr = build_ptr_make(builddate, 16);
 	build_ptr_string(bpr, "May 19 2021");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
+	datelen = bpr.len;
+	pkg_push_byte(datelen, pos);
 
+    /* time len */
 	bpr = build_ptr_make(buildtime, 16);
 	build_ptr_string(bpr, "15:13:12");
-	strlen = bpr.len;
-	pkg_push_byte(strlen, pos);
+	timelen = bpr.len;
+	pkg_push_byte(timelen, pos);
+    
 
-	pkg_push_stris(pdtmodel, pos, 16);
-	pkg_push_stris(manufactor, pos, 16);
-	pkg_push_stris(serialnum, pos, 16);
-	pkg_push_stris(cameraid, pos, 16);
-	pkg_push_stris(isensor, pos, 16);
-	pkg_push_stris(swversion, pos, 16);
-	pkg_push_stris(hwversion, pos, 16);
-	pkg_push_stris(fpversion, pos, 16);
-	pkg_push_stris(builddate, pos, 16);
-	pkg_push_stris(buildtime, pos, 16);
+	pkg_push_stris(pdtmodel, pos, modellen);
+	pkg_push_stris(manufactor, pos, maunlen);
+    pkg_push_dwrd(serialnum, pos);
+    pkg_push_dwrd(cameraid, pos);
+	pkg_push_stris(isensor, pos, snamelen);
+	pkg_push_dwrd(vcode, pos);
+	pkg_push_dwrd(hwversion, pos);
+	pkg_push_dwrd(fpversion, pos);
+	pkg_push_stris(builddate, pos, datelen);
+	pkg_push_stris(buildtime, pos, timelen);
 
 	litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
 
@@ -1783,6 +1886,67 @@ static err_type ltk_isp_get(struct cmder_protocol *proto,
 	return et_ok;
 }
 
+static err_type ltk_roi0_set(struct cmder_protocol *proto, 
+	struct litetalk_cmdinfo *info, void *in, int length)
+{
+	uint8_t *pos = (uint8_t *)in;
+    uint8_t enable;
+    uint32_t x, y, w, h;
+	struct uartcmder *uc = proto->context;
+	struct cmder_config *cfg = &uc->config;
+
+    pkg_pull_word(x, pos);
+	pkg_pull_word(y, pos);
+	pkg_pull_word(w, pos);
+	pkg_pull_word(h, pos);
+	pkg_pull_byte(enable, pos);
+    cmder_info("enable:%d", enable);
+
+    uc->roi0.x = x;
+    uc->roi0.y = y;
+    uc->roi0.w = w;
+    uc->roi0.h = h;
+    uc->roi0.enable = enable;
+
+    cmder_info("ROI0 %d %d %d %d %d",
+        uc->roi0.enable, uc->roi0.x, uc->roi0.y, 
+        uc->roi0.w, uc->roi0.h);
+
+	return et_ok;	
+}
+
+static err_type ltk_roi0_get(struct cmder_protocol *proto, 
+	struct litetalk_cmdinfo *info, awoke_buffchunk *chunk)
+{
+	uint8_t code = 0;
+	uint8_t *head = (uint8_t *)chunk->p + LITETALK_HEADERLEN;
+	uint8_t *pos = head;
+	uint8_t dpc_en, nuc_en, iff_en, gamm_en;
+	uint8_t blc_en;
+	uint16_t iffth, iffdiv;
+	struct uartcmder *uc = proto->context;
+	struct cmder_config *cfg = &uc->config;
+
+	pkg_push_byte(info->cmdtype, pos);
+	pkg_push_byte(code, pos);
+
+    pkg_push_word(uc->roi0.x, pos);
+    pkg_push_word(uc->roi0.y, pos);
+    pkg_push_word(uc->roi0.w, pos);
+    pkg_push_word(uc->roi0.h, pos);
+    pkg_push_byte(uc->roi0.enable, pos);
+
+    cmder_info("ROI0 %d %d %d %d %d",
+        uc->roi0.enable, uc->roi0.x, uc->roi0.y, 
+        uc->roi0.w, uc->roi0.h);
+
+    litetalk_pack_header((uint8_t *)chunk->p, LITETALK_CATEGORY_COMMAND, pos-head);
+
+    chunk->length = pos-head+LITETALK_HEADERLEN;
+
+    return et_ok;
+}
+
 static err_type work_temp_cap(struct uartcmder *uc, struct cmder_work *wk)
 {
 	uint8_t *pos;
@@ -1934,6 +2098,7 @@ static struct litetalk_cmd litetalk_cmd_array[] = {
 	{LITETALK_CMD_ISP,	ltk_isp_set, ltk_isp_get},
 	{LITETALK_CMD_TEMPCTL, ltk_temp_cap_set, ltk_temp_cap_get},
 	{LITETALK_CMD_CFG,		NULL,	ltk_config_get},
+	{LITETALK_CMD_ROI0, ltk_roi0_set, ltk_roi0_get},
 };
 
 #if (LITETALK_CONFIG_CMI == 1)
@@ -2069,6 +2234,23 @@ static void testbuf_tx(struct uartcmder *uc, uint8_t *buf, int len)
 }
 #endif
 
+err_type uartcmder_senddata_async(awoke_buffchunk *chunk, uint8_t tid)
+{
+    struct uartcmder *ctx = cmder_ctx;
+    
+    return awoke_minpq_insert(ctx->txqueue, &chunk, tid);
+}
+
+err_type uartcmder_senddata(uint8_t *buf, int len, uint8_t tid)
+{
+    struct uartcmder *ctx = cmder_ctx;
+    struct command_transceiver *tcvr;
+    
+    tcvr = cmder_find_tcvr_byid(&ctx->base, tid);
+
+    return tcvr->tx(tcvr, buf, len);
+}
+
 static err_type cmder_work_schedule(struct uartcmder *uc,
 	err_type (*cb)(struct uartcmder *, struct cmder_work *), uint32_t ms)
 {
@@ -2163,7 +2345,7 @@ int main (int argc, char *argv[])
 		return -1;
 	}
 
-	cmder_trace("cmder alloc ok");
+	cmder_trace("cmder alloc ok:0x%x", cmder);
 
 	signal(SIGSEGV, dumptrace);
 
@@ -2172,6 +2354,8 @@ int main (int argc, char *argv[])
 		cmder_err("cmder init error");
 		return -1;
 	}
+
+    cmder_ctx = cmder;
 
 #if (CMDER_TCVR_UART == 1)
 	//awoke_log_external_interface(litk_log_output, cmder);

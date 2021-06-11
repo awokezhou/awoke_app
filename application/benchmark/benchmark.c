@@ -677,6 +677,7 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	log_debug("length:%d", length);
     */
 
+    /*
     int raw = 66534;
     uint16_t volt;
     uint16_t data;
@@ -725,6 +726,25 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	log_debug("bufferout:%s", bufferout);
 	*/
+
+    uint16_t y, h;
+    uint16_t _y, _h, y_pad, h_pad;
+
+    y = atoi(argv[2]);
+    h = atoi(argv[3]);
+
+    y_pad = (y+4)%8;
+    _y = (y+4) & ~(0x7);
+    if ((y_pad+h)%4) {
+        h_pad = 4 - (y_pad+h)%4;
+    } else {
+        h_pad = 0;
+    }
+    _h = y_pad + h_pad + h;
+    bk_debug("ROI y:%d h:%d -> CCDRange(%d-%d)", y, h, y+4, y+4+h);
+    bk_debug("CCD y:%d h:%d -> CCDRange(%d-%d)", _y, _h, _y, _y+_h);
+    bk_debug("pad:%d %d", y_pad, h_pad);
+    
 	return et_ok;
 }
 

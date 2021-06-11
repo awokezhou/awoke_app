@@ -173,6 +173,14 @@ struct cmder {
 	unsigned int datacome:1;
 };
 
+struct roi_struct {
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+    uint32_t enable;
+};
+
 struct uartcmder {
 	struct cmder base;
 
@@ -191,6 +199,8 @@ struct uartcmder {
 	awoke_minpq workqueue;
 
 	uint8_t temp_cap_en;
+
+    struct roi_struct roi0;
 
 	awoke_buffchunk_pool *bpool_filechunk;
 };
@@ -212,6 +222,10 @@ struct cmder_work {
 #define cmder_err(...) 		logm_err(LOG_M_CMDER, 		__VA_ARGS__)
 #define cmder_warn(...) 	logm_warn(LOG_M_CMDER, 		__VA_ARGS__)
 #define cmder_bug(...) 		logm_bug(LOG_M_CMDER, 		__VA_ARGS__)
+
+
+err_type uartcmder_senddata_async(awoke_buffchunk *chunk, uint8_t tid);
+
 
 
 #endif /* Luster@__CMDER_H__ */
