@@ -48,7 +48,7 @@ obj/%.o:%.c
 .PHONY: build
 build:$(EXEC)
 $(EXEC):
-	$(CC) $(CFLAGS) -o $@ obj/*.o -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) -L/usr/lib/x86_64-linux-gnu $(LIBS) -lm
+	$(CC) $(CFLAGS) -T ldscript.lds -o $@ obj/*.o -Wl,-rpath $(LIB_PATH) -L$(LIB_PATH) -L/usr/lib/x86_64-linux-gnu $(LIBS) -lm
 	
 .PHONY: clean
 clean:

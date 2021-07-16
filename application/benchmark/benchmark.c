@@ -2333,6 +2333,73 @@ static err_type benchmark_memmove_test(int argc, char *argv)
 	awoke_hexdump_trace(buffer, 16);
 }
 
+#define _init __attribute__((unused, section(".myinit.1")))
+#define DECLARE_INIT(func) init_fn_t _fn_##func _init = func
+
+#define RT_SECTION(x)	 __attribute__((section(x)))
+typedef int (*init_fn_t)(void);
+#define INIT_EXPORT(fn, level) \
+	__attribute__((used)) const init_fn_t __rt_init_##fn RT_SECTION(".rti_fn."level) = fn
+#define INIT_BOARD_EXPORT(fn)           INIT_EXPORT(fn, "1")
+
+init_fn_t _init_start;
+init_fn_t _init_end;
+
+
+static int rti_start(void)
+{
+	return 0;
+}
+INIT_EXPORT(rti_start, "0");
+
+static int rti_end(void)
+{
+	return 0;
+}
+INIT_EXPORT(rti_end,"7");
+
+static int rti_board_start(void)
+{
+    return 0;
+}
+INIT_EXPORT(rti_board_start, "0.end");
+
+static int rti_board_end(void)
+{
+    return 0;
+}
+INIT_EXPORT(rti_board_end, "1.end");
+
+static int bk_hw_timer_init(void)
+{
+	bk_debug("timer init");
+}	
+INIT_BOARD_EXPORT(bk_hw_timer_init);
+
+static int bk_hw_spi_init(void)
+{
+	bk_debug("spi init");
+}	
+INIT_BOARD_EXPORT(bk_hw_spi_init);
+
+
+static err_type benchmark_attribute_test(int argc, char *argv)
+{
+	volatile const init_fn_t *fn_ptr;
+
+	//bk_debug("start:0x%x", __rt_init_rti_board_start);
+	//bk_debug("end:0x%x", __rt_init_rti_board_end);
+
+    for (fn_ptr = &__rt_init_rti_board_start; fn_ptr < &__rt_init_rti_board_end; fn_ptr++)
+    {
+        (*fn_ptr)();
+    }
+
+	//fn_ptr = &__rt_init_rti_board_start
+
+	return et_ok;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -2389,6 +2456,8 @@ int main(int argc, char *argv[])
 		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
 		{"buildmacros-test",	no_argument,        NULL,   arg_buildmacros_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
+		{"attribute-test",		no_argument,		NULL,	arg_attribute_test},
+		{"quickemb-test",		no_argument,		NULL,   arg_quickemb_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2593,6 +2662,14 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_memmove_test;
 				break;
 
+			case arg_attribute_test:
+				bmfn = benchmark_attribute_test;
+				break;
+
+			case arg_quickemb_test:
+				bmfn = benchmark_quickemb_test;
+				break;
+
             case '?':
             case 'h':
             default:
@@ -2602,7 +2679,7 @@ int main(int argc, char *argv[])
     }
 
 run:
-	awoke_log_init(loglevel, LOG_M_ALL);
+	awoke_log_init(loglevel, LOG_M_ALL, LOG_D_STDOUT);
 	bmfn(argc, argv);
 
 	return 0;

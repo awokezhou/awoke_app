@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include "proto-litetalk.h"
+#include "proto-xfer.h"
 #include "awoke_package.h"
 #include "awoke_socket.h"
 #include "uart.h"
@@ -728,9 +729,12 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 	swift_protocol.callback(&swift_protocol, SWIFT_CALLBACK_PROTOCOL_INIT, NULL, NULL, 0);
 	*/
 
-	litetalk_protocol.callback = litetalk_service_callback;
-	litetalk_protocol.context = c;
-	c->base.proto = &litetalk_protocol;
+	//litetalk_protocol.callback = litetalk_service_callback;
+	//litetalk_protocol.context = c;
+	//c->base.proto = &litetalk_protocol;
+	xfer_protocol.callback = NULL;
+	xfer_protocol.context = c;
+	c->base.proto = &xfer_protocol;
 	
 	c->rxqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 8, NULL, 0x0);
 	c->txqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 16, NULL, 0x0);
@@ -1922,8 +1926,8 @@ int main (int argc, char *argv[])
 	}
 
 #if (CMDER_TCVR_UART == 1)
-	awoke_log_external_interface(litk_log_output, cmder);
-	awoke_log_init(LOG_TRACE, LOG_M_ALL, LOG_D_STDOUT_EX);
+	//awoke_log_external_interface(litk_log_output, cmder);
+	//awoke_log_init(LOG_TRACE, LOG_M_ALL, LOG_D_STDOUT_EX);
 #endif
 
 	//uint8_t testbuf[7] = {0x56, 0x56, 0x2, 0x1, 0x1, 0x0, 0x5};
@@ -1931,7 +1935,7 @@ int main (int argc, char *argv[])
 
 	//testbuf_tx(cmder, testbuf, 7);
 
-	cmder_work_schedule(cmder, work_test, 1000);
+	//cmder_work_schedule(cmder, work_test, 1000);
 
 	while (1) {
 		

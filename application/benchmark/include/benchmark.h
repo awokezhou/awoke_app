@@ -73,6 +73,8 @@ typedef enum {
     arg_nucparamsgen_test,
     arg_buildmacros_test,
     arg_memmove_test,
+    arg_attribute_test,
+    arg_quickemb_test,
 } benchmark_args;
 
 typedef enum {
