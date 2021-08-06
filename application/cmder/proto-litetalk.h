@@ -28,12 +28,15 @@ typedef enum {
 } litetalk_category;
 
 typedef enum {
+	LITETALK_CMD_DEVINFO = 4,
 	LITETALK_CMD_SENSOR_REG = 5,
 	LITETALK_CMD_EXPOSURE = 6,
 	LITETALK_CMD_DISPLAY = 7,
 	LITETALK_CMD_ISP = 8,
 	LITETALK_CMD_TEMPCTL = 9,
 	LITETALK_CMD_TEMP_CAP = 10,
+	LITETALK_CMD_CFG = 11,
+	LITETALK_CMD_ROI0 = 12,
 } litetalk_cmd_t;
 
 typedef enum {

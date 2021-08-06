@@ -35,7 +35,11 @@
 #include "bk_nvm.h"
 #include "bk_epc.h"
 #include "md5.h"
+<<<<<<< HEAD
 #include "bk_quickemb.h"
+=======
+#include "bk_strucp.h"
+>>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 
 
 static void usage(int ex)
@@ -677,6 +681,7 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	log_debug("length:%d", length);
     */
 
+    /*
     int raw = 66534;
     uint16_t volt;
     uint16_t data;
@@ -725,6 +730,25 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	log_debug("bufferout:%s", bufferout);
 	*/
+
+    uint16_t y, h;
+    uint16_t _y, _h, y_pad, h_pad;
+
+    y = atoi(argv[2]);
+    h = atoi(argv[3]);
+
+    y_pad = (y+4)%8;
+    _y = (y+4) & ~(0x7);
+    if ((y_pad+h)%4) {
+        h_pad = 4 - (y_pad+h)%4;
+    } else {
+        h_pad = 0;
+    }
+    _h = y_pad + h_pad + h;
+    bk_debug("ROI y:%d h:%d -> CCDRange(%d-%d)", y, h, y+4, y+4+h);
+    bk_debug("CCD y:%d h:%d -> CCDRange(%d-%d)", _y, _h, _y, _y+_h);
+    bk_debug("pad:%d %d", y_pad, h_pad);
+    
 	return et_ok;
 }
 
@@ -1799,46 +1823,6 @@ static err_type benchmark_fibonacci_test(int argc, char *argv[])
 	return et_ok;
 }
 
-typedef struct _bk_version {
-	int major;
-	int monir;
-} bk_version;
-
-#define BK_VERSION_MAJOR	0
-#define BK_VERSION_MINOR	1
-#define BK_VERSION_STRING	"0.1"
-
-#define BK_VERSION_FORMAT	"%d.%d"
-
-#define bk_version_make(m1, m2)		{m1, m2}
-
-#define bk_version_encode(m1, m2)	((m1<<8)|m2)
-
-static char *version_str(void)
-{
-	return BK_VERSION_STRING;
-}
-
-static uint32_t bk_version_code(void)
-{
-	return bk_version_encode(0,1);
-}
-
-static struct _bk_version version_get(void)
-{
-	bk_version ver = bk_version_make(BK_VERSION_MAJOR, BK_VERSION_MINOR);
-	return ver;
-}
-
-static err_type benchmark_version_test(int argc, char *argv[])
-{
-	bk_debug("version str:%s", version_str());
-	bk_debug("version:"BK_VERSION_FORMAT, version_get());
-	bk_debug("version code:0x%x", bk_version_code());
-	
-	return et_ok;
-}
-
 static err_type benchmark_kalman_test(int argc, char *argv[])
 {
 	int i;
@@ -2254,7 +2238,11 @@ int *func(int *x)
 	return x;
 }
 
+<<<<<<< HEAD
 static err_type benchmark_ptrfunc_test(int argc, char *argv[])
+=======
+static err_type benchmark_memmove_test(int argc, char *argv[])
+>>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 {
 	int *p, x;
 	struct ptrfunc_test struc;
@@ -2321,9 +2309,13 @@ int main(int argc, char *argv[])
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
+<<<<<<< HEAD
 		{"attribute-test",		no_argument,		NULL,	arg_attribute_test},
 		{"quickemb-test",		no_argument,		NULL,   arg_quickemb_test},
 		{"ptrfunc-test",		no_argument,		NULL,	arg_ptrfunc_test},
+=======
+		{"strucp-test",         no_argument,        NULL,   arg_strucp_test},
+>>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2470,10 +2462,6 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_fibonacci_test;
 				break;
 
-			case arg_version_test:
-				bmfn = benchmark_version_test;
-				break;
-
 			case arg_mblock_test:
 				bmfn = benchmark_mblock_test;
 				//bmfn = benchmark_version_test;
@@ -2531,6 +2519,10 @@ int main(int argc, char *argv[])
 			case arg_ptrfunc_test:
 				bmfn = benchmark_ptrfunc_test;
 				break;
+
+            case arg_strucp_test:
+                bmfn = benchmark_strucp_test;
+                break;
 
             case '?':
             case 'h':

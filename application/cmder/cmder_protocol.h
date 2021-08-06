@@ -27,6 +27,10 @@ struct cmder_protocol {
 	void *context;
 
 	uint8_t initialized:1;
+
+    uint8_t tid;
+
+    uint32_t max_report;
 	
 	awoke_list _head;
 };
