@@ -75,6 +75,7 @@ typedef enum {
     arg_memmove_test,
     arg_attribute_test,
     arg_quickemb_test,
+    arg_ptrfunc_test,
 } benchmark_args;
 
 typedef enum {

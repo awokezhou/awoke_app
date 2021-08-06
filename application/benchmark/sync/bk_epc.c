@@ -47,7 +47,6 @@ static err_type fpga_work(void *context)
 {
 	awoke_worker_context *ctx = context;
 	awoke_worker *wk = ctx->worker;
-	struct bk_epc_struct *epc = wk->data;
 
 	sleep(2);
 	bk_notice("fpga start work");
@@ -75,7 +74,7 @@ void test_bitmap_clear(unsigned int *map, int start, int nr)
 	unsigned int *p = map + BIT_WORD(start);
 	const int size = start + nr;
 	int bits_to_clear = BITS_PER_LONG - (start % BITS_PER_LONG);
-	unsigned int mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
+	unsigned long mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
 
 	while (nr - bits_to_clear >= 0) {
 		*p &= ~mask_to_clear;
@@ -95,7 +94,7 @@ bool test_bitmap_empty(unsigned int *map, int start, int nr)
 	unsigned int data, *p = map + BIT_WORD(start);
 	const int size = start + nr;
 	int bits_to_check = BITS_PER_LONG - (start % BITS_PER_LONG);
-	unsigned int mask_to_check = BITMAP_FIRST_WORD_MASK(start);
+	unsigned long mask_to_check = BITMAP_FIRST_WORD_MASK(start);
 
 	while (nr - bits_to_check >= 0) {
 		data = *p;
@@ -155,7 +154,7 @@ err_type benchmark_epc_test(int argc, char *argv[])
 	struct bk_epc_struct epc;
 	memset(&epc, 0x0, sizeof(struct bk_epc_struct));
 
-	/*
+	
 	awoke_worker *mbp = awoke_worker_create("mbp", 1,
 		WORKER_FEAT_CUSTOM_DEFINE, mbp_work, &epc);
 
@@ -164,25 +163,25 @@ err_type benchmark_epc_test(int argc, char *argv[])
 
 	for (i=0; i<60; i++) {
 		usleep(1000000);
-	}*/
+	}
 
 	bk_epc_header_init(&epc);
 	bk_epc_header_dump(&epc);
 		
-	bk_debug("%d", test_bitmap_empty(&epc.bitmap, 70, 5));
+	bk_debug("%d", test_bitmap_empty((unsigned int *)&epc.bitmap, 70, 5));
 	awoke_bitmap_set(epc.bitmap, 64, 16);
-	bk_debug("%d", test_bitmap_empty(&epc.bitmap, 70, 5));
+	bk_debug("%d", test_bitmap_empty((unsigned int *)&epc.bitmap, 70, 5));
 	awoke_bitdump_trace(epc.bitmap, BK_EPC_SIZEOF);
 
 	test_bitmap_clear(epc.bitmap, 70, 16);
-	bk_debug("%d", test_bitmap_empty(&epc.bitmap, 70, 5));
+	bk_debug("%d", test_bitmap_empty((unsigned int *)&epc.bitmap, 70, 5));
 	awoke_bitdump_trace(epc.bitmap, BK_EPC_SIZEOF);
 
-	//awoke_worker_stop(mbp);
-	//awoke_worker_destroy(mbp);
+	awoke_worker_stop(mbp);
+	awoke_worker_destroy(mbp);
 
-	//awoke_worker_stop(fpga);
-	//awoke_worker_destroy(fpga);
+	awoke_worker_stop(fpga);
+	awoke_worker_destroy(fpga);
 
 	return et_ok;
 }

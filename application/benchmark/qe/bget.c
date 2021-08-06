@@ -403,15 +403,15 @@
 					 multiple of this size.  This
 					 MUST be a power of two. */
 
-#define BufDump     1		      /* Define this symbol to enable the
+/*#define BufDump     1*/		      /* Define this symbol to enable the
 					 bpoold() function which dumps the
 					 buffers in a buffer pool. */
 
-#define BufValid    1		      /* Define this symbol to enable the
+/*#define BufValid    1*/		      /* Define this symbol to enable the
 					 bpoolv() function for validating
 					 a buffer pool. */ 
 
-#define DumpData    1		      /* Define this symbol to enable the
+/*#define DumpData    1*/		      /* Define this symbol to enable the
 					 bufdump() function which allows
 					 dumping the contents of an allocated
 					 or free buffer. */
@@ -469,7 +469,6 @@ extern char *sprintf();               /* Sun includes don't define sprintf */
     bufsize.  */
 
 #include "bget.h"
-#include "eoc_log.h"
 
 #define BGET_SEMDOWN()
 #define BGET_SEMUP()

@@ -35,6 +35,7 @@
 #include "bk_nvm.h"
 #include "bk_epc.h"
 #include "md5.h"
+#include "bk_quickemb.h"
 
 
 static void usage(int ex)
@@ -706,13 +707,13 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	pkg_push_stris(string1, pos, strlen(string1));
 	awoke_hexdump_trace(buffer->p, buffer->size);
 	
-	pos = buffer->p;
+	pos = (uint8_t *)buffer->p;
 	pkg_pull_stris(bufferout, pos, strlen(string1));
 	awoke_hexdump_trace(bufferout, 32);
 	log_debug("string:%s", bufferout);
 
 	memset(buffer, 0x0, 32);
-	bk_string_pack_test(buffer, string1, strlen(string1));
+	bk_string_pack_test((uint8_t *)buffer, string1, strlen(string1));
 	awoke_hexdump_trace(buffer, 32);
 	
 	awoke_buffchunk_free(&buffer);
@@ -1921,7 +1922,6 @@ static void mae_calculate(awoke_queue *q)
 static err_type benchmark_mae_test(int argc, char *argv[])
 {
 	int i;
-	uint32_t xhat;
 	struct awoke_kalman1d kmf;
 	awoke_queue *q = awoke_queue_create(sizeof(uint32_t), 30, AWOKE_QUEUE_F_RB);
 
@@ -2118,7 +2118,7 @@ static err_type benchmark_cameraconfig_test(int argc, char *argv[])
 	bk_debug("read:%d", rc);
 	close(fd);
 
-	checksum = config_checksum(buffer, rc);
+	checksum = config_checksum((uint8_t *)buffer, rc);
 	bk_debug("checksum:0x%x", checksum);
 
 	cfg = (struct CameraConfig *)buffer;
@@ -2128,7 +2128,7 @@ static err_type benchmark_cameraconfig_test(int argc, char *argv[])
 	return et_ok;
 }
 
-static err_type benchmark_sensorconfig_test(int argc, char *argv)
+static err_type benchmark_sensorconfig_test(int argc, char *argv[])
 {
 	int fd, rc, i;
 	char buffer[1024];
@@ -2146,7 +2146,7 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv)
 	rc = read(fd, buffer, 1024);
 	bk_debug("read:%d", rc);
 	close(fd);
-	checksum = config_checksum(buffer, rc);
+	checksum = config_checksum((uint8_t *)buffer, rc);
 	bk_debug("checksum:0x%x", checksum);
 	awoke_hexdump_trace(buffer, rc);
 
@@ -2163,165 +2163,7 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv)
 	return et_ok;
 }
 
-static err_type nucparam_generate(char *filename)
-{
-	int i, j, fd;
-	int bytes = 0;
-	int sector_nr = 1280;
-	uint8_t buffer[4096];
-	uint8_t checksum[0] = {0x0};
-
-	fd = open(filename, O_CREAT|O_RDWR, S_IRWXU);
-	if (fd < 0) {
-		bk_err("open %s error", filename);
-		return et_file_open;
-	}
-
-	for (i=0; i<sector_nr; i++) {
-		for (j=0; j<4096; j++) {
-			buffer[j] = i+j+3;
-			checksum[0] += buffer[j];
-			//bk_debug("checksum:0x%x", checksum);
-			bytes++;
-		}
-		write(fd, buffer, 4096);
-	}
-
-	bk_debug("checksum:0x%x", checksum[0]);	/* 0x27d80000 */
-	bk_debug("bytes:%d", bytes+1);
-	write(fd, checksum, 1);
-
-	close(fd);
-
-	return et_ok;
-}
-
-static err_type nucparam_checksum(char *filename)
-{
-	int i, c, fd;
-	int sector_nr = 1280;
-	uint8_t buffer[4096];
-	uint8_t checksum = 0x0;
-
-	memset(buffer, 0x0, 4096);
-
-	fd = open(filename, O_RDWR);
-	if (fd < 0) {
-		bk_err("open %s error", filename);
-		return et_file_open;
-	}
-
-	for (i=0; i<sector_nr; i++) {
-		c = read(fd, buffer, 4096);
-		if (c != 4096) {
-			bk_err("read error");
-			close(fd);
-			return et_file_read;
-		}
-		if (i<32) {
-			//awoke_hexdump_trace(buffer, 16);
-		}
-		checksum += awoke_checksum_8(buffer, 4096);
-	}
-
-	close(fd);
-	
-	bk_debug("checksum:0x%x", checksum);
-
-	fd = open(filename, O_RDWR|O_APPEND);
-	if (fd < 0) {
-		bk_err("open %s error", filename);
-		return et_file_open;
-	}
-
-	write(fd, &checksum, 1);
-	close(fd);
-	
-	return et_ok;
-}
-
-static err_type benchmark_nucparamsgen_test(int argc, char *argv)
-{
-	//nucparam_generate("NUCParamters.bin");
-
-	nucparam_checksum("GO_125ms_LG.raw");
-
-	return et_ok;
-}
-
-static char *build_date = __DATE__;
-static char *build_time = __TIME__;
-
-struct bk_version {
-	uint8_t major;
-	uint8_t minor;
-	uint8_t patch;
-	char string[16];
-	char date[16];
-	char time[16];
-};
-
-#define MAJOR	1
-#define MINOR	2
-#define PATCH   3
-
-
-#define STR_FIX(x,y,z) #x"."#y"."#z
-#define VERSTR(x,y,z) STR_FIX(x,y,z)
-
-static struct bk_version version = {
-	.major = MAJOR,
-	.minor = MINOR,
-	.patch = PATCH,
-	.string = {VERSTR(MAJOR,MINOR,PATCH)},
-	.date = {__DATE__},
-	.time = {__TIME__},
-};
-
-static err_type bk_get_buildinfo(void)
-{
-	char date[20];
-	char time[20];
-	
-	sprintf(date, "%s", __DATE__);
-	sprintf(time, "%s", __TIME__);
-
-	mem_ptr_t ptr = mem_mk_ptr(version.string);
-
-	bk_debug("major:%d minor:%d patch:%d", version.major, version.minor, version.patch);
-	bk_debug("version:%s", version.string);
-	bk_debug("date:%s", version.date);
-	bk_debug("time:%s", version.time);
-	bk_debug("ptr:%.*s %d", ptr.len, ptr.p, ptr.len);
-	return et_ok;
-}
-
-static err_type benchmark_buildmacros_test(int argc, char *argv)
-{
-	char hwversion[16];
-	char serialnum[16];
-
-	build_ptr bpr;
-	
-	mem_ptr_t ptr = mem_mk_ptr(version.string);
-	bk_debug("build date:%s", __DATE__);
-	bk_debug("build time:%s", __TIME__);
-	bk_debug("major:%d minor:%d patch:%d", version.major, version.minor, version.patch);
-	bk_debug("version:%s", version.string);
-	bk_debug("date:%s", version.date);
-	bk_debug("time:%s", version.time);
-	bk_debug("ptr:%s %d", ptr.p, ptr.len);
-
-	bpr = build_ptr_make(hwversion, 16);
-	build_ptr_string(bpr, "1.0");
-	bpr = build_ptr_make(serialnum, 16);
-	build_ptr_string(bpr, "12456");
-
-	bk_debug("hwversion:%s", hwversion);
-	bk_debug("serialnum:%s", serialnum);
-}
-
-static err_type benchmark_memmove_test(int argc, char *argv)
+static err_type benchmark_memmove_test(int argc, char *argv[])
 {
 	uint8_t buffer[16] = {
 		0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x08,
@@ -2331,6 +2173,7 @@ static err_type benchmark_memmove_test(int argc, char *argv)
 	awoke_hexdump_trace(buffer, 16);
 	memmove(buffer, buffer+7, 16);
 	awoke_hexdump_trace(buffer, 16);
+	return et_ok;
 }
 
 #define _init __attribute__((unused, section(".myinit.1")))
@@ -2373,17 +2216,19 @@ INIT_EXPORT(rti_board_end, "1.end");
 static int bk_hw_timer_init(void)
 {
 	bk_debug("timer init");
+	return 0;
 }	
 INIT_BOARD_EXPORT(bk_hw_timer_init);
 
 static int bk_hw_spi_init(void)
 {
 	bk_debug("spi init");
+	return 0;
 }	
 INIT_BOARD_EXPORT(bk_hw_spi_init);
 
 
-static err_type benchmark_attribute_test(int argc, char *argv)
+static err_type benchmark_attribute_test(int argc, char *argv[])
 {
 	volatile const init_fn_t *fn_ptr;
 
@@ -2397,6 +2242,28 @@ static err_type benchmark_attribute_test(int argc, char *argv)
 
 	//fn_ptr = &__rt_init_rti_board_start
 
+	return et_ok;
+}
+
+struct ptrfunc_test {
+	int* (*func)(int *x);
+};
+
+int *func(int *x)
+{
+	return x;
+}
+
+static err_type benchmark_ptrfunc_test(int argc, char *argv[])
+{
+	int *p, x;
+	struct ptrfunc_test struc;
+
+	struc.func = func;
+
+	x = 100;
+	p = struc.func(&x);
+	bk_debug("&x:0x%x p:0x%x *p:%d", &x, p, *p);
 	return et_ok;
 }
 
@@ -2453,11 +2320,10 @@ int main(int argc, char *argv[])
 		{"sign-exten",			no_argument,		NULL,	arg_sign_exten},
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
-		{"nucparams-test",   	no_argument,        NULL,   arg_nucparamsgen_test},
-		{"buildmacros-test",	no_argument,        NULL,   arg_buildmacros_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
 		{"attribute-test",		no_argument,		NULL,	arg_attribute_test},
 		{"quickemb-test",		no_argument,		NULL,   arg_quickemb_test},
+		{"ptrfunc-test",		no_argument,		NULL,	arg_ptrfunc_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2649,14 +2515,6 @@ int main(int argc, char *argv[])
 			case arg_sensorconfig_test:
 				bmfn = benchmark_sensorconfig_test;
 				break;
-
-			case arg_nucparamsgen_test:
-				bmfn = benchmark_nucparamsgen_test;
-				break;
-
-			case arg_buildmacros_test:
-				bmfn = benchmark_buildmacros_test;
-				break;
 				
 			case arg_memmove_test:
 				bmfn = benchmark_memmove_test;
@@ -2668,6 +2526,10 @@ int main(int argc, char *argv[])
 
 			case arg_quickemb_test:
 				bmfn = benchmark_quickemb_test;
+				break;
+
+			case arg_ptrfunc_test:
+				bmfn = benchmark_ptrfunc_test;
 				break;
 
             case '?':

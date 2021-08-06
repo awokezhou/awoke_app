@@ -468,6 +468,7 @@ void awoke_hexdump(uint8_t level, const char *func, int linenr, const void *vbuf
 
 		for (m = 0; m < 16 && n < len; m++)
 			p += snprintf(p, 5, "%02X ", buf[n++]);
+		
 		while (m++ < 16)
 			p += snprintf(p, 5, "   ");
 

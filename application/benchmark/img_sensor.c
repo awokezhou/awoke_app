@@ -144,7 +144,7 @@ err_type benchmark_imgsensor_test(int argc, char *argv[])
 	}
 
 	bk_imgsensor_flash_config_generator(&fconfig, 0x00000020);
-	bk_imgsensor_memory_config_generator(&mconfig, &buffer);
+	bk_imgsensor_memory_config_generator(&mconfig, buffer);
 	
 	bk_imgsensor_config(sensor, &mconfig.base);
 	bk_debug("config finish");
