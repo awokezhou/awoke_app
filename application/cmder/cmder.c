@@ -720,7 +720,7 @@ static err_type cmder_uart_tcvr_claim(struct cmder *c, uint8_t id)
 
 	if (p->fd != -1) {
 		cmder_err("tcvr[%d] already open", id);
-		return et_noeed;
+		return et_noneed;
 	}
 
 	fd = uart_claim(p->port, 115200, 8, 1, 'N');
@@ -750,7 +750,7 @@ static err_type cmder_tcp_tcvr_claim(struct cmder *c, uint8_t id)
 	fd = awoke_socket_server(SOCK_INTERNET_TCP, "localhost", 5567, FALSE);
 	if (fd < 0) {
 		cmder_err("socket create error");
-		return et_sock_creat;
+		return err_sock_creat;
 	}
 	
  	p->fd = fd;
@@ -809,17 +809,17 @@ err_type cmder_tab_register(struct cmder *c, const char *name, struct command *c
 	struct command_table *p, *n;
 		
 	if (!c || !name || !commands || !matcher) {
-		return et_param;
+		return err_param;
 	}
 
 	list_for_each_entry(p, &c->tabs, _head) {
 		if (!strcmp(name, p->name)) {
-			return et_exist;
+			return err_exist;
 		}
 	}
 
 	n = mem_alloc_z(sizeof(struct command_table));
-	if (!n) {cmder_err("command table alloc error");return et_nomem;}
+	if (!n) {cmder_err("command table alloc error");return err_oom;}
 
 	n->name = awoke_string_dup(name);
 	n->matcher = matcher;
@@ -901,14 +901,14 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 
 #if defined(CMDER_TEST_ECMD_COMMAND)
 	cmder_tab_register(&c->base, "ecmds", test_ecmds,
-		array_size(test_ecmds), &ecmd_matcher);*/
+		array_size(test_ecmds), &ecmd_matcher);
 #endif
 
 #if (CMDER_TCVR_UART == 1)
 	//cmder_tcvr_register(&c->base, 0, port, uart_rx, uart_tx, 1024);
-	cmder_tcvr_register(&c->base, 0, port, uart_rxpoll, uart_tx, 1024);
+	cmder_tcvr_register(&c->base, 0, port, uart_rxpoll, uart_tx, 2048);
 #else
-	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rxpoll, tcp_tx, 1024);
+	cmder_tcvr_register(&c->base, 0, "localhost", tcp_rxpoll, tcp_tx, 2048);
 #endif
 
 	/*
@@ -917,21 +917,20 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
 	swift_protocol.callback(&swift_protocol, SWIFT_CALLBACK_PROTOCOL_INIT, NULL, NULL, 0);
 	*/
 
-<<<<<<< HEAD
 	//litetalk_protocol.callback = litetalk_service_callback;
 	//litetalk_protocol.context = c;
 	//c->base.proto = &litetalk_protocol;
-	xfer_protocol.callback = NULL;
-	xfer_protocol.context = c;
-	c->base.proto = &xfer_protocol;
+	//xfer_protocol.callback = NULL;
+	//xfer_protocol.context = c;
+	//c->base.proto = &xfer_protocol;
 	
-=======
     /*
 	litetalk_protocol.callback = litetalk_service_callback;
 	litetalk_protocol.context = c;
     list_append(&litetalk_protocol._head, &c->base.protocols);
     c->base.nr_protocols++;
     */
+
     xfer_protocol.context = c;
     list_append(&xfer_protocol._head, &c->base.protocols);
     c->base.nr_protocols++;
@@ -946,7 +945,6 @@ static err_type cmder_init(struct uartcmder *c, const char *port)
     c->base.nr_protocols++;
     */
     
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 	c->rxqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 8, NULL, 0x0);
 	c->txqueue = awoke_minpq_create(sizeof(awoke_buffchunk *), 16, NULL, 0x0);
 
@@ -2251,7 +2249,7 @@ err_type uartcmder_senddata_async(awoke_buffchunk *chunk, uint8_t tid)
     return awoke_minpq_insert(ctx->txqueue, &chunk, tid);
 }
 
-err_type uartcmder_senddata(uint8_t *buf, int len, uint8_t tid)
+err_type uartcmder_senddata(uint8_t tid, uint8_t *buf, int len)
 {
     struct uartcmder *ctx = cmder_ctx;
     struct command_transceiver *tcvr;
@@ -2347,7 +2345,7 @@ int main (int argc, char *argv[])
 
 	srand((unsigned)time(NULL));
 
-	awoke_log_init(LOG_TRACE, LOG_M_ALL, LOG_D_STDOUT);
+	awoke_log_init(LOG_DBG, LOG_M_ALL, LOG_D_STDOUT);
 	
 	cmder = mem_alloc_z(sizeof(struct uartcmder));
 	if (!cmder) {

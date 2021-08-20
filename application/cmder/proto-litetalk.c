@@ -15,7 +15,7 @@ static err_type litetalk_scan(struct cmder_protocol *proto, void *buf, int len, 
 
 	if (len < 4) {
 		*rlen = 0;
-		return et_notfind;
+		return err_notfind;
 	}
 
 	while (pos != end) {

@@ -1,122 +1,9 @@
 
 #include "proto-xfer.h"
 #include "cmder.h"
-<<<<<<< HEAD
 #include "cmder_protocol.h"
 #include "awoke_package.h"
 
-
-static err_type xfer_scan(struct cmder_protocol *proto, void *buf, int len, int *rlen)
-{
-	uint32_t marker;
-	uint8_t *p;
-	uint8_t *head = (uint8_t *)buf;
-	uint8_t *pos = head;
-	uint8_t *end = buf+len-1;
-
-	if (len < 1) {
-		*rlen = 0;
-		return err_notfind;
-	}
-
-	while (pos != end) {
-		p = pos;
-		pkg_pull_byte(marker, p);
-		if (marker == XFER_MARK) {
-			break;
-		}
-		pos++;
-	}
-
-	*rlen = ((pos==end) ? len : (pos-head));
-	return et_ok;
-}
-
-static err_type xfer_match(struct cmder_protocol *proto, void *buf, int len, int *rlen)
-{
-	uint8_t *head = buf; 
-	uint8_t *pos = head;
-	uint8_t *p;
-	uint8_t marker;
-	uint8_t postfix;
-	uint8_t command;
-	bool find_postfix = FALSE;
-
-	if (len < 4) {
-		return et_unfinished;
-	}
-
-	pkg_pull_byte(marker, pos);
-	pkg_pull_byte(command, pos);
-	if (marker != XFER_MARK) {
-		return err_match;
-	}
-	lib_debug("marker:0x%x", marker);
-
-	/* find postfix */
-	while (pos != (head+len)) {
-		p = pos;
-		pkg_pull_byte(postfix, p);
-		lib_debug("postfix:0x%x", postfix);
-		if (postfix == XFER_POSTFIX) {
-			find_postfix = TRUE;
-			lib_debug("find postfix");
-			break;
-		}
-		pos++;
-	}
-
-	if (!find_postfix) {
-		*rlen = 0;
-		return err_match;
-	}
-
-	*rlen = pos-head;
-	return et_ok;
-}
-
-static err_type xfer_read(struct cmder_protocol *proto, void *buf, int len) 
-{
-	uint8_t *head = buf; 
-	uint8_t *pos = head;
-	struct xferinfo info;
-
-	/* skip mark */
-	pos += 1;
-
-	pkg_pull_byte(info.ctype, pos);
-	pkg_pull_word(info.length, pos);
-	pkg_pull_dwrd(info.address, pos);
-
-	lib_debug("command:%d length:%d address:0x%x", 
-		info.ctype, info.length, info.address);
-
-	/*
-	switch(space) {
-
-	case XFER_SPACE_MB:
-		break;
-
-	case XFER_SPACE_CONFIG:
-		break;
-
-	case XFER_SPACE_EPC:
-		break;
-
-	case XFER_SPACE_FLASH:
-		break;
-
-	case XFER_SPACE_SENSOR:
-		break;
-
-	default:
-		lib_err("unknown space:%d", space);
-		break;
-	}
-
-	return xfer_action(proto, addr, len, opt);*/
-=======
-#include "awoke_package.h"
 
 
 static uint8_t sg_txbuf[512] = {0x0};
@@ -185,7 +72,7 @@ static err_type xfer_scan(struct cmder_protocol *proto, void *buf, int len, int 
 }
 
 static err_type xfer_pack_header(awoke_buffchunk *rsp, struct xfer_head *head, 
-    uint8_t code, int len)
+    uint8_t code)
 {
     uint8_t *pos;
     uint8_t postfix;
@@ -194,15 +81,19 @@ static err_type xfer_pack_header(awoke_buffchunk *rsp, struct xfer_head *head,
     memcpy(&rsphdr, head, sizeof(struct xfer_head));
     if (head->cmd != XFER_CMD_RD) {
         rsphdr.len = 0;
-    }
-
+    } else {
+		if (code != 0) {
+			rsphdr.len = 0;
+		}
+	}
     memcpy(rsp->p, &rsphdr, sizeof(struct xfer_head));
 
-    pos = (uint8_t *)rsp->p + sizeof(struct xfer_head) + len;
+    pos = (uint8_t *)rsp->p + sizeof(struct xfer_head) + rsp->length;
     postfix = XFER_POSFIX;
     pkg_push_byte(code, pos);
     pkg_push_byte(postfix, pos);
-    rsp->length = sizeof(struct xfer_head) + len + sizeof(struct xfer_tail);
+    rsp->length += sizeof(struct xfer_head) + sizeof(struct xfer_tail);
+	lib_debug("rsp->length:%d", rsp->length);
 	return et_ok;
 }
 
@@ -235,7 +126,7 @@ static err_type xfer_pack_sensordata(struct cmder_protocol *proto, uint32_t addr
 		addr++;
 	}
 
-	return uartcmder_senddata(sg_txbuf, i, proto->tid);
+	return uartcmder_senddata(proto->tid, sg_txbuf, i);
 }
 
 static err_type xfer_pack_flashdata(struct cmder_protocol *proto, uint32_t addr, uint16_t len)
@@ -256,7 +147,7 @@ static err_type xfer_send_tail(struct cmder_protocol *proto, uint8_t code)
 	sg_txbuf[0] = code;
 	sg_txbuf[1] = XFER_POSFIX;
 
-	return uartcmder_senddata(sg_txbuf, 2, proto->tid);
+	return uartcmder_senddata(proto->tid, sg_txbuf, 2);
 }
 
 static err_type xfer_muc_cmd_proc(struct mbp_context *ctx, uint8_t cmd, bool factory)
@@ -294,34 +185,7 @@ static err_type xfer_pack_tail_send(struct cmder_protocol *proto, uint8_t code, 
     }
     sg_txbuf[offset] = code;
 	sg_txbuf[offset+1] = XFER_POSFIX;
-    return uartcmder_senddata(sg_txbuf, offset+2, proto->tid);
-}
-
-static err_type xfer_response_build(awoke_buffchunk *rsp, struct xfer_head *head, 
-    uint8_t code, uint8_t *buf, int len)
-{
-    int padding = 0;
-	int datalen = 0;
-    uint8_t *phead = (uint8_t *)rsp->p + sizeof(struct xfer_head);
-    uint8_t *pos = phead;
-
-    if (head->cmd == XFER_CMD_RD) {
-        datalen = (head->len <= len) ? head->len : len;
-        if (head->len > len) {
-            padding = head->len-len;
-        }
-        lib_debug("datalen:%d padding:%d", datalen, padding);
-        memcpy(pos, buf, datalen);
-        pos += datalen;
-        if (padding) {
-            memset(pos, 0x0, padding);
-            pos += padding;
-        }
-    }
-
-    lib_debug("datalen:%d", pos-phead);
-
-    return xfer_pack_header(rsp, head, code, pos-phead);
+    return uartcmder_senddata(proto->tid, sg_txbuf, offset+2);
 }
 
 char pdtmodel[16] = "Cobra2000";
@@ -338,13 +202,38 @@ uint8_t xfer_mcu_range(uint32_t addr)
     }
 }
 
+static err_type xfer_pack_data(awoke_buffchunk *rsp, struct xfer_head *head, 
+    uint8_t *buf, int len, uint8_t pad)
+{
+    int padding = 0;
+	int datalen = 0;
+    uint8_t *phead = (uint8_t *)rsp->p + sizeof(struct xfer_head);
+    uint8_t *pos = phead;
+
+    if (head->cmd == XFER_CMD_RD) {
+        datalen = (head->len <= len) ? head->len : len;
+        if (head->len > len) {
+            padding = head->len-len;
+        }
+        memcpy(pos, buf, datalen);
+        pos += datalen;
+        if (padding) {
+            memset(pos, pad, padding);
+            pos += padding;
+        }
+    }
+
+    rsp->length = pos-phead;
+    return et_ok;
+}
+
 static err_type xfer_bitwidth_get(struct uartcmder *ctx, struct cmder_protocol *proto, 
     struct xfer_head *head, awoke_buffchunk *rsp)
 {
     uint32_t data;
     data = 10;
     lib_info("bitwidth:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_fps_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -362,7 +251,7 @@ static err_type xfer_fps_get(struct uartcmder *ctx, struct cmder_protocol *proto
     uint32_t data;
     data = 100;
     lib_info("fps:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+	return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_fpsmin_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -380,7 +269,7 @@ static err_type xfer_fpsmin_get(struct uartcmder *ctx, struct cmder_protocol *pr
     uint32_t data;
     data = 1;
     lib_info("fps min:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_fpsmax_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -398,7 +287,7 @@ static err_type xfer_fpsmax_get(struct uartcmder *ctx, struct cmder_protocol *pr
     uint32_t data;
     data = 1;
     lib_info("fps max:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_trigger_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -416,7 +305,7 @@ static err_type xfer_trigger_get(struct uartcmder *ctx, struct cmder_protocol *p
     uint32_t data;
     data = 0;
     lib_info("trigger:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_invs_en_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -434,7 +323,7 @@ static err_type xfer_invs_en_get(struct uartcmder *ctx, struct cmder_protocol *p
     uint32_t data;
     data = 0;
     lib_info("invs en:%d", data);
-    return xfer_response_build(rsp, head, 0, (uint8_t *)&data, 4);
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
 }
 
 static err_type xfer_config_save(struct uartcmder *ctx, struct cmder_protocol *proto, 
@@ -451,6 +340,49 @@ static err_type xfer_config_restore(struct uartcmder *ctx, struct cmder_protocol
     return et_ok;
 }
 
+static err_type xfer_lqit_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
+    uint8_t *in, int length)
+{
+    uint32_t data;
+    pkg_pull_dwrd(data, in);
+
+	ctx->config.LQ_single_test = data;
+    return et_ok;
+}
+
+static err_type xfer_lqit_get(struct uartcmder *ctx, struct cmder_protocol *proto, 
+    struct xfer_head *head, awoke_buffchunk *rsp)
+{
+    uint32_t data;
+    data = ctx->config.LQ_single_test;
+    return xfer_pack_data(rsp, head, (uint8_t *)&data, head->len, 0x0);
+}
+
+static err_type xfer_lqst_set(struct uartcmder *ctx, struct cmder_protocol *proto, 
+    uint8_t *in, int length)
+{
+	if (!ctx->lq_stream) {
+		ctx->lq_stream = awoke_buffchunk_create(length);
+		awoke_buffchunk_write(ctx->lq_stream, in, length, FALSE);
+		//awoke_hexdump_info(in, length);
+	}
+	
+    return et_ok;
+}
+
+static err_type xfer_lqst_get(struct uartcmder *ctx, struct cmder_protocol *proto, 
+    struct xfer_head *head, awoke_buffchunk *rsp)
+{
+	if (!ctx->lq_stream) {
+		return err_notfind;
+	}
+	
+    xfer_pack_data(rsp, head, (uint8_t *)ctx->lq_stream->p, head->len, 0x0);
+	awoke_buffchunk_free(&ctx->lq_stream);
+	ctx->lq_stream = NULL;
+	return et_ok;
+}
+
 static struct xfer_mcu_req xfer_mcu_reqtab[] = {
     {XFER_ADDR_BITWIDTH,        NULL,                   xfer_bitwidth_get},
     {XFER_ADDR_FPS,             xfer_fps_set,           xfer_fps_get},
@@ -460,68 +392,64 @@ static struct xfer_mcu_req xfer_mcu_reqtab[] = {
     {XFER_ADDR_INVS_EN,         xfer_invs_en_set,       xfer_invs_en_get},
     {XFER_ADDR_CONFIG_SAVE,     xfer_config_save,       NULL},
     {XFER_ADDR_CONFIG_RESTORE,  xfer_config_restore,    NULL},
+    {XFER_ADDR_LQIT,			xfer_lqit_set,			xfer_lqit_get},
+    {XFER_ADDR_LQST,			xfer_lqst_set,			xfer_lqst_get},
 };
 
 static err_type xfer_mcu_params_process(struct uartcmder *ctx, struct cmder_protocol *proto, 
-    struct xfer_head *head, uint8_t *rpos)
+    struct xfer_head *head, uint8_t *rpos, awoke_buffchunk *rsp)
 {
     int tsize;
-    err_type ret;
     struct xfer_mcu_req *thead, *p;
-    awoke_buffchunk *rsp;
+	struct xfer_private *priv = (struct xfer_private *)proto->private;
 
     thead = xfer_mcu_reqtab;
     tsize = array_size(xfer_mcu_reqtab);
-
-    rsp = awoke_buffchunk_create(512);
-
+	
     array_foreach(thead, tsize, p) {
 
         if (p->address == head->addr) {
             if (head->cmd == XFER_CMD_WR) {
-                ret = p->set(ctx, proto, rpos, head->len);
-                xfer_response_build(rsp, head, ret, NULL, 0);
+                return p->set(ctx, proto, rpos, head->len);
             } else if (head->cmd == XFER_CMD_RD) {
-                ret = p->get(ctx, proto, head, rsp);
-                awoke_hexdump_info(rsp->p, rsp->length);
+               	return p->get(ctx, proto, head, rsp);
             } else {
-                ret = err_notfind;
-                xfer_response_build(rsp, head, ret, NULL, 0);
+                return err_notsupport;
             }
-            return ret;
         }
     };
-
-    xfer_response_build(rsp, head, ret, err_notfind, 0);
-    return err_notfind;
+	lib_err("notfind");
+	return err_notfind;
 }
 
 static err_type xfer_mcu_process(struct uartcmder *ctx, struct cmder_protocol *proto, 
-    struct xfer_head *head, uint8_t *rpos)
+    struct xfer_head *head, uint8_t *rpos, awoke_buffchunk *rsp)
 {
     uint8_t range;
+	err_type ret;
 
     range = xfer_mcu_range(head->addr);
 
     switch (range) {
 
     case XFER_MCU_ALGORITHM_BASE:
-        lib_info("range:algorithm");
+        //lib_info("range:algorithm");
     case XFER_ADDR_RANGE_PARAMS:
-        lib_info("range:params");
-        xfer_mcu_params_process(ctx, proto, head, rpos);
+        //lib_info("range:params");
+        ret = xfer_mcu_params_process(ctx, proto, head, rpos, rsp);
         break;
 
     case XFER_ADDR_RANGE_BOOTINFO:
-        lib_info("range:bootinfo");
+        //lib_info("range:bootinfo");
         break;
 
     default:
-        lib_err("unknown range:%d", range);
+        //lib_err("unknown range:%d", range);
+		ret = xfer_mcu_params_process(ctx, proto, head, rpos, rsp);
         break;
     }
 
-    return et_ok;
+    return ret;
 }
 
 static err_type xfer_read(struct cmder_protocol *proto, void *buf, int len)
@@ -530,23 +458,41 @@ static err_type xfer_read(struct cmder_protocol *proto, void *buf, int len)
 	uint8_t *base = 0x0;
 	uint8_t *data;
 	uint8_t code = 0;
-	bool flash_opt = FALSE;
-	bool sensor_opt = FALSE;
+	bool realloc = FALSE;
 	uint32_t flash_erase_size;
 	struct xfer_head *head = (struct xfer_head *)buf;
     struct uartcmder *ctx = (struct uartcmder *)proto->context;
+	struct xfer_private *priv = (struct xfer_private *)proto->private;
+	awoke_buffchunk *rsp;
+
+	if (!proto->initialized) {
+		proto->private = mem_alloc_z(sizeof(struct xfer_private));
+		priv = proto->private;
+		priv->response = awoke_buffchunk_create(512);
+		rsp = priv->response;
+		proto->initialized = 1;
+		lib_info("xfer init");
+	}
+
+	rsp = priv->response;
 
 	/* response header */
 	data = XFER_GET_DATA(head);
 
-	lib_info("space:%d cmd:%d seq:%d data:0x%x offset:0x%x len:%d", 
-        head->space, head->cmd, head->seq, data, head->addr, head->len);
+	lib_trace("space:%d cmd:%d seq:%d offset:0x%x len:%d", 
+        head->space, head->cmd, head->seq, head->addr, head->len);
+
+	if ((head->cmd == XFER_CMD_RD) && (head->len > rsp->size)) {
+		rsp = awoke_buffchunk_create(sizeof(struct xfer_head)+sizeof(struct xfer_tail)+head->len);
+		realloc = TRUE;
+		lib_notice("rsp malloc %d", rsp->size);
+	}
 
 	switch (head->space) {
 
 	case XFER_SPACE_MCU:
 		lib_debug("SPACE MCU");
-		ret = xfer_mcu_process(ctx, proto, head, data);
+		ret = xfer_mcu_process(ctx, proto, head, data, rsp);
 		break;
 
 	case XFER_SPACE_FPGA:
@@ -557,12 +503,10 @@ static err_type xfer_read(struct cmder_protocol *proto, void *buf, int len)
 	case XFER_SPACE_SENSOR:
 		lib_debug("SPACE FPGA");
 		//base = (uint32_t)head->addr;
-		sensor_opt = TRUE;
 		break;
 
 	case XFER_SPACE_FLASH:
 		lib_info("SPACE FLASH");
-		flash_opt = TRUE;
 		base = (uint8_t *)head->addr;
 		break;
 
@@ -577,81 +521,34 @@ static err_type xfer_read(struct cmder_protocol *proto, void *buf, int len)
 		break;
 	}
     
-    return ret;
+    if (ret != et_ok) {
+        code = ret;
+    } else {
+        code = 0;
+    }
 
-	switch (head->cmd) {
+	xfer_pack_header(rsp, head, code);
+	
+    if (rsp->length) {
+        awoke_hexdump_trace(rsp->p, rsp->length);
+        uartcmder_senddata(proto->tid, (uint8_t *)rsp->p, rsp->length);
+        awoke_buffchunk_clear(rsp);
+    }
 
-	case XFER_CMD_RD:
-		lib_debug("CMD RD");
-		if (sensor_opt) {
-			xfer_pack_sensordata(proto, base, head->len);
-		} else if (flash_opt) {
-			xfer_pack_flashdata(proto, base, head->len);
-		}
-		break;
-
-	case XFER_CMD_WR:
-		lib_debug("CMD WR");
-		if (!flash_opt && !sensor_opt) {
-			if (head->space == XFER_SPACE_FPGA) {
-				for (int i=0; i<head->len; i+=4) {
-					//*(unsigned int*)(base+i)=*(unsigned int*)(data+i);
-				}
-			} else {
-				//memcpy((uint32_t *)base, data, head->len);
-			}
-		} else if (flash_opt) {
-			lib_notice("base:0x%x len:%d", base, head->len);
-			for (int i=0; i<head->len; i++) {
-                sg_flashbuff[(uint32_t)base+i] = data[i];
-            }
-		} else if (sensor_opt) {
-			for(int i=0; i<head->len; i++) {				 
-				//imgsensor_write_reg(ctx->isensor, (uint8_t *)(base++), &data[i]);
-			}
-		}
-		break;
-
-	case XFER_CMD_CL:
-		lib_debug("CMD CL");
-		if (!flash_opt && !sensor_opt) {
-			//memset((uint32_t *)base, 0x0, head->len);
-		} else if (flash_opt) {
-			if (head->len == XFER_FLASH_OUTRANGE) {
-				flash_erase_size = XFER_FLASH_OUTRANGE_SIZE;
-			} else {
-				flash_erase_size = head->len;
-			}
-			//nvm_size_erase(base, flash_erase_size);
-		}
-		break;
-
-	default:
-		lib_err("unknown cmd:%d", head->cmd);
-		break;
+	if (realloc) {
+		lib_notice("rsp free");
+		awoke_buffchunk_free(&rsp);
 	}
 
-    xfer_pack_tail_send(proto, code, head);
-
-	//xfer_send_tail(proto, code);
-
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 	return et_ok;
 }
 
 struct cmder_protocol xfer_protocol = {
-<<<<<<< HEAD
-	.name = "xfer",
-	.read  = xfer_read,
-	.scan  = xfer_scan,
-	.match = xfer_match,
-=======
 	.name = "Xfer",
 	.read = xfer_read,
 	.scan = xfer_scan,
 	.match = xfer_match,
 	.max_report = 10,
 	.tid = 0,
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 };
 

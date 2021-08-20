@@ -5,7 +5,6 @@
 
 #include "awoke_type.h"
 #include "awoke_error.h"
-<<<<<<< HEAD
 
 
 #define XFER_MARK		0x55
@@ -23,7 +22,6 @@ struct xferinfo {
 	uint32_t address;
 };
 
-=======
 #include "awoke_buffer.h"
 #include "cmder_protocol.h"
 #include "cmder.h"
@@ -103,7 +101,14 @@ typedef enum {
     XFER_ADDR_GAMMA =           0x00034000,
     XFER_ADDR_IFFR =            0x00035000,
     XFER_ADDR_BINING =          0x00036000,
+
+	XFER_ADDR_LQIT    =         0x02000000,
+	XFER_ADDR_LQST    =         0x02000020,
 } xfer_mcu_address_e;
+
+struct xfer_private {
+	awoke_buffchunk *response;
+};
 
 struct xfer_head {
 	uint8_t mark;
@@ -126,16 +131,11 @@ struct xfer_tail {
 	uint8_t code;
 	uint8_t mark;   //0xff
 };
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
 
 
 extern struct cmder_protocol xfer_protocol;
 
-<<<<<<< HEAD
 
 
-#endif /* __PROTO_XFER_H__ */
-=======
 #endif /* __XFER_H__ */
 
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2

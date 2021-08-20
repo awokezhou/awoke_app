@@ -5,7 +5,6 @@
 typedef enum 
 {
     et_ok = 0,
-<<<<<<< HEAD
 
 	/* 1~10: special return value, means non-error */
 	et_finish,					/* for waiting areas */
@@ -14,6 +13,7 @@ typedef enum
 	et_noneed,					/* don't need to do something */
 	et_reboot,					/* system reboot */
 	et_killed,					/* object be killed */
+	et_oneed,
 
 	/* 11~30: general error */
 	err_common = 10,			/* general error */
@@ -34,68 +34,8 @@ typedef enum
 	err_open,
 	err_send,
 	err_unfinished,
-
-=======
-    et_unfinished,
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
-	et_noeed,
-    et_fail,
-    et_param,
-    et_nomem,
-    et_mem_limit,
-    et_exist,
-    et_full,
-    et_empty,
-    et_notfind,
-    et_encode,
-    et_decode,
-    et_sock_set,
-    et_sock_creat,
-    et_sock_bind,
-    et_sock_conn,
-    et_sock_accept,
-    et_sock_listen,
-    et_sock_send,
-    et_sock_recv,
-    et_evl_create,
-    et_parser,
-    et_response,
-    et_file_open,
-    et_file_read,
-    et_file_send,
-    et_file_mmap,
-    et_sendmore,
-    et_flow_pull,
-    et_sem_create,
-    et_sem_init,
-    et_worker_mutex,
-    et_worker_condition,
-    et_aes_enc,
-
-	et_pipe,
-
-	et_locked,
-	et_lock_init,
-	et_lock_timeout,
-
-	et_waitev_create,
-	et_waitev_finish,
-
-<<<<<<< HEAD
-=======
-	err_param,
-	err_exist,
-	err_oom,
-	err_notfind,
-	err_open,
-	err_fail,
-	err_empty,
-	err_send,
-	err_match,
-	err_unfinished,
-	err_checksum,
 	err_incomplete,
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
+	err_sock_creat,
 } err_type;
 
 

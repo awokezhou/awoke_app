@@ -152,6 +152,8 @@ struct cmder_config {
 	struct cmder_2dpoint crossview_point;
 
 	uint32_t iffparam;
+
+	uint32_t LQ_single_test;
 	
 	uint8_t checksum;
 }PACKED_ALIGN_BYTE;
@@ -202,6 +204,7 @@ struct uartcmder {
 
     struct roi_struct roi0;
 
+	awoke_buffchunk *lq_stream;
 	awoke_buffchunk_pool *bpool_filechunk;
 };
 
