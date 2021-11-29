@@ -5,7 +5,7 @@ LIBS = -lpthread -lutil -lsecurity -levent -lrtmsg -lpattern -lvinparser -lhttp
 SRC_FILES = $(wildcard *.c)
 OBJ_FILES = $(patsubst %.c, obj/%.o, $(SRC_FILES))
 
-SUB_DIRS := nvm sync qe
+SUB_DIRS := nvm sync qe struct debug
 
 INCLUDE_FILES = include
 
@@ -25,6 +25,8 @@ INCLUDE_PATHS := -I$(LIB_PATH)/libutil/include \
 				 -I$(CURR_DIR)/nvm \
 				 -I$(CURR_DIR)/sync \
 				 -I$(CURR_DIR)/qe \
+				 -I$(CURR_DIR)/struct \
+				 -I$(CURR_DIR)/debug \
 				 -I$(CURR_DIR)/include
 
 all: prepare compile build

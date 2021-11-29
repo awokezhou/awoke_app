@@ -35,11 +35,11 @@
 #include "bk_nvm.h"
 #include "bk_epc.h"
 #include "md5.h"
-<<<<<<< HEAD
 #include "bk_quickemb.h"
-=======
 #include "bk_strucp.h"
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
+#include "ring_queue.h"
+#include "memtrace.h"
+
 
 
 static void usage(int ex)
@@ -91,7 +91,7 @@ static err_type wait_test1_fn(struct _awoke_wait_ev *ev)
 
 	if (p->count >= 5) {
 		log_debug("count > 5, finish");
-		return et_waitev_finish;
+		return et_finish;
 	}
 
 	return et_ok;
@@ -106,7 +106,7 @@ err_type awoke_wait_test(int argc, char *argv[])
 		WAIT_EV_F_SLEEP, wait_test1_fn, NULL, (void *)&t);
 	if (!ev) {
 		log_err("ev create error");
-		return et_waitev_create;
+		return et_ok;
 	}
 
 	return awoke_waitev(ev);
@@ -178,13 +178,13 @@ static err_type benchmark_event_channel_test(int argc, char *argv[])
 	t->evl = awoke_event_loop_create(8);
 	if (!t->evl) {
 		log_err("event loop create error");
-		return et_evl_create;
+		return err_fail;
 	}
 
 	ret = awoke_event_pipech_create(t->evl, &t->pipe_channel);
 	if (ret != et_ok) {
 		log_err("event channel create error, ret %d", ret);
-		return et_evl_create;
+		return err_fail;
 	}
 	log_debug("main event channel create ok");
 
@@ -489,7 +489,7 @@ static err_type benchmark_queue_zero_filter_test(int argc, char *argv[])
 	awoke_queue *q = awoke_queue_create(sizeof(uint32_t), 10, 0x0);
 	if (!q) {
 		log_err("queue create error");
-		return et_nomem;
+		return err_oom;
 	}
 
 	for (i=0; i<8; i++) {
@@ -722,7 +722,6 @@ static err_type benchmark_sscanf_test(int argc, char *argv[])
 	awoke_hexdump_trace(buffer, 32);
 	
 	awoke_buffchunk_free(&buffer);
-	/*
 	pkg_push_stris(string1, pos, strlen(string1));
 	log_debug("buffer:%s", buffer);
 	awoke_hexdump_trace(buffer, 32);
@@ -782,7 +781,7 @@ static err_type benchmark_buffchunk_test(int argc, char *argv[])
 	pool = awoke_buffchunk_pool_create(8092);
 	if (!pool) {
 		log_err("bcpool create error");
-		return et_nomem;
+		return err_oom;
 	}
 
 	awoke_buffchunk *chunk1 = awoke_buffchunk_create(32);
@@ -1325,14 +1324,18 @@ static err_type benchmark_socket_poll_test(int argc, char *argv[])
 
 	int ret = poll(fds, 2, 1000);
 	log_debug("ret:%d", ret);
-	log_debug("fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
-	log_debug("fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
+	log_debug(
+"fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
+	log_debug(
+"fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
 
 	fds[0].events |= POLLOUT;
 
 	ret = poll(fds, 2, 1000);
-	log_debug("fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
-	log_debug("fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
+	log_debug(
+"fd[0]:%d %d %d", fds[0].fd, fds[0].events, fds[0].revents);
+	log_debug(
+"fd[1]:%d %d %d", fds[1].fd, fds[1].events, fds[1].revents);
 	*/
 
 	fd_set readfds, writefds, errfds;
@@ -2095,7 +2098,7 @@ static err_type benchmark_cameraconfig_test(int argc, char *argv[])
 	fd = open("CameraConfig.bin", O_RDONLY);
 	if (fd < 0) {
 		bk_err("open file CameraConfig.bin error");
-		return et_file_open;
+		return err_open;
 	}
 
 	rc = read(fd, buffer, 1024);
@@ -2124,7 +2127,7 @@ static err_type benchmark_sensorconfig_test(int argc, char *argv[])
 	fd = open("SensorConfig.bin", O_RDONLY);
 	if (fd < 0) {
 		bk_err("open file SensorConfig.bin error");
-		return et_file_open;
+		return err_open;
 	}
 
 	rc = read(fd, buffer, 1024);
@@ -2238,20 +2241,76 @@ int *func(int *x)
 	return x;
 }
 
-<<<<<<< HEAD
-static err_type benchmark_ptrfunc_test(int argc, char *argv[])
-=======
-static err_type benchmark_memmove_test(int argc, char *argv[])
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
+unsigned int BKDRHash(const char *str)
 {
-	int *p, x;
-	struct ptrfunc_test struc;
+	unsigned int seed = 131;
+	unsigned int hash = 0;
 
-	struc.func = func;
+	while (*str)
+		hash = hash * seed + (*str++);
 
-	x = 100;
-	p = struc.func(&x);
-	bk_debug("&x:0x%x p:0x%x *p:%d", &x, p, *p);
+	return hash & 0x7FFFFFFF;
+}
+
+err_type benchmark_bkdrhash_test(int argc, char *argv[])
+{
+	int i;
+	
+	struct bkdrhash_test {
+		char *str;
+		unsigned int key;
+	};
+
+	struct bkdrhash_test hashs[8] = {
+		{"TaskACount", 0},
+		{"TaskBCount", 0},
+		{"AEControl", 0},
+		{"Temperate", 0},
+		{"XferReadCount", 0},
+		{"XferWriteCount", 0},
+		{"IICReadCount", 0},
+		{"IICWriteCount", 0},
+		{"IICWriteCount", 0},
+	};
+
+	for (i=0; i<8; i++) {
+		hashs[i].key = BKDRHash(hashs[i].str)%128;
+		bk_debug("%s %d", hashs[i].str, hashs[i].key);
+	}
+	
+	return et_ok;
+}
+
+err_type benchmark_ringbuffer(int argc, char *argv[])
+{
+	int fd;
+	char buffer[512];
+	struct awoke_ringbuffer rb;
+
+	char *strings[] = {
+		"A12345\r\n",
+		"B123456789\r\n",
+		"C123456789123456789\r\n",
+		"D1234567891234567891234567891234567891234567891234567891234567891234\r\n",
+		"E12345678912345678912345678912345678912345\r\n",
+		"F123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123\r\n",
+	};
+
+	memset(buffer, 0x0, 512);
+	awoke_ringbuffer_init(&rb, buffer, 512);
+
+	for (int j=0; j<200; j++) {
+		for (int i=0; i<array_size(strings); i++) {
+			awoke_ringbuffer_write(&rb, strings[i], strlen(strings[i]));
+		}
+	}
+
+	awoke_hexdump_debug(buffer, 512);
+
+	fd = open("RingBuffer", O_WRONLY|O_CREAT, 0777);
+	write(fd, buffer, 512);
+	close(fd);
+
 	return et_ok;
 }
 
@@ -2309,13 +2368,13 @@ int main(int argc, char *argv[])
 		{"cameraconfig-test",   no_argument,        NULL,   arg_cameraconfig_test},
 		{"sensorconfig-test",   no_argument,        NULL,   arg_sensorconfig_test},
 		{"memmove-test",   		no_argument,        NULL,   arg_memmove_test},
-<<<<<<< HEAD
 		{"attribute-test",		no_argument,		NULL,	arg_attribute_test},
 		{"quickemb-test",		no_argument,		NULL,   arg_quickemb_test},
-		{"ptrfunc-test",		no_argument,		NULL,	arg_ptrfunc_test},
-=======
 		{"strucp-test",         no_argument,        NULL,   arg_strucp_test},
->>>>>>> 9f093788c86a002f47df2a51c71270239926b9d2
+		{"bkdrhash-test",       no_argument,        NULL,   arg_bkdrhash_test},
+		{"ringq-test",			no_argument, 		NULL,	arg_ringq_test},
+		{"ringbuffer",			no_argument,		NULL,	arg_ringbuffer},
+		{"memtrace",			no_argument,		NULL,	arg_memtrace_test},
 		{NULL, 0, NULL, 0}
     };	
 
@@ -2516,13 +2575,25 @@ int main(int argc, char *argv[])
 				bmfn = benchmark_quickemb_test;
 				break;
 
-			case arg_ptrfunc_test:
-				bmfn = benchmark_ptrfunc_test;
-				break;
-
             case arg_strucp_test:
                 bmfn = benchmark_strucp_test;
                 break;
+
+			case arg_bkdrhash_test:
+				bmfn = benchmark_bkdrhash_test;
+				break;
+
+			case arg_ringq_test:
+				bmfn = benchmark_ringq_test;
+				break;
+
+			case arg_ringbuffer:
+				bmfn = benchmark_ringbuffer;
+				break;
+
+			case arg_memtrace_test:
+				bmfn = benchmark_memtrace_test;
+				goto run;
 
             case '?':
             case 'h':
